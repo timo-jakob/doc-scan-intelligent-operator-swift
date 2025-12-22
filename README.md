@@ -11,7 +11,12 @@ This is the Swift version of [doc-scan-intelligent-operator](https://github.com/
 
 ## Features
 
+- **Dual Verification System**: Runs both VLM and OCR in parallel for maximum accuracy
+  - Automatic processing when both methods agree
+  - Interactive conflict resolution when results differ
+  - Combines AI intelligence with traditional OCR reliability
 - **AI-Powered Invoice Detection**: Uses Vision-Language Models to identify invoices
+- **Native OCR Integration**: Apple Vision framework for text recognition
 - **Smart Data Extraction**: Automatically extracts invoice date and company name
 - **Intelligent Renaming**: Generates standardized filenames (e.g., `2024-12-15_Rechnung_Acme-Corp.pdf`)
 - **Apple Silicon Optimized**: Leverages MLX for high-performance inference on M1/M2/M3 Macs
@@ -105,14 +110,76 @@ filenamePattern: "{date}_Rechnung_{company}.pdf"
 verbose: false
 ```
 
-## How It Works
+## How It Works - Dual Verification
+
+DocScan uses a unique **dual verification** approach that combines AI and traditional OCR:
 
 1. **PDF Validation**: Checks if the file is a valid PDF
 2. **Image Conversion**: Converts the first page to an image using PDFKit
-3. **Invoice Detection**: VLM analyzes the image to detect if it's an invoice
-4. **Data Extraction**: Extracts invoice date and company name using VLM
-5. **Filename Generation**: Creates a standardized filename based on the pattern
-6. **Safe Renaming**: Renames the file with collision detection
+3. **Parallel Processing**: Runs both methods simultaneously
+   - **VLM Path**: Vision-Language Model analyzes the image
+   - **OCR Path**: Apple Vision framework extracts text and patterns
+4. **Result Comparison**: Compares outputs from both methods
+   - ✅ **Agreement**: If both agree, proceeds automatically
+   - ⚠️ **Conflict**: If they differ, displays both results and asks user to choose
+5. **Data Validation**: Ensures date and company name are extracted
+6. **Filename Generation**: Creates a standardized filename based on the pattern
+7. **Safe Renaming**: Renames the file with collision detection
+
+### Example Output (Agreement)
+
+```
+Running dual verification (VLM + OCR in parallel)...
+
+╔══════════════════════════════════════════════════╗
+║         Dual Verification Results              ║
+╠══════════════════════════════════════════════════╣
+║ VLM Results:                                    ║
+║   Is Invoice: ✅ Yes                             ║
+║   Date: 2024-12-15                              ║
+║   Company: Acme Corporation                     ║
+║                                                 ║
+║ OCR Results:                                    ║
+║   Is Invoice: ✅ Yes                             ║
+║   Date: 2024-12-15                              ║
+║   Company: Acme Corporation                     ║
+╚══════════════════════════════════════════════════╝
+
+✅ VLM and OCR agree - proceeding automatically
+```
+
+### Example Output (Conflict)
+
+```
+╔══════════════════════════════════════════════════╗
+║         Dual Verification Results              ║
+╠══════════════════════════════════════════════════╣
+║ VLM Results:                                    ║
+║   Date: 2024-12-15                              ║
+║   Company: Acme Corp                            ║
+║ OCR Results:                                    ║
+║   Date: 2024-12-16                              ║
+║   Company: Acme Corporation GmbH                ║
+╚══════════════════════════════════════════════════╝
+
+⚠️  CONFLICTS DETECTED:
+   - Date
+   - Company name
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  CONFLICT RESOLUTION REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Conflict: Invoice Date
+  [1] VLM says: 2024-12-15
+  [2] OCR says: 2024-12-16
+Enter your choice: 2
+
+Conflict: Company Name
+  [1] VLM says: Acme Corp
+  [2] OCR says: Acme Corporation GmbH
+Enter your choice: 2
+```
 
 ## Architecture
 

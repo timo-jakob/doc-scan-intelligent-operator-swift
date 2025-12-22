@@ -1,31 +1,95 @@
 import Foundation
 import AppKit
 
-/// Result of invoice detection and data extraction
+/// Result of invoice detection and data extraction from a single method
+public struct ExtractionResult: Sendable {
+    public let isInvoice: Bool
+    public let date: Date?
+    public let company: String?
+    public let method: String // "VLM" or "OCR"
+
+    public init(isInvoice: Bool, date: Date?, company: String?, method: String) {
+        self.isInvoice = isInvoice
+        self.date = date
+        self.company = company
+        self.method = method
+    }
+}
+
+/// Comparison result showing agreement or conflict between VLM and OCR
+public struct VerificationResult {
+    public let vmlResult: ExtractionResult
+    public let ocrResult: ExtractionResult
+    public let hasConflict: Bool
+    public let conflicts: [String]
+
+    public init(vmlResult: ExtractionResult, ocrResult: ExtractionResult) {
+        self.vmlResult = vmlResult
+        self.ocrResult = ocrResult
+
+        var conflicts: [String] = []
+
+        // Check for conflicts
+        if vmlResult.isInvoice != ocrResult.isInvoice {
+            conflicts.append("Invoice detection")
+        }
+
+        if vmlResult.date != ocrResult.date {
+            conflicts.append("Date")
+        }
+
+        if vmlResult.company != ocrResult.company {
+            conflicts.append("Company name")
+        }
+
+        self.conflicts = conflicts
+        self.hasConflict = !conflicts.isEmpty
+    }
+
+    /// Get agreed-upon result if no conflicts, otherwise nil
+    public var agreedResult: ExtractionResult? {
+        guard !hasConflict else { return nil }
+        return vmlResult
+    }
+}
+
+/// Result of invoice detection and data extraction (final)
 public struct InvoiceData {
     public let isInvoice: Bool
     public let date: Date?
     public let company: String?
+    public let verificationResult: VerificationResult?
 
-    public init(isInvoice: Bool, date: Date? = nil, company: String? = nil) {
+    public init(isInvoice: Bool, date: Date?, company: String?, verificationResult: VerificationResult? = nil) {
         self.isInvoice = isInvoice
         self.date = date
         self.company = company
+        self.verificationResult = verificationResult
+    }
+
+    /// Create from extraction result
+    public init(from result: ExtractionResult, verificationResult: VerificationResult? = nil) {
+        self.isInvoice = result.isInvoice
+        self.date = result.date
+        self.company = result.company
+        self.verificationResult = verificationResult
     }
 }
 
-/// Detects invoices and extracts key information using Vision-Language Models
+/// Detects invoices and extracts key information using dual verification (VLM + OCR)
 public class InvoiceDetector {
     private let modelManager: ModelManager
+    private let ocrEngine: OCREngine
     private let config: Configuration
 
     public init(config: Configuration) {
         self.config = config
         self.modelManager = ModelManager(config: config)
+        self.ocrEngine = OCREngine(config: config)
     }
 
-    /// Analyze a PDF and extract invoice information
-    public func analyze(pdfPath: String) async throws -> InvoiceData {
+    /// Analyze a PDF with dual verification (VLM + OCR in parallel)
+    public func analyze(pdfPath: String) async throws -> VerificationResult {
         // Validate PDF
         try PDFUtils.validatePDF(at: pdfPath)
 
@@ -35,27 +99,80 @@ public class InvoiceDetector {
         }
         let image = try PDFUtils.pdfToImage(at: pdfPath, dpi: config.pdfDPI)
 
-        // Detect if document is an invoice
+        // Run both VLM and OCR in parallel
         if config.verbose {
-            print("Detecting invoice...")
+            print("Running dual verification (VLM + OCR in parallel)...")
         }
-        let isInvoice = try await detectInvoice(image: image)
+
+        // Use Task directly to avoid sendability issues
+        let vmlTask = Task {
+            try await self.extractWithVLM(image: image)
+        }
+
+        let ocrTask = Task {
+            try await self.extractWithOCR(image: image)
+        }
+
+        let vml = try await vmlTask.value
+        let ocr = try await ocrTask.value
+
+        // Compare results
+        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
+
+        if config.verbose {
+            if verification.hasConflict {
+                print("⚠️  Conflict detected in: \(verification.conflicts.joined(separator: ", "))")
+            } else {
+                print("✅ VLM and OCR agree on all fields")
+            }
+        }
+
+        return verification
+    }
+
+    /// Extract data using VLM
+    private func extractWithVLM(image: NSImage) async throws -> ExtractionResult {
+        if config.verbose {
+            print("VLM: Starting analysis...")
+        }
+
+        // Detect if document is an invoice
+        let isInvoice = try await detectInvoiceVLM(image: image)
 
         guard isInvoice else {
-            return InvoiceData(isInvoice: false)
+            if config.verbose {
+                print("VLM: Not an invoice")
+            }
+            return ExtractionResult(isInvoice: false, date: nil, company: nil, method: "VLM")
         }
 
         // Extract invoice date and company
-        if config.verbose {
-            print("Extracting invoice data...")
-        }
-        let (date, company) = try await extractInvoiceData(image: image)
+        let (date, company) = try await extractInvoiceDataVLM(image: image)
 
-        return InvoiceData(isInvoice: true, date: date, company: company)
+        if config.verbose {
+            print("VLM Results:")
+            print("  Is Invoice: \(isInvoice)")
+            print("  Date: \(date?.description ?? "nil")")
+            print("  Company: \(company ?? "nil")")
+        }
+
+        return ExtractionResult(isInvoice: isInvoice, date: date, company: company, method: "VLM")
     }
 
-    /// Detect if an image contains an invoice
-    private func detectInvoice(image: NSImage) async throws -> Bool {
+    /// Extract data using OCR
+    private func extractWithOCR(image: NSImage) async throws -> ExtractionResult {
+        if config.verbose {
+            print("OCR: Starting analysis...")
+        }
+
+        let text = try await ocrEngine.extractText(from: image)
+        let (isInvoice, date, company) = ocrEngine.extractInvoiceData(from: text)
+
+        return ExtractionResult(isInvoice: isInvoice, date: date, company: company, method: "OCR")
+    }
+
+    /// Detect if an image contains an invoice using VLM
+    private func detectInvoiceVLM(image: NSImage) async throws -> Bool {
         let prompt = """
         Is this document an invoice (Rechnung)?
         Answer with only 'yes' or 'no'.
@@ -70,8 +187,8 @@ public class InvoiceDetector {
         return normalized.contains("yes") || normalized.contains("ja")
     }
 
-    /// Extract invoice date and company name
-    private func extractInvoiceData(image: NSImage) async throws -> (Date?, String?) {
+    /// Extract invoice date and company using VLM
+    private func extractInvoiceDataVLM(image: NSImage) async throws -> (Date?, String?) {
         let prompt = """
         Extract the following information from this invoice:
         1. Invoice date (Rechnungsdatum): Provide in format YYYY-MM-DD
@@ -114,11 +231,6 @@ public class InvoiceDetector {
                     company = sanitizeCompanyName(companyName)
                 }
             }
-        }
-
-        if config.verbose {
-            print("Extracted date: \(date?.description ?? "nil")")
-            print("Extracted company: \(company ?? "nil")")
         }
 
         return (date, company)

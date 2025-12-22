@@ -134,48 +134,76 @@ The project follows a modular Swift architecture:
    - Validates disk space before downloading
    - **NOTE**: VLM inference is currently a placeholder and needs full MLX integration
 
-4. **Invoice Detector (`InvoiceDetector.swift`)** - VLM-based analysis
-   - Detects if document is an invoice
-   - Extracts invoice date (Rechnungsdatum)
-   - Extracts invoicing party (company name)
-   - Generates standardized filenames
+4. **OCR Engine (`OCREngine.swift`)** - Native text recognition using Apple Vision
+   - Extracts text from images using Vision framework
+   - Detects invoice indicators in multiple languages (DE, EN, FR, ES)
+   - Extracts dates using regex patterns (ISO, European, US formats)
+   - Extracts company names using keyword matching and heuristics
+   - Provides complete invoice data extraction pipeline
+
+5. **Invoice Detector (`InvoiceDetector.swift`)** - Dual verification system
+   - **Runs VLM and OCR in parallel** using Swift concurrency (Task-based)
+   - Compares results from both methods automatically
+   - Detects conflicts in: invoice detection, date, company name
+   - Returns `VerificationResult` with both method outputs
+   - Generates standardized filenames from agreed/chosen data
    - Supports multiple date formats
 
-5. **File Renamer (`FileRenamer.swift`)** - Safe file operations
+6. **File Renamer (`FileRenamer.swift`)** - Safe file operations
    - Renames files with extracted data
    - Handles filename collisions (adds _1, _2, etc.)
    - Supports dry-run mode
    - In-place or directory-based renaming
 
-6. **Errors (`Errors.swift`)** - Error handling
+7. **Errors (`Errors.swift`)** - Error handling
    - Custom `DocScanError` enum
    - Localized error descriptions
    - Comprehensive error types for all failure modes
 
-7. **CLI (`main.swift`)** - Command-line interface
+8. **CLI (`main.swift`)** - Command-line interface
    - Built with swift-argument-parser
    - Async/await support
-   - Clear user feedback
-   - Progress indicators
+   - Displays dual verification results in formatted table
+   - Interactive conflict resolution when VLM and OCR disagree
+   - Clear user feedback with progress indicators
 
 ### Data Flow
 
 ```
-PDF File → PDF Validation → PDF to Image → VLM Analysis →
-Invoice Detection → Data Extraction → Filename Generation →
-Safe File Renaming
+PDF File → PDF Validation → PDF to Image → Dual Verification
+                                              ├─> VLM Analysis
+                                              └─> OCR Analysis
+                                                     ↓
+                                            Result Comparison
+                                            ├─> Agreement → Auto-proceed
+                                            └─> Conflict → User chooses
+                                                     ↓
+                                           Filename Generation →
+                                           Safe File Renaming
 ```
 
-### Invoice Processing Workflow
+### Invoice Processing Workflow (Dual Verification)
 
 1. **Validation**: Check if file is valid PDF using PDFKit
 2. **Conversion**: Convert first page to NSImage (configurable DPI)
-3. **Detection**: VLM determines if document is invoice
-4. **Extraction**: If invoice, extract:
-   - Invoice date (multiple format support)
-   - Invoicing party (sanitized for filenames)
-5. **Filename Generation**: Create `{date}_Rechnung_{company}.pdf`
-6. **Renaming**: Safely rename with collision handling
+3. **Parallel Dual Verification**: Run both methods concurrently using Swift Tasks
+   - **VLM Path**:
+     - Detect if document is invoice via LLM prompt
+     - Extract date and company via structured LLM prompts
+   - **OCR Path**:
+     - Extract all text using Vision framework
+     - Detect invoice keywords (Rechnung, Invoice, Facture, etc.)
+     - Parse dates using regex patterns
+     - Extract company using heuristics and keywords
+4. **Comparison**: Automatic comparison of both results
+   - Check: Invoice detection match?
+   - Check: Date match?
+   - Check: Company name match?
+5. **Resolution**:
+   - **If agree**: Proceed automatically
+   - **If conflict**: Display both results, user chooses
+6. **Filename Generation**: Create `{date}_Rechnung_{company}.pdf`
+7. **Renaming**: Safely rename with collision handling
 
 ### Configuration
 
