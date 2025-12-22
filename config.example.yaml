@@ -1,0 +1,35 @@
+# Example configuration for DocScan
+# Copy this file to config.yaml and customize as needed
+
+# Model configuration
+# Specify the MLX-compatible Vision-Language Model to use
+modelName: mlx-community/Qwen2-VL-2B-Instruct-4bit
+
+# Directory to cache downloaded models
+# Default: ~/.cache/docscan/models
+modelCacheDir: ~/.cache/docscan/models
+
+# Generation parameters
+# Maximum number of tokens to generate in model responses
+maxTokens: 256
+
+# Temperature for text generation (0.0 = deterministic, 1.0 = creative)
+# Lower values recommended for invoice processing
+temperature: 0.1
+
+# PDF processing
+# DPI for PDF to image conversion (higher = better quality, more memory)
+pdfDPI: 150
+
+# Output configuration
+# Date format for invoice filename (Swift DateFormatter format)
+# Examples: yyyy-MM-dd, dd.MM.yyyy, MM/dd/yyyy
+dateFormat: yyyy-MM-dd
+
+# Filename pattern for renamed invoices
+# Available placeholders: {date}, {company}
+filenamePattern: "{date}_Rechnung_{company}.pdf"
+
+# Logging
+# Enable verbose output for debugging
+verbose: false
