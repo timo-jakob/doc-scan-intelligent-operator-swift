@@ -2,146 +2,146 @@ import XCTest
 @testable import DocScanCore
 
 final class VerificationTests: XCTestCase {
-    func testExtractionResultInitialization() {
-        let result = ExtractionResult(
+    // MARK: - CategorizationResult Tests
+
+    func testCategorizationResultInitialization() {
+        let result = CategorizationResult(
             isInvoice: true,
-            date: Date(),
-            company: "Test Corp",
-            method: "VLM"
+            confidence: "high",
+            method: "VLM",
+            reason: "Contains invoice keywords"
         )
 
         XCTAssertTrue(result.isInvoice)
-        XCTAssertNotNil(result.date)
-        XCTAssertEqual(result.company, "Test Corp")
+        XCTAssertEqual(result.confidence, "high")
         XCTAssertEqual(result.method, "VLM")
+        XCTAssertEqual(result.reason, "Contains invoice keywords")
     }
 
-    func testVerificationResultNoConflict() {
-        let date = Date()
-        let vml = ExtractionResult(
-            isInvoice: true,
-            date: date,
-            company: "Acme Corp",
-            method: "VLM"
-        )
-        let ocr = ExtractionResult(
-            isInvoice: true,
-            date: date,
-            company: "Acme Corp",
-            method: "OCR"
-        )
-
-        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
-
-        XCTAssertFalse(verification.hasConflict)
-        XCTAssertTrue(verification.conflicts.isEmpty)
-        XCTAssertNotNil(verification.agreedResult)
-    }
-
-    func testVerificationResultInvoiceConflict() {
-        let vml = ExtractionResult(
-            isInvoice: true,
-            date: Date(),
-            company: "Acme Corp",
-            method: "VLM"
-        )
-        let ocr = ExtractionResult(
+    func testCategorizationResultDefaultConfidence() {
+        let result = CategorizationResult(
             isInvoice: false,
-            date: Date(),
-            company: "Acme Corp",
             method: "OCR"
         )
 
-        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
-
-        XCTAssertTrue(verification.hasConflict)
-        XCTAssertTrue(verification.conflicts.contains("Invoice detection"))
-        XCTAssertNil(verification.agreedResult)
+        XCTAssertFalse(result.isInvoice)
+        XCTAssertEqual(result.confidence, "high") // default value
+        XCTAssertEqual(result.method, "OCR")
+        XCTAssertNil(result.reason)
     }
 
-    func testVerificationResultDateConflict() {
-        let date1 = Date()
-        let date2 = Date().addingTimeInterval(86400) // +1 day
+    // MARK: - CategorizationVerification Tests
 
-        let vml = ExtractionResult(
-            isInvoice: true,
-            date: date1,
-            company: "Acme Corp",
-            method: "VLM"
-        )
-        let ocr = ExtractionResult(
-            isInvoice: true,
-            date: date2,
-            company: "Acme Corp",
-            method: "OCR"
-        )
+    func testCategorizationVerificationBothAgreeInvoice() {
+        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
+        let ocr = CategorizationResult(isInvoice: true, method: "OCR")
 
-        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
+        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
-        XCTAssertTrue(verification.hasConflict)
-        XCTAssertTrue(verification.conflicts.contains("Date"))
-        XCTAssertNil(verification.agreedResult)
+        XCTAssertTrue(verification.bothAgree)
+        XCTAssertEqual(verification.agreedIsInvoice, true)
     }
 
-    func testVerificationResultCompanyConflict() {
+    func testCategorizationVerificationBothAgreeNotInvoice() {
+        let vlm = CategorizationResult(isInvoice: false, method: "VLM")
+        let ocr = CategorizationResult(isInvoice: false, method: "OCR")
+
+        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
+
+        XCTAssertTrue(verification.bothAgree)
+        XCTAssertEqual(verification.agreedIsInvoice, false)
+    }
+
+    func testCategorizationVerificationConflict() {
+        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
+        let ocr = CategorizationResult(isInvoice: false, method: "OCR")
+
+        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
+
+        XCTAssertFalse(verification.bothAgree)
+        XCTAssertNil(verification.agreedIsInvoice)
+    }
+
+    func testCategorizationVerificationConflictReverse() {
+        let vlm = CategorizationResult(isInvoice: false, method: "VLM")
+        let ocr = CategorizationResult(isInvoice: true, method: "OCR")
+
+        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
+
+        XCTAssertFalse(verification.bothAgree)
+        XCTAssertNil(verification.agreedIsInvoice)
+    }
+
+    // MARK: - ExtractionResult Tests
+
+    func testExtractionResultInitialization() {
         let date = Date()
-        let vml = ExtractionResult(
+        let result = ExtractionResult(date: date, company: "Test Corp")
+
+        XCTAssertEqual(result.date, date)
+        XCTAssertEqual(result.company, "Test Corp")
+    }
+
+    func testExtractionResultNilValues() {
+        let result = ExtractionResult(date: nil, company: nil)
+
+        XCTAssertNil(result.date)
+        XCTAssertNil(result.company)
+    }
+
+    func testExtractionResultPartialValues() {
+        let date = Date()
+        let result = ExtractionResult(date: date, company: nil)
+
+        XCTAssertEqual(result.date, date)
+        XCTAssertNil(result.company)
+    }
+
+    // MARK: - InvoiceData Tests
+
+    func testInvoiceDataInitialization() {
+        let date = Date()
+        let invoiceData = InvoiceData(
             isInvoice: true,
             date: date,
-            company: "Acme Corp",
-            method: "VLM"
-        )
-        let ocr = ExtractionResult(
-            isInvoice: true,
-            date: date,
-            company: "Different Corp",
-            method: "OCR"
+            company: "Acme Corp"
         )
 
-        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
-
-        XCTAssertTrue(verification.hasConflict)
-        XCTAssertTrue(verification.conflicts.contains("Company name"))
-        XCTAssertNil(verification.agreedResult)
+        XCTAssertTrue(invoiceData.isInvoice)
+        XCTAssertEqual(invoiceData.date, date)
+        XCTAssertEqual(invoiceData.company, "Acme Corp")
+        XCTAssertNil(invoiceData.categorization)
     }
 
-    func testVerificationResultMultipleConflicts() {
-        let vml = ExtractionResult(
-            isInvoice: true,
-            date: Date(),
-            company: "Acme Corp",
-            method: "VLM"
-        )
-        let ocr = ExtractionResult(
-            isInvoice: false,
-            date: Date().addingTimeInterval(86400),
-            company: "Different Corp",
-            method: "OCR"
-        )
-
-        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
-
-        XCTAssertTrue(verification.hasConflict)
-        XCTAssertEqual(verification.conflicts.count, 3)
-        XCTAssertTrue(verification.conflicts.contains("Invoice detection"))
-        XCTAssertTrue(verification.conflicts.contains("Date"))
-        XCTAssertTrue(verification.conflicts.contains("Company name"))
-        XCTAssertNil(verification.agreedResult)
-    }
-
-    func testInvoiceDataFromExtractionResult() {
+    func testInvoiceDataWithCategorization() {
         let date = Date()
-        let result = ExtractionResult(
+        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
+        let ocr = CategorizationResult(isInvoice: true, method: "OCR")
+        let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
+
+        let invoiceData = InvoiceData(
             isInvoice: true,
             date: date,
             company: "Test Corp",
-            method: "VLM"
+            categorization: categorization
         )
-
-        let invoiceData = InvoiceData(from: result)
 
         XCTAssertTrue(invoiceData.isInvoice)
         XCTAssertEqual(invoiceData.date, date)
         XCTAssertEqual(invoiceData.company, "Test Corp")
+        XCTAssertNotNil(invoiceData.categorization)
+        XCTAssertTrue(invoiceData.categorization!.bothAgree)
+    }
+
+    func testInvoiceDataNotInvoice() {
+        let invoiceData = InvoiceData(
+            isInvoice: false,
+            date: nil,
+            company: nil
+        )
+
+        XCTAssertFalse(invoiceData.isInvoice)
+        XCTAssertNil(invoiceData.date)
+        XCTAssertNil(invoiceData.company)
     }
 }
