@@ -2,12 +2,14 @@ import Foundation
 import Vision
 import AppKit
 
-/// OCR engine using Apple's Vision framework for text recognition
+/// OCR engine using Apple's Vision framework for text recognition + Text-LLM for analysis
 public class OCREngine {
     private let config: Configuration
+    private let textLLM: TextLLMManager
 
     public init(config: Configuration) {
         self.config = config
+        self.textLLM = TextLLMManager(config: config)
     }
 
     /// Extract text from an image using Vision OCR
@@ -53,23 +55,50 @@ public class OCREngine {
         }
     }
 
-    /// Detect if text contains invoice indicators
+    /// Detect if text contains invoice indicators (simple boolean)
     public func detectInvoice(from text: String) -> Bool {
+        let (isInvoice, _, _) = detectInvoiceKeywords(from: text)
+        return isInvoice
+    }
+
+    /// Detect invoice keywords with confidence and reason
+    public func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
         let lowercased = text.lowercased()
 
-        // Common invoice indicators in multiple languages
-        let indicators = [
-            // German
-            "rechnung", "rechnungsnummer", "rechnungsdatum",
-            // English
-            "invoice", "invoice number", "invoice date",
-            // French
-            "facture", "numéro de facture",
-            // Spanish
-            "factura", "número de factura"
+        // Strong indicators (high confidence)
+        let strongIndicators = [
+            "rechnungsnummer", "invoice number", "numéro de facture", "número de factura",
+            "rechnungsdatum", "invoice date"
         ]
 
-        return indicators.contains { lowercased.contains($0) }
+        // Medium indicators
+        let mediumIndicators = [
+            "rechnung", "invoice", "facture", "factura", "quittung", "receipt"
+        ]
+
+        var foundStrong: [String] = []
+        var foundMedium: [String] = []
+
+        for indicator in strongIndicators {
+            if lowercased.contains(indicator) {
+                foundStrong.append(indicator)
+            }
+        }
+
+        for indicator in mediumIndicators {
+            if lowercased.contains(indicator) {
+                foundMedium.append(indicator)
+            }
+        }
+
+        // Determine result
+        if !foundStrong.isEmpty {
+            return (true, "high", "Found: \(foundStrong.joined(separator: ", "))")
+        } else if !foundMedium.isEmpty {
+            return (true, "medium", "Found: \(foundMedium.joined(separator: ", "))")
+        } else {
+            return (false, "high", "No invoice keywords found")
+        }
     }
 
     /// Extract invoice date from OCR text
@@ -199,27 +228,42 @@ public class OCREngine {
         return String(trimmed.prefix(50))
     }
 
-    /// Extract all invoice data from OCR text
-    public func extractInvoiceData(from text: String) -> (isInvoice: Bool, date: Date?, company: String?) {
+    /// Extract all invoice data from OCR text using Text-LLM (legacy method)
+    public func extractInvoiceData(from text: String) async throws -> (isInvoice: Bool, date: Date?, company: String?) {
         if config.verbose {
             print("OCR extracted text (\(text.count) characters)")
+            print("Sending to Text-LLM for analysis...")
         }
 
-        let isInvoice = detectInvoice(from: text)
-        guard isInvoice else {
-            return (false, nil, nil)
-        }
-
-        let date = extractDate(from: text)
-        let company = extractCompany(from: text)
+        // Use Text-LLM to analyze the OCR text
+        let (isInvoice, date, company) = try await textLLM.analyzeInvoiceText(text)
 
         if config.verbose {
-            print("OCR Results:")
+            print("OCR + Text-LLM Results:")
             print("  Is Invoice: \(isInvoice)")
             print("  Date: \(date?.description ?? "nil")")
             print("  Company: \(company ?? "nil")")
         }
 
         return (isInvoice, date, company)
+    }
+
+    /// Extract only date and company from OCR text (no invoice detection)
+    /// Used in Phase 2 after categorization confirms it's an invoice
+    public func extractDateAndCompany(from text: String) async throws -> (date: Date?, company: String?) {
+        if config.verbose {
+            print("Extracting date and company from OCR text (\(text.count) characters)...")
+        }
+
+        // Use Text-LLM to extract date and company
+        let (date, company) = try await textLLM.extractDateAndCompany(from: text)
+
+        if config.verbose {
+            print("Extraction Results:")
+            print("  Date: \(date?.description ?? "not found")")
+            print("  Company: \(company ?? "not found")")
+        }
+
+        return (date, company)
     }
 }

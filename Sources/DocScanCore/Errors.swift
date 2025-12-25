@@ -1,5 +1,12 @@
 import Foundation
 
+/// Timeout error for async operations
+public struct TimeoutError: Error, LocalizedError {
+    public var errorDescription: String? {
+        return "Operation timed out"
+    }
+}
+
 /// Errors that can occur during document scanning and processing
 public enum DocScanError: LocalizedError {
     case invalidPDF(String)

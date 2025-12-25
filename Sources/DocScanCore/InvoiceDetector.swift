@@ -1,86 +1,79 @@
 import Foundation
 import AppKit
 
-/// Result of invoice detection and data extraction from a single method
-public struct ExtractionResult: Sendable {
+// MARK: - Categorization Results (Phase 1: VLM + OCR in parallel)
+
+/// Result of invoice categorization from a single method
+public struct CategorizationResult: Sendable {
     public let isInvoice: Bool
+    public let confidence: String // "high", "medium", "low"
+    public let method: String // "VLM" or "OCR"
+    public let reason: String? // Optional explanation
+
+    public init(isInvoice: Bool, confidence: String = "high", method: String, reason: String? = nil) {
+        self.isInvoice = isInvoice
+        self.confidence = confidence
+        self.method = method
+        self.reason = reason
+    }
+}
+
+/// Comparison result for categorization phase
+public struct CategorizationVerification {
+    public let vlmResult: CategorizationResult
+    public let ocrResult: CategorizationResult
+    public let bothAgree: Bool
+    public let agreedIsInvoice: Bool?
+
+    public init(vlmResult: CategorizationResult, ocrResult: CategorizationResult) {
+        self.vlmResult = vlmResult
+        self.ocrResult = ocrResult
+        self.bothAgree = vlmResult.isInvoice == ocrResult.isInvoice
+        self.agreedIsInvoice = bothAgree ? vlmResult.isInvoice : nil
+    }
+}
+
+// MARK: - Extraction Results (Phase 2: OCR+TextLLM only)
+
+/// Result of data extraction (OCR+TextLLM only)
+public struct ExtractionResult: Sendable {
     public let date: Date?
     public let company: String?
-    public let method: String // "VLM" or "OCR"
 
-    public init(isInvoice: Bool, date: Date?, company: String?, method: String) {
-        self.isInvoice = isInvoice
+    public init(date: Date?, company: String?) {
         self.date = date
         self.company = company
-        self.method = method
     }
 }
 
-/// Comparison result showing agreement or conflict between VLM and OCR
-public struct VerificationResult {
-    public let vmlResult: ExtractionResult
-    public let ocrResult: ExtractionResult
-    public let hasConflict: Bool
-    public let conflicts: [String]
+// MARK: - Final Invoice Data
 
-    public init(vmlResult: ExtractionResult, ocrResult: ExtractionResult) {
-        self.vmlResult = vmlResult
-        self.ocrResult = ocrResult
-
-        var conflicts: [String] = []
-
-        // Check for conflicts
-        if vmlResult.isInvoice != ocrResult.isInvoice {
-            conflicts.append("Invoice detection")
-        }
-
-        if vmlResult.date != ocrResult.date {
-            conflicts.append("Date")
-        }
-
-        if vmlResult.company != ocrResult.company {
-            conflicts.append("Company name")
-        }
-
-        self.conflicts = conflicts
-        self.hasConflict = !conflicts.isEmpty
-    }
-
-    /// Get agreed-upon result if no conflicts, otherwise nil
-    public var agreedResult: ExtractionResult? {
-        guard !hasConflict else { return nil }
-        return vmlResult
-    }
-}
-
-/// Result of invoice detection and data extraction (final)
+/// Final result combining categorization and extraction
 public struct InvoiceData {
     public let isInvoice: Bool
     public let date: Date?
     public let company: String?
-    public let verificationResult: VerificationResult?
+    public let categorization: CategorizationVerification?
 
-    public init(isInvoice: Bool, date: Date?, company: String?, verificationResult: VerificationResult? = nil) {
+    public init(isInvoice: Bool, date: Date?, company: String?, categorization: CategorizationVerification? = nil) {
         self.isInvoice = isInvoice
         self.date = date
         self.company = company
-        self.verificationResult = verificationResult
-    }
-
-    /// Create from extraction result
-    public init(from result: ExtractionResult, verificationResult: VerificationResult? = nil) {
-        self.isInvoice = result.isInvoice
-        self.date = result.date
-        self.company = result.company
-        self.verificationResult = verificationResult
+        self.categorization = categorization
     }
 }
 
-/// Detects invoices and extracts key information using dual verification (VLM + OCR)
+/// Detects invoices and extracts key information using two-phase approach:
+/// Phase 1: Categorization (VLM + OCR in parallel) - Is this an invoice?
+/// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and company
 public class InvoiceDetector {
     private let modelManager: ModelManager
     private let ocrEngine: OCREngine
     private let config: Configuration
+
+    // Cache the image and OCR text between phases
+    private var cachedImage: NSImage?
+    private var cachedOCRText: String?
 
     public init(config: Configuration) {
         self.config = config
@@ -88,8 +81,10 @@ public class InvoiceDetector {
         self.ocrEngine = OCREngine(config: config)
     }
 
-    /// Analyze a PDF with dual verification (VLM + OCR in parallel)
-    public func analyze(pdfPath: String) async throws -> VerificationResult {
+    // MARK: - Phase 1: Categorization (VLM + OCR in parallel)
+
+    /// Categorize a PDF - determine if it's an invoice using VLM + OCR in parallel
+    public func categorize(pdfPath: String) async throws -> CategorizationVerification {
         // Validate PDF
         try PDFUtils.validatePDF(at: pdfPath)
 
@@ -98,182 +93,197 @@ public class InvoiceDetector {
             print("Converting PDF to image...")
         }
         let image = try PDFUtils.pdfToImage(at: pdfPath, dpi: config.pdfDPI)
+        cachedImage = image
 
-        // Run both VLM and OCR in parallel
+        // Run both VLM and OCR categorization in parallel
         if config.verbose {
-            print("Running dual verification (VLM + OCR in parallel)...")
+            print("Running categorization (VLM + OCR in parallel)...")
         }
 
-        // Use Task directly to avoid sendability issues
-        let vmlTask = Task {
-            try await self.extractWithVLM(image: image)
+        // Timeout duration: 30 seconds
+        let timeoutDuration: TimeInterval = 30.0
+
+        // VLM categorization task
+        let vlmTask = Task {
+            try await self.categorizeWithVLM(image: image)
         }
 
+        // OCR categorization task (also caches the OCR text for phase 2)
         let ocrTask = Task {
-            try await self.extractWithOCR(image: image)
+            try await self.categorizeWithOCR(image: image)
         }
 
-        let vml = try await vmlTask.value
-        let ocr = try await ocrTask.value
+        // Handle VLM with timeout
+        let vlm: CategorizationResult
+        do {
+            vlm = try await withTimeout(seconds: timeoutDuration) {
+                try await vlmTask.value
+            }
+        } catch is TimeoutError {
+            if config.verbose {
+                print("⏱️  VLM timed out after \(Int(timeoutDuration)) seconds")
+            }
+            vlmTask.cancel()
+            vlm = CategorizationResult(isInvoice: false, confidence: "low", method: "VLM (timeout)", reason: "Timed out")
+        } catch {
+            if config.verbose {
+                print("VLM categorization failed: \(error)")
+            }
+            vlm = CategorizationResult(isInvoice: false, confidence: "low", method: "VLM (error)", reason: error.localizedDescription)
+        }
+
+        // Handle OCR with timeout
+        let ocr: CategorizationResult
+        do {
+            ocr = try await withTimeout(seconds: timeoutDuration) {
+                try await ocrTask.value
+            }
+        } catch is TimeoutError {
+            if config.verbose {
+                print("⏱️  OCR timed out after \(Int(timeoutDuration)) seconds")
+            }
+            ocrTask.cancel()
+            ocr = CategorizationResult(isInvoice: false, confidence: "low", method: "OCR (timeout)", reason: "Timed out")
+        } catch {
+            if config.verbose {
+                print("OCR categorization failed: \(error)")
+            }
+            throw error
+        }
 
         // Compare results
-        let verification = VerificationResult(vmlResult: vml, ocrResult: ocr)
+        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
         if config.verbose {
-            if verification.hasConflict {
-                print("⚠️  Conflict detected in: \(verification.conflicts.joined(separator: ", "))")
+            if verification.bothAgree {
+                let result = verification.agreedIsInvoice == true ? "IS an invoice" : "is NOT an invoice"
+                print("✅ VLM and OCR agree: Document \(result)")
             } else {
-                print("✅ VLM and OCR agree on all fields")
+                print("⚠️  Categorization conflict: VLM says \(vlm.isInvoice ? "invoice" : "not invoice"), OCR says \(ocr.isInvoice ? "invoice" : "not invoice")")
             }
         }
 
         return verification
     }
 
-    /// Extract data using VLM
-    private func extractWithVLM(image: NSImage) async throws -> ExtractionResult {
-        if config.verbose {
-            print("VLM: Starting analysis...")
+    // MARK: - Phase 2: Data Extraction (OCR+TextLLM only)
+
+    /// Extract invoice data using OCR+TextLLM only (call after categorization confirms it's an invoice)
+    public func extractData() async throws -> ExtractionResult {
+        guard let ocrText = cachedOCRText else {
+            throw DocScanError.extractionFailed("No OCR text available. Call categorize() first.")
         }
-
-        // Detect if document is an invoice
-        let isInvoice = try await detectInvoiceVLM(image: image)
-
-        guard isInvoice else {
-            if config.verbose {
-                print("VLM: Not an invoice")
-            }
-            return ExtractionResult(isInvoice: false, date: nil, company: nil, method: "VLM")
-        }
-
-        // Extract invoice date and company
-        let (date, company) = try await extractInvoiceDataVLM(image: image)
 
         if config.verbose {
-            print("VLM Results:")
-            print("  Is Invoice: \(isInvoice)")
-            print("  Date: \(date?.description ?? "nil")")
-            print("  Company: \(company ?? "nil")")
+            print("Extracting invoice data (OCR+TextLLM)...")
         }
 
-        return ExtractionResult(isInvoice: isInvoice, date: date, company: company, method: "VLM")
+        // Use TextLLM to extract date and company from cached OCR text
+        let (date, company) = try await ocrEngine.extractDateAndCompany(from: ocrText)
+
+        if config.verbose {
+            print("Extracted data:")
+            print("  Date: \(date?.description ?? "not found")")
+            print("  Company: \(company ?? "not found")")
+        }
+
+        return ExtractionResult(date: date, company: company)
     }
 
-    /// Extract data using OCR
-    private func extractWithOCR(image: NSImage) async throws -> ExtractionResult {
+    // MARK: - VLM Categorization
+
+    /// Categorize using VLM - simple yes/no invoice detection
+    private func categorizeWithVLM(image: NSImage) async throws -> CategorizationResult {
         if config.verbose {
-            print("OCR: Starting analysis...")
+            print("VLM: Starting categorization...")
         }
 
+        let prompt = """
+        Look at this document image carefully.
+
+        Is this document an INVOICE, BILL, or RECEIPT?
+
+        Look for these indicators:
+        - Words like "Rechnung", "Invoice", "Facture", "Faktura", "Bill", "Receipt"
+        - Invoice number or receipt number
+        - Itemized charges with prices
+        - Total amount due
+        - Payment terms or due date
+
+        Answer with ONLY one word: YES or NO
+        """
+
+        let response = try await modelManager.generateFromImage(image, prompt: prompt)
+
+        if config.verbose {
+            print("VLM response: \(response)")
+        }
+
+        // Parse response - look for yes/no
+        let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let isInvoice = lowercased.contains("yes") || lowercased.hasPrefix("ja")
+        let confidence = (lowercased == "yes" || lowercased == "no") ? "high" : "medium"
+
+        if config.verbose {
+            print("VLM: Is invoice = \(isInvoice) (confidence: \(confidence))")
+        }
+
+        return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "VLM", reason: response)
+    }
+
+    // MARK: - OCR Categorization
+
+    /// Categorize using OCR keyword detection
+    private func categorizeWithOCR(image: NSImage) async throws -> CategorizationResult {
+        if config.verbose {
+            print("OCR: Starting categorization...")
+        }
+
+        // Extract text using Vision OCR
         let text = try await ocrEngine.extractText(from: image)
-        let (isInvoice, date, company) = ocrEngine.extractInvoiceData(from: text)
+        cachedOCRText = text // Cache for phase 2
 
-        return ExtractionResult(isInvoice: isInvoice, date: date, company: company, method: "OCR")
-    }
+        if config.verbose {
+            print("OCR: Extracted \(text.count) characters")
+        }
 
-    /// Detect if an image contains an invoice using VLM
-    private func detectInvoiceVLM(image: NSImage) async throws -> Bool {
-        let prompt = """
-        Is this document an invoice (Rechnung)?
-        Answer with only 'yes' or 'no'.
-        """
+        // Use keyword-based detection
+        let (isInvoice, confidence, reason) = ocrEngine.detectInvoiceKeywords(from: text)
 
-        let response = try await modelManager.generateFromImage(
-            image,
-            prompt: prompt
-        )
-
-        let normalized = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.contains("yes") || normalized.contains("ja")
-    }
-
-    /// Extract invoice date and company using VLM
-    private func extractInvoiceDataVLM(image: NSImage) async throws -> (Date?, String?) {
-        let prompt = """
-        Extract the following information from this invoice:
-        1. Invoice date (Rechnungsdatum): Provide in format YYYY-MM-DD
-        2. Invoicing party (company name that issued the invoice)
-
-        Respond in this exact format:
-        DATE: YYYY-MM-DD
-        COMPANY: Company Name
-
-        If you cannot find the information, write "UNKNOWN" for that field.
-        """
-
-        let response = try await modelManager.generateFromImage(
-            image,
-            prompt: prompt
-        )
-
-        // Parse response
-        let lines = response.components(separatedBy: .newlines)
-        var date: Date?
-        var company: String?
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed.hasPrefix("DATE:") {
-                let dateString = trimmed
-                    .replacingOccurrences(of: "DATE:", with: "")
-                    .trimmingCharacters(in: .whitespaces)
-
-                if dateString != "UNKNOWN" {
-                    date = parseDate(dateString)
-                }
-            } else if trimmed.hasPrefix("COMPANY:") {
-                let companyName = trimmed
-                    .replacingOccurrences(of: "COMPANY:", with: "")
-                    .trimmingCharacters(in: .whitespaces)
-
-                if companyName != "UNKNOWN" {
-                    company = sanitizeCompanyName(companyName)
-                }
+        if config.verbose {
+            print("OCR: Is invoice = \(isInvoice) (confidence: \(confidence))")
+            if let reason = reason {
+                print("OCR: Reason: \(reason)")
             }
         }
 
-        return (date, company)
+        return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "OCR", reason: reason)
     }
 
-    /// Parse date string in various formats
-    private func parseDate(_ dateString: String) -> Date? {
-        let formatters = [
-            "yyyy-MM-dd",
-            "dd.MM.yyyy",
-            "MM/dd/yyyy",
-            "dd/MM/yyyy"
-        ].map { format -> DateFormatter in
-            let formatter = DateFormatter()
-            formatter.dateFormat = format
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            return formatter
-        }
+    // MARK: - Helper Methods
 
-        for formatter in formatters {
-            if let date = formatter.date(from: dateString) {
-                return date
+    /// Execute an async operation with a timeout
+    private func withTimeout<T>(
+        seconds: TimeInterval,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            // Add the actual operation
+            group.addTask {
+                try await operation()
             }
+
+            // Add the timeout task
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw TimeoutError()
+            }
+
+            // Wait for the first to complete
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
         }
-
-        return nil
-    }
-
-    /// Sanitize company name for use in filename
-    private func sanitizeCompanyName(_ name: String) -> String {
-        // Remove special characters that are problematic in filenames
-        let invalidChars = CharacterSet(charactersIn: ":/\\?%*|\"<>")
-        let sanitized = name.components(separatedBy: invalidChars).joined()
-
-        // Replace multiple spaces with single space
-        let singleSpaced = sanitized.replacingOccurrences(
-            of: "\\s+",
-            with: " ",
-            options: .regularExpression
-        )
-
-        // Trim whitespace
-        return singleSpaced.trimmingCharacters(in: .whitespaces)
     }
 
     /// Generate filename from invoice data
