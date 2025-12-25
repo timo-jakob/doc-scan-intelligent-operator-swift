@@ -11,6 +11,8 @@ final class OCREngineTests: XCTestCase {
         engine = OCREngine(config: config)
     }
 
+    // MARK: - Invoice Detection Tests
+
     func testDetectInvoiceWithKeywords() {
         let germanText = "Rechnung\nRechnungsnummer: 12345\nDatum: 2024-12-22"
         XCTAssertTrue(engine.detectInvoice(from: germanText))
@@ -24,6 +26,29 @@ final class OCREngineTests: XCTestCase {
         let nonInvoiceText = "This is just a regular document"
         XCTAssertFalse(engine.detectInvoice(from: nonInvoiceText))
     }
+
+    func testDetectInvoiceKeywordsWithConfidence() {
+        // Strong indicators (high confidence)
+        let strongText = "Rechnungsnummer: 12345"
+        let (isInvoice1, confidence1, reason1) = engine.detectInvoiceKeywords(from: strongText)
+        XCTAssertTrue(isInvoice1)
+        XCTAssertEqual(confidence1, "high")
+        XCTAssertNotNil(reason1)
+
+        // Medium indicators
+        let mediumText = "Rechnung für Dienstleistungen"
+        let (isInvoice2, confidence2, _) = engine.detectInvoiceKeywords(from: mediumText)
+        XCTAssertTrue(isInvoice2)
+        XCTAssertEqual(confidence2, "medium")
+
+        // No invoice keywords
+        let noInvoiceText = "Just a regular document"
+        let (isInvoice3, confidence3, _) = engine.detectInvoiceKeywords(from: noInvoiceText)
+        XCTAssertFalse(isInvoice3)
+        XCTAssertEqual(confidence3, "high") // High confidence it's NOT an invoice
+    }
+
+    // MARK: - Date Extraction Tests
 
     func testExtractDateISO() {
         let text = "Invoice Date: 2024-12-22"
@@ -56,6 +81,8 @@ final class OCREngineTests: XCTestCase {
         XCTAssertNil(date)
     }
 
+    // MARK: - Company Extraction Tests
+
     func testExtractCompanyWithKeywords() {
         let text = """
         Acme Corporation GmbH
@@ -79,28 +106,16 @@ final class OCREngineTests: XCTestCase {
         XCTAssertEqual(company, "My Company Name")
     }
 
-    func testExtractInvoiceDataComplete() {
+    func testExtractCompanyWithLegalSuffix() {
         let text = """
-        Acme Corp GmbH
-        Rechnung
-        Rechnungsdatum: 2024-12-22
-        Rechnungsnummer: 12345
+        Some Random Text
+        Another Line
+        BigCorp AG
+        More text here
         """
 
-        let (isInvoice, date, company) = engine.extractInvoiceData(from: text)
-
-        XCTAssertTrue(isInvoice)
-        XCTAssertNotNil(date)
+        let company = engine.extractCompany(from: text)
         XCTAssertNotNil(company)
-    }
-
-    func testExtractInvoiceDataNotInvoice() {
-        let text = "Just a regular document"
-
-        let (isInvoice, date, company) = engine.extractInvoiceData(from: text)
-
-        XCTAssertFalse(isInvoice)
-        XCTAssertNil(date)
-        XCTAssertNil(company)
+        XCTAssertTrue(company!.contains("BigCorp"))
     }
 }

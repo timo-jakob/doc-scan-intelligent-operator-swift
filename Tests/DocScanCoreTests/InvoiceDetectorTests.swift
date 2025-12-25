@@ -20,7 +20,7 @@ final class InvoiceDetectorTests: XCTestCase {
     }
 
     func testNotAnInvoice() {
-        let data = InvoiceData(isInvoice: false)
+        let data = InvoiceData(isInvoice: false, date: nil, company: nil)
 
         XCTAssertFalse(data.isInvoice)
         XCTAssertNil(data.date)
@@ -39,7 +39,7 @@ final class InvoiceDetectorTests: XCTestCase {
     }
 
     func testGenerateFilenameNotAnInvoice() {
-        let data = InvoiceData(isInvoice: false)
+        let data = InvoiceData(isInvoice: false, date: nil, company: nil)
         let filename = detector.generateFilename(from: data)
 
         XCTAssertNil(filename)
