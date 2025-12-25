@@ -13,6 +13,7 @@ public class ModelManager {
 
     // Chat session for VLM (lazy loaded)
     private var chatSession: ChatSession?
+    private var loadedModel: ModelContext?
     private var currentModelName: String?
 
     public init(config: Configuration) {
@@ -82,8 +83,8 @@ public class ModelManager {
 
     /// Load VLM model and create ChatSession if not already loaded
     private func loadModelIfNeeded(modelName: String, resetSession: Bool = false) async throws {
-        // Check if model needs to be reloaded
-        let needsReload = currentModelName != modelName || chatSession == nil
+        // Check if model needs to be reloaded (different model or no model loaded)
+        let needsReload = currentModelName != modelName || loadedModel == nil
 
         if needsReload {
             if config.verbose {
@@ -100,20 +101,19 @@ public class ModelManager {
                 }
             }
 
-            // Create ChatSession for VLM inference
+            // Cache the loaded model and create ChatSession
+            loadedModel = model
             chatSession = ChatSession(model)
             currentModelName = modelName
 
             if config.verbose {
                 print("VLM: Model loaded successfully")
             }
-        } else if resetSession, let currentName = currentModelName {
-            // Model already loaded, but reset the session to clear conversation history
+        } else if resetSession, let model = loadedModel {
+            // Model already loaded, just create a fresh session (no expensive reload)
             if config.verbose {
-                print("VLM: Resetting ChatSession to clear history")
+                print("VLM: Creating fresh ChatSession (reusing cached model)")
             }
-            // Reload the model to get a fresh session
-            let model = try await loadModel(id: currentName)
             chatSession = ChatSession(model)
         }
     }
