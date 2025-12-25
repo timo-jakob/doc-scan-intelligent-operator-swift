@@ -280,7 +280,10 @@ public class InvoiceDetector {
             }
 
             // Wait for the first to complete
-            let result = try await group.next()!
+            guard let result = try await group.next() else {
+                group.cancelAll()
+                throw TimeoutError()
+            }
             group.cancelAll()
             return result
         }
