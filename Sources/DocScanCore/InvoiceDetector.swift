@@ -92,7 +92,7 @@ public class InvoiceDetector {
         if config.verbose {
             print("Converting PDF to image...")
         }
-        let image = try PDFUtils.pdfToImage(at: pdfPath, dpi: config.pdfDPI)
+        let image = try PDFUtils.pdfToImage(at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose)
         cachedImage = image
 
         // Run both VLM and OCR categorization in parallel
@@ -245,6 +245,7 @@ public class InvoiceDetector {
 
         if config.verbose {
             print("OCR: Extracted \(text.count) characters")
+            print("OCR: Text preview: \(String(text.prefix(500)))")
         }
 
         // Use keyword-based detection

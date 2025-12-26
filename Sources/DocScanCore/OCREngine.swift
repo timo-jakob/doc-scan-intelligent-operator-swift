@@ -13,11 +13,29 @@ public class OCREngine {
     }
 
     /// Extract text from an image using Vision OCR
+    /// For very tall images (aspect ratio > 4:1), tiles the image to ensure full text extraction
     public func extractText(from image: NSImage) async throws -> String {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw DocScanError.pdfConversionFailed("Unable to convert NSImage to CGImage")
         }
 
+        let width = cgImage.width
+        let height = cgImage.height
+        let aspectRatio = Double(height) / Double(width)
+
+        // For very tall images, tile to work around Vision's limitations
+        if aspectRatio > 4.0 {
+            if config.verbose {
+                print("OCR: Tall image detected (aspect ratio \(String(format: "%.1f", aspectRatio)):1), using tiled OCR")
+            }
+            return try await extractTextTiled(from: cgImage)
+        }
+
+        return try await extractTextSingle(from: cgImage)
+    }
+
+    /// Extract text from a single image (standard OCR)
+    private func extractTextSingle(from cgImage: CGImage) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
                 if let error = error {
@@ -53,6 +71,39 @@ public class OCREngine {
                 continuation.resume(throwing: DocScanError.extractionFailed("OCR request failed: \(error.localizedDescription)"))
             }
         }
+    }
+
+    /// Extract text from a tall image by splitting into tiles
+    private func extractTextTiled(from cgImage: CGImage) async throws -> String {
+        let width = cgImage.width
+        let height = cgImage.height
+        let tileHeight = 800  // Tile height in pixels
+        var allText = ""
+
+        for tileY in stride(from: 0, to: height, by: tileHeight) {
+            let cropHeight = min(tileHeight, height - tileY)
+            let cropRect = CGRect(x: 0, y: tileY, width: width, height: cropHeight)
+
+            guard let croppedImage = cgImage.cropping(to: cropRect) else {
+                continue
+            }
+
+            do {
+                let tileText = try await extractTextSingle(from: croppedImage)
+                allText += tileText + "\n"
+            } catch {
+                // Continue with other tiles even if one fails
+                if config.verbose {
+                    print("OCR: Tile at y=\(tileY) failed: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        if allText.isEmpty {
+            throw DocScanError.extractionFailed("No text recognized from any tile")
+        }
+
+        return allText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Detect if text contains invoice indicators (simple boolean)
