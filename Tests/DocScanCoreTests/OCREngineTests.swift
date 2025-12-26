@@ -81,6 +81,42 @@ final class OCREngineTests: XCTestCase {
         XCTAssertNil(date)
     }
 
+    func testExtractDateColonSeparated() {
+        // OCR sometimes reads dots as colons
+        let text = "Datum:13:11:2025"
+        let date = engine.extractDate(from: text)
+
+        XCTAssertNotNil(date)
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2025)
+        XCTAssertEqual(components.month, 11)
+        XCTAssertEqual(components.day, 13)
+    }
+
+    func testExtractDateGermanMonth() {
+        let text = "Beitragsrechnung September 2022"
+        let date = engine.extractDate(from: text)
+
+        XCTAssertNotNil(date)
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2022)
+        XCTAssertEqual(components.month, 9)
+        XCTAssertEqual(components.day, 1) // First of month for month-only dates
+    }
+
+    func testExtractDateGermanMonthAbbreviated() {
+        let text = "Rechnung Okt 2023"
+        let date = engine.extractDate(from: text)
+
+        XCTAssertNotNil(date)
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2023)
+        XCTAssertEqual(components.month, 10)
+    }
+
     // MARK: - Company Extraction Tests
 
     func testExtractCompanyWithKeywords() {

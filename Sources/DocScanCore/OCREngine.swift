@@ -165,31 +165,76 @@ public class OCREngine {
             "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b",
             // European format: 22.12.2024 or 22/12/2024
             "\\b(\\d{2})[./](\\d{2})[./](\\d{4})\\b",
+            // Colon-separated (OCR artifact): 22:12:2024
+            "\\b(\\d{2}):(\\d{2}):(\\d{4})\\b",
             // US format: 12/22/2024
             "\\b(\\d{2})/(\\d{2})/(\\d{4})\\b"
         ]
 
+        // Try to find date near common keywords first (more reliable)
+        let dateKeywords = [
+            "rechnungsdatum:", "invoice date:", "datum:", "date:",
+            "rechnungsdatum", "invoice date", "facture du:", "fecha:"
+        ]
+
+        for keyword in dateKeywords {
+            if let range = text.range(of: keyword, options: .caseInsensitive) {
+                let afterKeyword = String(text[range.upperBound...])
+                let nearbyText = String(afterKeyword.prefix(40))
+
+                for pattern in patterns {
+                    if let date = extractDateWithPattern(nearbyText, pattern: pattern) {
+                        return date
+                    }
+                }
+
+                // Also try German month format near keywords
+                if let date = extractGermanMonthDate(from: nearbyText) {
+                    return date
+                }
+            }
+        }
+
+        // Fallback: try any date pattern in the text
         for pattern in patterns {
             if let date = extractDateWithPattern(text, pattern: pattern) {
                 return date
             }
         }
 
-        // Try to find date near common keywords
-        let dateKeywords = [
-            "datum:", "date:", "rechnungsdatum:", "invoice date:",
-            "facture du:", "fecha:"
+        // Try German month format anywhere in text
+        if let date = extractGermanMonthDate(from: text) {
+            return date
+        }
+
+        return nil
+    }
+
+    /// Extract date from German month format like "September 2022"
+    private func extractGermanMonthDate(from text: String) -> Date? {
+        // Pattern to find month name followed by year
+        let germanMonths = [
+            "januar", "februar", "märz", "maerz", "april", "mai", "juni",
+            "juli", "august", "september", "oktober", "november", "dezember",
+            "jan", "feb", "mrz", "apr", "jun", "jul", "aug", "sep", "sept", "okt", "nov", "dez"
         ]
 
-        for keyword in dateKeywords {
-            if let range = text.range(of: keyword, options: .caseInsensitive) {
-                let afterKeyword = String(text[range.upperBound...])
-                let nearbyText = String(afterKeyword.prefix(30))
+        let lowercased = text.lowercased()
+        for month in germanMonths {
+            if let monthRange = lowercased.range(of: month) {
+                // Look for a 4-digit year after the month
+                let afterMonth = String(lowercased[monthRange.upperBound...]).prefix(20)
+                let yearPattern = "\\b(20\\d{2})\\b"
 
-                for pattern in patterns {
-                    if let date = extractDateWithPattern(nearbyText, pattern: pattern) {
-                        return date
-                    }
+                guard let regex = try? NSRegularExpression(pattern: yearPattern),
+                      let match = regex.firstMatch(in: String(afterMonth), range: NSRange(afterMonth.startIndex..., in: afterMonth)),
+                      let range = Range(match.range, in: afterMonth) else {
+                    continue
+                }
+
+                let monthYearString = "\(month) \(afterMonth[range])"
+                if let date = DateUtils.parseDate(monthYearString) {
+                    return date
                 }
             }
         }
