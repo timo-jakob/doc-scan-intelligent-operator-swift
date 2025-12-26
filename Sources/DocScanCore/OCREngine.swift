@@ -57,12 +57,17 @@ public class OCREngine {
 
     /// Detect if text contains invoice indicators (simple boolean)
     public func detectInvoice(from text: String) -> Bool {
-        let (isInvoice, _, _) = detectInvoiceKeywords(from: text)
+        let (isInvoice, _, _) = Self.detectInvoiceKeywords(from: text)
         return isInvoice
     }
 
-    /// Detect invoice keywords with confidence and reason
+    /// Detect invoice keywords with confidence and reason (instance method)
     public func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
+        return Self.detectInvoiceKeywords(from: text)
+    }
+
+    /// Detect invoice keywords with confidence and reason (static, shared implementation)
+    public static func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
         let lowercased = text.lowercased()
 
         // Strong indicators (high confidence)

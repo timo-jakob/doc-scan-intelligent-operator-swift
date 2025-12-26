@@ -23,8 +23,8 @@ public class TextLLMManager {
             print("Text-LLM: Analyzing OCR text...")
         }
 
-        // First, check if it's an invoice
-        let isInvoice = try await detectInvoice(from: text)
+        // First, check if it's an invoice using keyword detection
+        let isInvoice = detectInvoice(from: text)
 
         guard isInvoice else {
             if config.verbose {
@@ -46,40 +46,23 @@ public class TextLLMManager {
         return (isInvoice, date, company)
     }
 
-    /// Detect if text represents an invoice using LLM
-    private func detectInvoice(from text: String) async throws -> Bool {
-        // Use more text for better context (up to 2000 characters)
-        let textExcerpt = String(text.prefix(2000))
-
+    /// Detect if text represents an invoice using keyword detection
+    private func detectInvoice(from text: String) -> Bool {
         if config.verbose {
             print("Text-LLM: Checking if text contains invoice...")
         }
 
-        // Keyword-based detection - reliable for invoice identification
-        let lowercased = textExcerpt.lowercased()
-
-        // Check for strong invoice indicators
-        let hasRechnung = lowercased.contains("rechnung")  // German: invoice
-        let hasRechnungsnummer = lowercased.contains("rechnungsnummer")  // German: invoice number
-        let hasInvoice = lowercased.contains("invoice")  // English
-        let hasInvoiceNumber = lowercased.contains("invoice number")
-        let hasFacture = lowercased.contains("facture")  // French
-        let hasFactura = lowercased.contains("factura")  // Spanish
-
-        // Strong indicators that this is definitely an invoice
-        let isDefinitelyInvoice = hasRechnungsnummer || hasInvoiceNumber ||
-                                  hasRechnung || hasInvoice ||
-                                  hasFacture || hasFactura
+        // Use shared keyword detection from OCREngine
+        let (isInvoice, confidence, reason) = OCREngine.detectInvoiceKeywords(from: text)
 
         if config.verbose {
-            print("Text-LLM: Keyword detection:")
-            print("  - Contains 'rechnung': \(hasRechnung)")
-            print("  - Contains 'rechnungsnummer': \(hasRechnungsnummer)")
-            print("  - Contains 'invoice': \(hasInvoice)")
-            print("  - Definitely an invoice: \(isDefinitelyInvoice)")
+            print("Text-LLM: Keyword detection result: \(isInvoice) (confidence: \(confidence))")
+            if let reason = reason {
+                print("  - \(reason)")
+            }
         }
 
-        return isDefinitelyInvoice
+        return isInvoice
     }
 
     /// Extract date and company from text using LLM (public API for Phase 2)
