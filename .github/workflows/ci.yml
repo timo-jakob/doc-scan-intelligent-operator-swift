@@ -9,34 +9,50 @@ on:
 jobs:
   build-and-test:
     name: Build and Test
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Select Xcode version
-      run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+      run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
     - name: Swift version
       run: swift --version
 
-    - name: Build
-      run: swift build -v
+    - name: Verify Metal toolchain
+      run: |
+        # Check if Metal compiler is available (required for MLX)
+        if xcrun -f metal &> /dev/null; then
+          echo "✅ Metal toolchain available"
+          xcrun metal --version
+        else
+          echo "⚠️ Metal toolchain not found, attempting download..."
+          xcodebuild -downloadComponent MetalToolchain
+        fi
 
-    - name: Run tests
-      run: swift test -v
+    - name: Build with xcodebuild
+      run: |
+        # Use xcodebuild to properly compile Metal shaders for MLX
+        xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build
+
+    - name: Run tests with xcodebuild
+      run: |
+        # Run tests using xcodebuild for Metal shader support
+        # Use DocScan-Package scheme which includes all test targets
+        xcodebuild test -scheme DocScan-Package -destination 'platform=macOS'
 
   lint:
     name: Code Quality
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Select Xcode version
-      run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+      run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
     - name: Check Swift format (if available)
       run: |

@@ -22,7 +22,7 @@ public struct PDFUtils {
     }
 
     /// Convert the first page of a PDF to an NSImage at specified DPI
-    public static func pdfToImage(at path: String, dpi: Int = 150) throws -> NSImage {
+    public static func pdfToImage(at path: String, dpi: Int = 150, verbose: Bool = false) throws -> NSImage {
         let url = URL(fileURLWithPath: path)
 
         guard let document = PDFDocument(url: url) else {
@@ -40,6 +40,11 @@ public struct PDFUtils {
             width: pageRect.width * scale,
             height: pageRect.height * scale
         )
+
+        if verbose {
+            print("PDF page size: \(Int(pageRect.width))x\(Int(pageRect.height)) points")
+            print("Image size at \(dpi) DPI: \(Int(scaledSize.width))x\(Int(scaledSize.height)) pixels")
+        }
 
         // Create bitmap representation
         guard let bitmap = NSBitmapImageRep(

@@ -38,6 +38,10 @@ Branch naming conventions:
 
 **Key Focus**: Native macOS invoice processing with format `YYYY-MM-DD_Rechnung_Company.pdf`
 
+**Architecture**: Two-phase verification system:
+- **Phase 1**: Categorization (VLM + OCR in parallel) - "Is this an invoice?"
+- **Phase 2**: Data Extraction (OCR + TextLLM only) - Extract date and company
+
 ## Technology Stack
 
 - **Language**: Swift 6.0+
@@ -53,13 +57,36 @@ Branch naming conventions:
 
 ### Building
 
+**IMPORTANT: MLX Swift requires Xcode to compile Metal shaders**
+
+The `swift build` command cannot compile Metal shaders, which causes the VLM to fail with:
+```
+MLX error: Failed to load the default metallib. library not found
+```
+
+**Use `xcodebuild` for full functionality:**
+
 ```bash
-# Debug build
+# Build with xcodebuild (required for VLM/Metal support)
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build
+
+# The binary will be at:
+# ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan
+
+# Alternative: Open in Xcode and build with ⌘+B
+open Package.swift
+```
+
+**For OCR-only testing (no VLM):**
+```bash
+# swift build works for OCR-only mode
 swift build
 
-# Release build (optimized)
-swift build -c release
+# Run with --auto-resolve ocr to skip VLM
+.build/debug/docscan invoice.pdf --dry-run --auto-resolve ocr
+```
 
+```bash
 # Clean build artifacts
 swift package clean
 ```
@@ -67,11 +94,11 @@ swift package clean
 ### Running
 
 ```bash
-# Run directly with SPM
-swift run docscan invoice.pdf
+# Run the Xcode-built binary (full VLM + OCR support)
+~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan invoice.pdf
 
 # Run with arguments
-swift run docscan invoice.pdf --dry-run -v
+~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan invoice.pdf --dry-run -v
 
 # Run the release binary
 .build/release/docscan invoice.pdf
@@ -128,82 +155,191 @@ The project follows a modular Swift architecture:
    - Optimized for invoice processing
 
 3. **Model Manager (`ModelManager.swift`)** - VLM loading and inference
-   - Loads Vision-Language Models with MLX
-   - Caches models locally
-   - Manages model downloads from Hugging Face
-   - Validates disk space before downloading
-   - **NOTE**: VLM inference is currently a placeholder and needs full MLX integration
+   - Loads Vision-Language Models using `loadModel()` and `ChatSession` API
+   - Uses proper image handling via temporary file URLs
+   - Caches models locally in `~/.cache/docscan/models`
+   - Manages model downloads from Hugging Face with progress tracking
+   - Supports Qwen2-VL series models optimized for Apple Silicon
+   - **Used for categorization only** (simple YES/NO invoice detection)
 
-4. **OCR Engine (`OCREngine.swift`)** - Native text recognition using Apple Vision
+4. **Text LLM Manager (`TextLLMManager.swift`)** - Text-based LLM for data extraction
+   - Uses Qwen2.5-7B-Instruct for analyzing OCR text
+   - Extracts invoice date and company name from text
+   - More accurate than VLM for structured data extraction
+   - Separate from VLM to optimize for each task
+
+5. **OCR Engine (`OCREngine.swift`)** - Native text recognition using Apple Vision
    - Extracts text from images using Vision framework
    - Detects invoice indicators in multiple languages (DE, EN, FR, ES)
-   - Extracts dates using regex patterns (ISO, European, US formats)
-   - Extracts company names using keyword matching and heuristics
+   - `detectInvoiceKeywords()` - Returns confidence and reason for categorization
+   - `extractDateAndCompany()` - Uses TextLLM for accurate data extraction
    - Provides complete invoice data extraction pipeline
 
-5. **Invoice Detector (`InvoiceDetector.swift`)** - Dual verification system
-   - **Runs VLM and OCR in parallel** using Swift concurrency (Task-based)
-   - Compares results from both methods automatically
-   - Detects conflicts in: invoice detection, date, company name
-   - Returns `VerificationResult` with both method outputs
-   - Generates standardized filenames from agreed/chosen data
-   - Supports multiple date formats
+6. **Invoice Detector (`InvoiceDetector.swift`)** - Two-phase verification system
+   - **Phase 1: Categorization** (VLM + OCR in parallel)
+     - VLM answers: "Is this an invoice? YES/NO"
+     - OCR uses keyword detection (rechnung, invoice, etc.)
+     - If both agree → proceed automatically
+     - If conflict → user chooses (or `--auto-resolve`)
+   - **Phase 2: Data Extraction** (OCR + TextLLM only)
+     - Uses cached OCR text from Phase 1
+     - TextLLM extracts date and company
+     - No VLM involvement (more accurate)
+   - Returns `CategorizationVerification` and `ExtractionResult`
+   - Generates standardized filenames from extracted data
 
-6. **File Renamer (`FileRenamer.swift`)** - Safe file operations
+7. **File Renamer (`FileRenamer.swift`)** - Safe file operations
    - Renames files with extracted data
    - Handles filename collisions (adds _1, _2, etc.)
    - Supports dry-run mode
    - In-place or directory-based renaming
 
-7. **Errors (`Errors.swift`)** - Error handling
+8. **Errors (`Errors.swift`)** - Error handling
    - Custom `DocScanError` enum
    - Localized error descriptions
    - Comprehensive error types for all failure modes
 
-8. **CLI (`main.swift`)** - Command-line interface
+9. **CLI (`DocScanCommand.swift`)** - Command-line interface
    - Built with swift-argument-parser
    - Async/await support
-   - Displays dual verification results in formatted table
-   - Interactive conflict resolution when VLM and OCR disagree
-   - Clear user feedback with progress indicators
+   - Two-phase display with clear separation
+   - Shows categorization results (Phase 1)
+   - Shows extraction results (Phase 2)
+   - Interactive conflict resolution for categorization disagreements
+   - `--auto-resolve vlm|ocr` for automation/testing
 
 ### Data Flow
 
 ```
-PDF File → PDF Validation → PDF to Image → Dual Verification
-                                              ├─> VLM Analysis
-                                              └─> OCR Analysis
-                                                     ↓
-                                            Result Comparison
-                                            ├─> Agreement → Auto-proceed
-                                            └─> Conflict → User chooses
-                                                     ↓
-                                           Filename Generation →
-                                           Safe File Renaming
+PDF File → PDF Validation → PDF to Image
+                                ↓
+              ┌─────── PHASE 1: Categorization ───────┐
+              │  (VLM + OCR in parallel)              │
+              │                                        │
+              │  VLM: "Is this an invoice? YES/NO"    │
+              │  OCR: Keyword detection + cache text   │
+              │                                        │
+              │  Both agree? → Proceed                 │
+              │  Conflict?   → User chooses / auto     │
+              └────────────────────────────────────────┘
+                                ↓
+              ┌─────── PHASE 2: Data Extraction ──────┐
+              │  (OCR + TextLLM only)                 │
+              │                                        │
+              │  Use cached OCR text                  │
+              │  TextLLM extracts: date, company      │
+              └────────────────────────────────────────┘
+                                ↓
+              Filename Generation → Safe File Renaming
 ```
 
-### Invoice Processing Workflow (Dual Verification)
+### Invoice Processing Workflow (Two-Phase)
 
 1. **Validation**: Check if file is valid PDF using PDFKit
 2. **Conversion**: Convert first page to NSImage (configurable DPI)
-3. **Parallel Dual Verification**: Run both methods concurrently using Swift Tasks
-   - **VLM Path**:
-     - Detect if document is invoice via LLM prompt
-     - Extract date and company via structured LLM prompts
-   - **OCR Path**:
-     - Extract all text using Vision framework
-     - Detect invoice keywords (Rechnung, Invoice, Facture, etc.)
-     - Parse dates using regex patterns
-     - Extract company using heuristics and keywords
-4. **Comparison**: Automatic comparison of both results
-   - Check: Invoice detection match?
-   - Check: Date match?
-   - Check: Company name match?
-5. **Resolution**:
-   - **If agree**: Proceed automatically
-   - **If conflict**: Display both results, user chooses
-6. **Filename Generation**: Create `{date}_Rechnung_{company}.pdf`
-7. **Renaming**: Safely rename with collision handling
+
+**PHASE 1: Categorization (Parallel)**
+
+3. **VLM Categorization**: Simple prompt asking "Is this an invoice? YES/NO"
+4. **OCR Categorization**: Extract text + keyword detection (rechnung, invoice, etc.)
+   - OCR text is cached for Phase 2
+5. **Agreement Check**:
+   - **Both agree (invoice)**: Proceed to Phase 2
+   - **Both agree (not invoice)**: Exit
+   - **Conflict**: User chooses or `--auto-resolve vlm|ocr`
+
+**PHASE 2: Data Extraction (Sequential)**
+
+6. **TextLLM Extraction**: Analyze cached OCR text to extract:
+   - Invoice date (formatted as YYYY-MM-DD)
+   - Company name (sanitized for filename)
+7. **Filename Generation**: Create `{date}_Rechnung_{company}.pdf`
+8. **Renaming**: Safely rename with collision handling
+
+### How Parallel Processing Works (Phase 1)
+
+Phase 1 (Categorization) uses Swift's structured concurrency (`Task`) to run VLM and OCR categorization simultaneously.
+
+#### Implementation Details
+
+**Location**: `Sources/DocScanCore/InvoiceDetector.swift` - `categorize()` method
+
+**Step 1: Both Tasks Start Immediately**
+```swift
+// VLM categorization starts immediately
+let vlmTask = Task {
+    try await self.categorizeWithVLM(image: image)
+}
+
+// OCR categorization starts immediately (also caches text for Phase 2)
+let ocrTask = Task {
+    try await self.categorizeWithOCR(image: image)
+}
+```
+
+**Step 2: Wait for Both to Complete**
+```swift
+// Wait for VLM to finish
+vlm = try await vlmTask.value
+
+// Wait for OCR to finish
+ocr = try await ocrTask.value
+```
+
+#### Execution Timeline
+
+```
+Time 0ms:  PDF converted to image
+
+Time 10ms: VLM Task starts ────────────────┐  (asks "Invoice? YES/NO")
+           OCR Task starts ───────┐         │  (keyword detection)
+                                  │         │
+                                  ▼         ▼
+           Both running in parallel
+
+Time 1s:   OCR finishes ─────────X         │  (keywords found, text cached)
+           VLM still running ───────────────┤
+
+Time 3s:   VLM finishes ─────────────────X    (answers "YES")
+
+           Compare categorization results
+           If agree → Phase 2 (extraction)
+```
+
+#### Why Two Phases?
+
+1. **VLM is good at categorization** - Simple YES/NO questions work well
+2. **VLM is poor at data extraction** - Often reads wrong dates/companies
+3. **OCR+TextLLM is accurate for extraction** - Text-based analysis is more reliable
+4. **Parallel categorization saves time** - Both methods run simultaneously
+5. **OCR text is cached** - No need to re-extract in Phase 2
+
+#### Verification in Verbose Mode
+
+```bash
+docscan invoice.pdf -v
+```
+
+Output shows the two-phase flow:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 PHASE 1: Categorization (VLM + OCR in parallel)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VLM: Starting categorization...
+OCR: Starting categorization...
+OCR: Extracted 1413 characters
+VLM response: Yes
+✅ VLM and OCR agree: This IS an invoice
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 PHASE 2: Data Extraction (OCR + TextLLM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Extracting invoice data (OCR+TextLLM)...
+   📅 Date: 2025-06-27
+   🏢 Company: DB_Fernverkehr_AG
+```
 
 ### Configuration
 
@@ -226,25 +362,64 @@ filenamePattern: "{date}_Rechnung_{company}.pdf"
 
 ## MLX Integration
 
-This project is designed to leverage MLX Swift for Apple Silicon acceleration:
+This project leverages MLX Swift for Apple Silicon acceleration with two model types:
 
-- Models are loaded from Hugging Face using MLX Swift
-- Inference runs natively on Apple Neural Engine
-- Models are automatically downloaded and cached locally
-- MLX compatibility is assumed for models
-- Disk space is checked before downloading
+### VLM (Vision-Language Model) - Categorization Only
 
-**Current Status:**
-- MLX dependencies are included in Package.swift
-- ModelManager structure is in place
-- **VLM inference is a placeholder** - needs actual MLX VLM implementation
-- See `ModelManager.swift:performInference()` for integration point
+Used in Phase 1 for simple invoice detection (YES/NO):
 
-**Integration TODO:**
-- Implement actual VLM model loading using MLX Swift
-- Add image preprocessing for specific VLM models
-- Implement token generation and decoding
-- Add support for different VLM architectures (Qwen-VL, Pixtral, etc.)
+- Models: Qwen2-VL series (2B, 7B variants)
+- Task: "Is this an invoice?" → YES/NO
+- Loaded via `ModelManager.swift`
+
+```swift
+// Simple categorization prompt
+let prompt = "Is this document an INVOICE? Answer YES or NO"
+let response = try await session.respond(to: prompt, image: .url(tempURL))
+```
+
+### Text LLM - Data Extraction
+
+Used in Phase 2 for accurate data extraction from OCR text:
+
+- Model: `mlx-community/Qwen2.5-7B-Instruct-4bit`
+- Task: Extract date and company from text
+- Loaded via `TextLLMManager.swift`
+
+```swift
+// Data extraction from OCR text
+let (date, company) = try await textLLM.extractDateAndCompany(from: ocrText)
+```
+
+### Why Two Model Types?
+
+| Task | VLM | TextLLM | Winner |
+|------|-----|---------|--------|
+| "Is this an invoice?" | ✅ Good | ✅ Good | Both work |
+| Extract date | ❌ Often wrong | ✅ Accurate | TextLLM |
+| Extract company | ❌ Picks wrong text | ✅ Accurate | TextLLM |
+
+VLMs excel at visual understanding but struggle with precise text extraction. TextLLMs working on OCR output are more reliable for structured data.
+
+### Supported Models
+
+**VLM (Categorization):**
+- `mlx-community/Qwen2-VL-2B-Instruct-4bit` (faster)
+- `mlx-community/Qwen2-VL-7B-Instruct-4bit` (more accurate)
+
+**TextLLM (Extraction):**
+- `mlx-community/Qwen2.5-7B-Instruct-4bit` (recommended)
+
+### Build Requirements
+
+**Important**: MLX requires Xcode build for proper Metal library bundling:
+```bash
+# SPM build has Metal library issues
+swift build  # ❌ May fail at runtime
+
+# Use Xcode build instead
+xcodebuild -scheme docscan -configuration Debug build  # ✅ Works
+```
 
 ## Testing Strategy
 
@@ -253,7 +428,18 @@ Tests use XCTest with Swift's native testing features:
 - `ConfigurationTests.swift` - Configuration loading and defaults
 - `FileRenamerTests.swift` - File operations and collision handling
 - `InvoiceDetectorTests.swift` - Filename generation and data validation
-- **Note**: Full integration tests require VLM implementation
+- `OCREngineTests.swift` - OCR text extraction and parsing
+- `VerificationTests.swift` - Dual verification result comparison
+
+**Integration Testing:**
+Full end-to-end testing with real invoices:
+```bash
+# Test with auto-resolve for non-interactive testing
+.build/debug/docscan invoice.pdf -v --dry-run --auto-resolve ocr
+
+# Test with 7B VLM model
+.build/debug/docscan invoice.pdf -v --dry-run -m "mlx-community/Qwen2-VL-7B-Instruct-4bit" --auto-resolve ocr
+```
 
 Testing best practices:
 - Use temporary directories for file operations
@@ -262,15 +448,6 @@ Testing best practices:
 - Use `XCTAssertThrowsError` for error cases
 
 ## Key Implementation Notes
-
-### Adding New Features
-
-When adding new features:
-1. Add implementation to appropriate module in `Sources/DocScanCore/`
-2. Update tests in `Tests/DocScanCoreTests/`
-3. Update CLI in `Sources/DocScanCLI/main.swift` if needed
-4. Update README.md with new functionality
-5. Follow Swift naming conventions and style
 
 ### Modifying Configuration
 
@@ -289,15 +466,35 @@ PDFKit integration notes:
 - Consider memory usage for high DPI conversions
 - NSImage quality depends on DPI setting
 
-### MLX VLM Implementation
+### Two-Phase Architecture
 
-When implementing actual VLM inference:
-1. Study mlx-swift-examples for VLM patterns
-2. Implement model loading in `ModelManager.swift`
-3. Add image preprocessing pipeline
-4. Implement token generation
-5. Add proper error handling
-6. Update tests with mocked inference
+The system uses a two-phase approach for optimal accuracy:
+
+1. **Phase 1: Categorization (Parallel)**
+   - VLM: Simple YES/NO question
+   - OCR: Keyword detection
+   - Both run in parallel using Swift Tasks
+   - OCR caches text for Phase 2
+
+2. **Phase 2: Data Extraction (OCR+TextLLM)**
+   - Uses cached OCR text (no re-extraction needed)
+   - TextLLM extracts date and company
+   - More accurate than VLM for structured data
+
+**Key Design Decisions:**
+- VLM is only used for categorization (what it's good at)
+- Data extraction uses TextLLM (more accurate)
+- OCR text is cached between phases (efficiency)
+- Conflicts only occur in categorization (simpler resolution)
+
+### Adding New Features
+
+When adding new features:
+1. Add implementation to appropriate module in `Sources/DocScanCore/`
+2. Update tests in `Tests/DocScanCoreTests/`
+3. Update CLI in `Sources/DocScanCLI/DocScanCommand.swift` if needed
+4. Update CLAUDE.md with new functionality
+5. Follow Swift naming conventions and style
 
 ### Error Handling
 
@@ -372,15 +569,15 @@ Key differences from the original Python implementation:
 ## Future Enhancements
 
 Potential areas for improvement:
-- Complete MLX VLM integration
 - Batch processing support
 - macOS Quick Actions integration
 - SwiftUI GUI application
 - Watch folder mode
-- OCR fallback for scanned documents
+- Multi-page invoice support
 - iCloud Drive integration
 - Finder extension
 - Preview Quick Look plugin
+- Additional document types (receipts, contracts, etc.)
 
 ## Code Style
 
