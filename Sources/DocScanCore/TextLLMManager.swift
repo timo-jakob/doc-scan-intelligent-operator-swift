@@ -204,27 +204,9 @@ public class TextLLMManager {
         }
     }
 
-    /// Parse date string
+    /// Parse date string using shared utility
     private func parseDate(_ dateString: String) -> Date? {
-        let formatters = [
-            "yyyy-MM-dd",
-            "dd.MM.yyyy",
-            "MM/dd/yyyy",
-            "dd/MM/yyyy"
-        ].map { format -> DateFormatter in
-            let formatter = DateFormatter()
-            formatter.dateFormat = format
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            return formatter
-        }
-
-        for formatter in formatters {
-            if let date = formatter.date(from: dateString) {
-                return date
-            }
-        }
-
-        return nil
+        return DateUtils.parseDate(dateString)
     }
 
     /// Sanitize company name
