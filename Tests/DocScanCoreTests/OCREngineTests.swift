@@ -103,7 +103,8 @@ final class OCREngineTests: XCTestCase {
         """
 
         let company = engine.extractCompany(from: text)
-        XCTAssertEqual(company, "My Company Name")
+        // sanitizeCompanyName replaces spaces with underscores
+        XCTAssertEqual(company, "My_Company_Name")
     }
 
     func testExtractCompanyWithLegalSuffix() {

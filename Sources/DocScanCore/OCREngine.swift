@@ -199,20 +199,7 @@ public class OCREngine {
     }
 
     private func sanitizeCompanyName(_ name: String) -> String {
-        // Remove special characters problematic in filenames
-        let invalidChars = CharacterSet(charactersIn: ":/\\?%*|\"<>")
-        let sanitized = name.components(separatedBy: invalidChars).joined()
-
-        // Replace multiple spaces with single space
-        let singleSpaced = sanitized.replacingOccurrences(
-            of: "\\s+",
-            with: " ",
-            options: .regularExpression
-        )
-
-        // Trim and limit length
-        let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
-        return String(trimmed.prefix(50))
+        return StringUtils.sanitizeCompanyName(name)
     }
 
     /// Extract all invoice data from OCR text using Text-LLM (legacy method)

@@ -209,20 +209,8 @@ public class TextLLMManager {
         return DateUtils.parseDate(dateString)
     }
 
-    /// Sanitize company name
+    /// Sanitize company name using shared utility
     private func sanitizeCompanyName(_ name: String) -> String {
-        let invalidChars = CharacterSet(charactersIn: ":/\\?%*|\"<>")
-        let sanitized = name.components(separatedBy: invalidChars).joined()
-
-        let singleSpaced = sanitized.replacingOccurrences(
-            of: "\\s+",
-            with: " ",
-            options: .regularExpression
-        )
-
-        let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
-
-        // Replace spaces with underscores
-        return trimmed.replacingOccurrences(of: " ", with: "_")
+        return StringUtils.sanitizeCompanyName(name)
     }
 }
