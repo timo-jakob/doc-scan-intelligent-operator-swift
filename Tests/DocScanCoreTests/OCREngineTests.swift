@@ -7,7 +7,7 @@ final class OCREngineTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        config = Configuration.default
+        config = Configuration.defaultConfiguration
         engine = OCREngine(config: config)
     }
 

@@ -1,6 +1,23 @@
 import Foundation
 import Yams
 
+/// Output formatting settings for invoice filenames
+public struct OutputSettings: Codable, Equatable {
+    /// Date format for invoice filename (e.g., "yyyy-MM-dd")
+    public var dateFormat: String
+
+    /// Filename pattern (e.g., "{date}_Rechnung_{company}.pdf")
+    public var filenamePattern: String
+
+    public init(
+        dateFormat: String = "yyyy-MM-dd",
+        filenamePattern: String = "{date}_Rechnung_{company}.pdf"
+    ) {
+        self.dateFormat = dateFormat
+        self.filenamePattern = filenamePattern
+    }
+}
+
 /// Configuration for document scanning and invoice processing
 public struct Configuration: Codable {
     /// Model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
@@ -21,11 +38,20 @@ public struct Configuration: Codable {
     /// Whether to enable verbose logging
     public var verbose: Bool
 
-    /// Date format for invoice filename (e.g., "yyyy-MM-dd")
-    public var dateFormat: String
+    /// Output formatting settings
+    public var output: OutputSettings
 
-    /// Filename pattern (e.g., "{date}_Rechnung_{company}.pdf")
-    public var filenamePattern: String
+    /// Date format for invoice filename (convenience accessor)
+    public var dateFormat: String {
+        get { output.dateFormat }
+        set { output.dateFormat = newValue }
+    }
+
+    /// Filename pattern (convenience accessor)
+    public var filenamePattern: String {
+        get { output.filenamePattern }
+        set { output.filenamePattern = newValue }
+    }
 
     public init(
         modelName: String = "mlx-community/Qwen2-VL-2B-Instruct-4bit",
@@ -34,8 +60,7 @@ public struct Configuration: Codable {
         temperature: Double = 0.1,
         pdfDPI: Int = 150,
         verbose: Bool = false,
-        dateFormat: String = "yyyy-MM-dd",
-        filenamePattern: String = "{date}_Rechnung_{company}.pdf"
+        output: OutputSettings = OutputSettings()
     ) {
         self.modelName = modelName
         self.modelCacheDir = modelCacheDir ?? FileManager.default.homeDirectoryForCurrentUser
@@ -45,8 +70,7 @@ public struct Configuration: Codable {
         self.temperature = temperature
         self.pdfDPI = pdfDPI
         self.verbose = verbose
-        self.dateFormat = dateFormat
-        self.filenamePattern = filenamePattern
+        self.output = output
     }
 
     /// Load configuration from YAML file
@@ -70,7 +94,7 @@ public struct Configuration: Codable {
     }
 
     /// Get default configuration
-    public static var `default`: Configuration {
+    public static var defaultConfiguration: Configuration {
         Configuration()
     }
 }

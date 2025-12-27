@@ -3,7 +3,7 @@ import XCTest
 
 final class ConfigurationTests: XCTestCase {
     func testDefaultConfiguration() {
-        let config = Configuration.default
+        let config = Configuration.defaultConfiguration
 
         XCTAssertEqual(config.modelName, "mlx-community/Qwen2-VL-2B-Instruct-4bit")
         XCTAssertEqual(config.maxTokens, 256)
@@ -22,8 +22,10 @@ final class ConfigurationTests: XCTestCase {
             temperature: 0.5,
             pdfDPI: 300,
             verbose: true,
-            dateFormat: "dd-MM-yyyy",
-            filenamePattern: "{company}_{date}.pdf"
+            output: OutputSettings(
+                dateFormat: "dd-MM-yyyy",
+                filenamePattern: "{company}_{date}.pdf"
+            )
         )
 
         XCTAssertEqual(config.modelName, "custom-model")
@@ -37,7 +39,7 @@ final class ConfigurationTests: XCTestCase {
     }
 
     func testConfigurationDescription() {
-        let config = Configuration.default
+        let config = Configuration.defaultConfiguration
         let description = config.description
 
         XCTAssertTrue(description.contains("Configuration:"))
