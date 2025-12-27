@@ -31,15 +31,17 @@ jobs:
 
     - name: Convert Coverage to SonarQube Format
       run: |
-        # Extract coverage data from xcresult bundle
-        # Using xcrun xccov to extract coverage info
-        xcrun xccov view --report --json TestResults.xcresult > coverage.json || true
+        # Install xcresultparser for coverage conversion
+        brew install a7ex/homebrew-formulae/xcresultparser
 
-        # Convert to generic coverage format if coverage data exists
-        if [ -f coverage.json ] && [ -s coverage.json ]; then
-          echo "Coverage data extracted successfully"
+        # Convert xcresult to SonarQube generic coverage format
+        xcresultparser --output-format cobertura TestResults.xcresult > coverage.xml || true
+
+        if [ -f coverage.xml ] && [ -s coverage.xml ]; then
+          echo "✅ Coverage data converted to Cobertura format"
+          head -20 coverage.xml
         else
-          echo "No coverage data available"
+          echo "⚠️ No coverage data available"
         fi
 
     - name: Run SwiftLint (Optional)
