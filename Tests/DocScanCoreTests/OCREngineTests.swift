@@ -81,6 +81,64 @@ final class OCREngineTests: XCTestCase {
         XCTAssertNil(date)
     }
 
+    func testExtractDateColonSeparated() {
+        // OCR sometimes reads dots as colons
+        let text = "Datum:13:11:2025"
+        let date = engine.extractDate(from: text)
+
+        XCTAssertNotNil(date)
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2025)
+        XCTAssertEqual(components.month, 11)
+        XCTAssertEqual(components.day, 13)
+    }
+
+    func testExtractDateGermanMonth() {
+        let text = "Beitragsrechnung September 2022"
+        let date = engine.extractDate(from: text)
+
+        XCTAssertNotNil(date)
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2022)
+        XCTAssertEqual(components.month, 9)
+        XCTAssertEqual(components.day, 1) // First of month for month-only dates
+    }
+
+    func testExtractDateGermanMonthAbbreviated() {
+        let text = "Rechnung Okt 2023"
+        let date = engine.extractDate(from: text)
+
+        XCTAssertNotNil(date)
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2023)
+        XCTAssertEqual(components.month, 10)
+    }
+
+    func testExtractDateGermanMonthWordBoundary() {
+        // "mai" should not match within "email"
+        let textWithEmail = "Contact: info@company.com or email 2023"
+        let dateFromEmail = engine.extractDate(from: textWithEmail)
+        XCTAssertNil(dateFromEmail, "Should not match 'mai' within 'email'")
+
+        // "jan" should not match within "january" when looking for German abbreviation
+        // (but "januar" should still work as full German month)
+        let textWithJanuar = "Rechnung Januar 2023"
+        let dateFromJanuar = engine.extractDate(from: textWithJanuar)
+        XCTAssertNotNil(dateFromJanuar, "Should match 'januar' as complete word")
+
+        // Standalone "mai" should still work
+        let textWithMai = "Rechnung Mai 2023"
+        let dateFromMai = engine.extractDate(from: textWithMai)
+        XCTAssertNotNil(dateFromMai, "Should match standalone 'Mai'")
+        if let date = dateFromMai {
+            let components = Calendar.current.dateComponents([.month], from: date)
+            XCTAssertEqual(components.month, 5)
+        }
+    }
+
     // MARK: - Company Extraction Tests
 
     func testExtractCompanyWithKeywords() {
