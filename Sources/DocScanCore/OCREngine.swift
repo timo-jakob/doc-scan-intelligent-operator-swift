@@ -195,16 +195,18 @@ public class OCREngine {
             }
         }
 
-        // Fallback: try any date pattern in the text
+        // Try German month format anywhere in text FIRST
+        // This is preferred over numeric dates because billing period dates like "September 2022"
+        // are more likely to be the invoice date than other dates like payment due dates
+        if let date = extractGermanMonthDate(from: text) {
+            return date
+        }
+
+        // Fallback: try any numeric date pattern in the text
         for pattern in patterns {
             if let date = extractDateWithPattern(text, pattern: pattern) {
                 return date
             }
-        }
-
-        // Try German month format anywhere in text
-        if let date = extractGermanMonthDate(from: text) {
-            return date
         }
 
         return nil
