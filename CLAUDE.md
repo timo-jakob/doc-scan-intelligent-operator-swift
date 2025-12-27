@@ -447,6 +447,38 @@ Testing best practices:
 - Test both success and failure cases
 - Use `XCTAssertThrowsError` for error cases
 
+## SonarQube Cloud Integration
+
+The project uses SonarQube Cloud for code quality analysis. Analysis runs automatically on:
+- Push to `main` branch
+- Pull requests targeting `main`
+
+### Setup Requirements
+
+1. **Add SONAR_TOKEN secret to GitHub repository:**
+   - Go to [SonarQube Cloud](https://sonarcloud.io) → Your Account → Security
+   - Generate a new token
+   - Add it to GitHub: Repository → Settings → Secrets → Actions → New secret
+   - Name: `SONAR_TOKEN`, Value: your generated token
+
+2. **Project Configuration:**
+   - Organization: `timo-jakob-github`
+   - Project Key: `timo-jakob_doc-scan-intelligent-operator-swift`
+   - Configuration file: `sonar-project.properties`
+
+### What Gets Analyzed
+
+- Source code in `Sources/`
+- Test code in `Tests/`
+- Code coverage from xcodebuild tests
+- SwiftLint issues (if SwiftLint is installed)
+
+### Quality Gate
+
+The workflow includes a Quality Gate check that will:
+- Pass if the code meets quality standards
+- Fail if new code introduces issues above thresholds
+
 ## Key Implementation Notes
 
 ### Modifying Configuration

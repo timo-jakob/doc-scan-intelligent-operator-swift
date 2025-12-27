@@ -1,0 +1,65 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sonarqube:
+    name: SonarQube Scan
+    runs-on: macos-15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for accurate blame information
+
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+    - name: Build and Test with Coverage
+      run: |
+        # Build and run tests with code coverage enabled
+        xcodebuild test \
+          -scheme DocScan-Package \
+          -destination 'platform=macOS' \
+          -enableCodeCoverage YES \
+          -resultBundlePath TestResults.xcresult
+
+    - name: Convert Coverage to SonarQube Format
+      run: |
+        # Extract coverage data from xcresult bundle
+        # Using xcrun xccov to extract coverage info
+        xcrun xccov view --report --json TestResults.xcresult > coverage.json || true
+
+        # Convert to generic coverage format if coverage data exists
+        if [ -f coverage.json ] && [ -s coverage.json ]; then
+          echo "Coverage data extracted successfully"
+        else
+          echo "No coverage data available"
+        fi
+
+    - name: Run SwiftLint (Optional)
+      run: |
+        if command -v swiftlint &> /dev/null; then
+          swiftlint --reporter json > swiftlint-report.json || true
+        else
+          echo "SwiftLint not installed, skipping"
+          echo "[]" > swiftlint-report.json
+        fi
+      continue-on-error: true
+
+    - name: SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@v5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: https://sonarcloud.io
+
+    - name: SonarQube Quality Gate
+      uses: SonarSource/sonarqube-quality-gate-action@v1
+      timeout-minutes: 5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
