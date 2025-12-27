@@ -31,22 +31,23 @@ jobs:
 
     - name: Convert Coverage to SonarQube Format
       run: |
-        # Install slather for coverage conversion (lcov format for SonarQube)
-        gem install slather
+        # Convert xcresult coverage to SonarQube generic format
+        # Set REPO_ROOT for relative path conversion
+        export REPO_ROOT="${GITHUB_WORKSPACE}"
 
-        # First, export the xcresult coverage to a format we can work with
-        # Using xcrun xccov to get coverage data
-        xcrun xccov view --report --json TestResults.xcresult > coverage.json 2>/dev/null || true
+        if [ -d "TestResults.xcresult" ]; then
+          echo "Converting coverage data to SonarQube format..."
+          bash scripts/xccov-to-sonarqube-generic.sh TestResults.xcresult > coverage.xml
 
-        # Create lcov-style coverage report from xccov
-        if [ -f coverage.json ] && [ -s coverage.json ]; then
-          echo "✅ Coverage data extracted from xcresult"
-
-          # For now, just log that coverage was found
-          # Full lcov conversion requires additional tooling
-          echo "Coverage data available for analysis"
+          if [ -s coverage.xml ]; then
+            echo "✅ Coverage report generated: coverage.xml"
+            # Show first few lines for debugging
+            head -20 coverage.xml
+          else
+            echo "⚠️ Coverage report is empty"
+          fi
         else
-          echo "⚠️ No coverage data available - continuing without coverage"
+          echo "⚠️ No xcresult bundle found - continuing without coverage"
         fi
 
     - name: Run SwiftLint (Optional)
