@@ -214,7 +214,6 @@ public class OCREngine {
 
     /// Extract date from German month format like "September 2022"
     private func extractGermanMonthDate(from text: String) -> Date? {
-        // Pattern to find month name followed by year
         let germanMonths = [
             "januar", "februar", "märz", "maerz", "april", "mai", "juni",
             "juli", "august", "september", "oktober", "november", "dezember",
@@ -223,21 +222,28 @@ public class OCREngine {
 
         let lowercased = text.lowercased()
         for month in germanMonths {
-            if let monthRange = lowercased.range(of: month) {
-                // Look for a 4-digit year after the month
-                let afterMonth = String(lowercased[monthRange.upperBound...]).prefix(20)
-                let yearPattern = "\\b(20\\d{2})\\b"
+            // Use word boundary regex to avoid false positives (e.g., "mai" in "email")
+            let monthPattern = "\\b\(NSRegularExpression.escapedPattern(for: month))\\b"
+            guard let monthRegex = try? NSRegularExpression(pattern: monthPattern, options: .caseInsensitive),
+                  let monthMatch = monthRegex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)),
+                  let monthRange = Range(monthMatch.range, in: lowercased) else {
+                continue
+            }
 
-                guard let regex = try? NSRegularExpression(pattern: yearPattern),
-                      let match = regex.firstMatch(in: String(afterMonth), range: NSRange(afterMonth.startIndex..., in: afterMonth)),
-                      let range = Range(match.range, in: afterMonth) else {
-                    continue
-                }
+            // Look for a 4-digit year after the month
+            let afterMonthString = String(String(lowercased[monthRange.upperBound...]).prefix(20))
+            let yearPattern = "\\b(20\\d{2})\\b"
 
-                let monthYearString = "\(month) \(afterMonth[range])"
-                if let date = DateUtils.parseDate(monthYearString) {
-                    return date
-                }
+            guard let yearRegex = try? NSRegularExpression(pattern: yearPattern),
+                  let yearMatch = yearRegex.firstMatch(in: afterMonthString, range: NSRange(afterMonthString.startIndex..., in: afterMonthString)),
+                  let yearRange = Range(yearMatch.range, in: afterMonthString) else {
+                continue
+            }
+
+            let yearString = afterMonthString[yearRange]
+            let monthYearString = "\(month) \(yearString)"
+            if let date = DateUtils.parseDate(monthYearString) {
+                return date
             }
         }
 

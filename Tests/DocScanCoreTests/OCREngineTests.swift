@@ -117,6 +117,28 @@ final class OCREngineTests: XCTestCase {
         XCTAssertEqual(components.month, 10)
     }
 
+    func testExtractDateGermanMonthWordBoundary() {
+        // "mai" should not match within "email"
+        let textWithEmail = "Contact: info@company.com or email 2023"
+        let dateFromEmail = engine.extractDate(from: textWithEmail)
+        XCTAssertNil(dateFromEmail, "Should not match 'mai' within 'email'")
+
+        // "jan" should not match within "january" when looking for German abbreviation
+        // (but "januar" should still work as full German month)
+        let textWithJanuar = "Rechnung Januar 2023"
+        let dateFromJanuar = engine.extractDate(from: textWithJanuar)
+        XCTAssertNotNil(dateFromJanuar, "Should match 'januar' as complete word")
+
+        // Standalone "mai" should still work
+        let textWithMai = "Rechnung Mai 2023"
+        let dateFromMai = engine.extractDate(from: textWithMai)
+        XCTAssertNotNil(dateFromMai, "Should match standalone 'Mai'")
+        if let date = dateFromMai {
+            let components = Calendar.current.dateComponents([.month], from: date)
+            XCTAssertEqual(components.month, 5)
+        }
+    }
+
     // MARK: - Company Extraction Tests
 
     func testExtractCompanyWithKeywords() {
