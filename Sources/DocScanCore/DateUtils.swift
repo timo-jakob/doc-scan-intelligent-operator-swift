@@ -15,6 +15,20 @@ public enum DateUtils {
         "MM/dd/yyyy"    // US format: 12/22/2024
     ]
 
+    /// Regex patterns for extracting dates from text
+    private static let datePatterns = [
+        "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b",       // ISO: 2024-12-22
+        "\\b(\\d{2})[./](\\d{2})[./](\\d{4})\\b", // European: 22.12.2024
+        "\\b(\\d{2}):(\\d{2}):(\\d{4})\\b",       // Colon-separated: 22:12:2024
+        "\\b(\\d{2})/(\\d{2})/(\\d{4})\\b"        // US: 12/22/2024
+    ]
+
+    /// Keywords that typically precede invoice dates
+    private static let dateKeywords = [
+        "rechnungsdatum:", "invoice date:", "datum:", "date:",
+        "rechnungsdatum", "invoice date", "facture du:", "fecha:"
+    ]
+
     /// German month names for parsing "September 2022" style dates
     private static let germanMonths: [String: Int] = [
         "januar": 1, "jan": 1,
@@ -29,6 +43,13 @@ public enum DateUtils {
         "oktober": 10, "okt": 10, "oct": 10,
         "november": 11, "nov": 11,
         "dezember": 12, "dez": 12, "dec": 12
+    ]
+
+    /// German month names as array for text searching (ordered by length for proper matching)
+    private static let germanMonthNames = [
+        "januar", "februar", "märz", "maerz", "april", "mai", "juni",
+        "juli", "august", "september", "oktober", "november", "dezember",
+        "jan", "feb", "mrz", "apr", "jun", "jul", "aug", "sep", "sept", "okt", "nov", "dez"
     ]
 
     /// Parse a date string using multiple format attempts
@@ -127,5 +148,111 @@ public enum DateUtils {
         formatter.dateFormat = format
         formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter.string(from: date)
+    }
+
+    // MARK: - Text Extraction Functions
+
+    /// Extract a date from text, trying multiple strategies
+    /// 1. Look for dates near common keywords (most reliable)
+    /// 2. Try German month format anywhere (preferred for billing periods)
+    /// 3. Try numeric date patterns anywhere (fallback)
+    /// - Parameter text: The text to search for dates
+    /// - Returns: The first valid date found, or nil
+    public static func extractDateFromText(_ text: String) -> Date? {
+        // Strategy 1: Try to find date near common keywords first (more reliable)
+        for keyword in dateKeywords {
+            if let range = text.range(of: keyword, options: .caseInsensitive) {
+                let afterKeyword = String(text[range.upperBound...])
+                let nearbyText = String(afterKeyword.prefix(40))
+
+                // Try numeric patterns near keywords
+                for pattern in datePatterns {
+                    if let date = extractDateWithPattern(nearbyText, pattern: pattern) {
+                        return date
+                    }
+                }
+
+                // Try German month format near keywords
+                if let date = extractGermanMonthFromText(nearbyText) {
+                    return date
+                }
+            }
+        }
+
+        // Strategy 2: Try German month format anywhere in text FIRST
+        // This is preferred over numeric dates because billing period dates like "September 2022"
+        // are more likely to be the invoice date than other dates like payment due dates
+        if let date = extractGermanMonthFromText(text) {
+            return date
+        }
+
+        // Strategy 3: Fallback - try any numeric date pattern in the text
+        for pattern in datePatterns {
+            if let date = extractDateWithPattern(text, pattern: pattern) {
+                return date
+            }
+        }
+
+        return nil
+    }
+
+    /// Extract date from German month format like "September 2022"
+    /// Uses word boundary matching to avoid false positives (e.g., "mai" in "email")
+    /// - Parameter text: The text to search
+    /// - Returns: A Date if a German month + year pattern is found, nil otherwise
+    public static func extractGermanMonthFromText(_ text: String) -> Date? {
+        let lowercased = text.lowercased()
+
+        for month in germanMonthNames {
+            // Use word boundary regex to avoid false positives
+            let monthPattern = "\\b\(NSRegularExpression.escapedPattern(for: month))\\b"
+            guard let monthRegex = try? NSRegularExpression(pattern: monthPattern, options: .caseInsensitive),
+                  let monthMatch = monthRegex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)),
+                  let monthRange = Range(monthMatch.range, in: lowercased) else {
+                continue
+            }
+
+            // Look for a 4-digit year after the month
+            let afterMonthString = String(String(lowercased[monthRange.upperBound...]).prefix(20))
+            let yearPattern = "\\b(20\\d{2})\\b"
+
+            guard let yearRegex = try? NSRegularExpression(pattern: yearPattern),
+                  let yearMatch = yearRegex.firstMatch(in: afterMonthString, range: NSRange(afterMonthString.startIndex..., in: afterMonthString)),
+                  let yearRange = Range(yearMatch.range, in: afterMonthString) else {
+                continue
+            }
+
+            let yearString = afterMonthString[yearRange]
+            let monthYearString = "\(month) \(yearString)"
+            if let date = parseDate(monthYearString) {
+                return date
+            }
+        }
+
+        return nil
+    }
+
+    /// Extract a date using a specific regex pattern
+    /// - Parameters:
+    ///   - text: The text to search
+    ///   - pattern: The regex pattern to match
+    /// - Returns: A Date if the pattern matches and parses successfully, nil otherwise
+    public static func extractDateWithPattern(_ text: String, pattern: String) -> Date? {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+
+        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+
+        for match in matches {
+            if let range = Range(match.range, in: text) {
+                let dateString = String(text[range])
+                if let date = parseDate(dateString) {
+                    return date
+                }
+            }
+        }
+
+        return nil
     }
 }
