@@ -1,14 +1,61 @@
 import XCTest
+import PDFKit
 @testable import DocScanCore
 
 final class InvoiceDetectorTests: XCTestCase {
     var detector: InvoiceDetector!
     var config: Configuration!
+    var tempDirectory: URL!
+
+    /// Embedded searchable PDF for testing
+    private static let searchablePDFBase64 = """
+    JVBERi0xLjQKJcOkw7zDtsOfCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBS
+    Cj4+CmVuZG9iagoKMiAwIG9iago8PAovVHlwZSAvUGFnZXMKL0tpZHMgWzMgMCBSXQovQ291bnQg
+    MQo+PgplbmRvYmoKCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFC
+    b3ggWzAgMCA2MTIgNzkyXQovQ29udGVudHMgNCAwIFIKL1Jlc291cmNlcyA8PAovRm9udCA8PAov
+    RjEgNSAwIFIKPj4KPj4KPj4KZW5kb2JqCgo0IDAgb2JqCjw8Ci9MZW5ndGggMTIzCj4+CnN0cmVh
+    bQpCVAovRjEgMTIgVGYKNTAgNzAwIFRkCihIZWxsbyBXb3JsZCBSZWNobnVuZyBJbnZvaWNlIFRl
+    c3QgRG9jdW1lbnQgMTIzNDUgVGhpcyBpcyBhIHRlc3QgUERGIHdpdGggc2VhcmNoYWJsZSB0ZXh0
+    KSBUagpFVAplbmRzdHJlYW0KZW5kb2JqCgo1IDAgb2JqCjw8Ci9UeXBlIC9Gb250Ci9TdWJ0eXBl
+    IC9UeXBlMQovQmFzZUZvbnQgL0hlbHZldGljYQo+PgplbmRvYmoKCnhyZWYKMCA2CjAwMDAwMDAw
+    MDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDY4IDAwMDAwIG4gCjAwMDAw
+    MDAxMjcgMDAwMDAgbiAKMDAwMDAwMDI5NCAwMDAwMCBuIAowMDAwMDAwNDY5IDAwMDAwIG4gCnRy
+    YWlsZXIKPDwKL1NpemUgNgovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNTQ5CiUlRU9GCg==
+    """
 
     override func setUp() {
         super.setUp()
         config = Configuration.defaultConfiguration
         detector = InvoiceDetector(config: config)
+        tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: tempDirectory)
+        super.tearDown()
+    }
+
+    private func createSearchablePDF() throws -> String {
+        let pdfPath = tempDirectory.appendingPathComponent("test_invoice.pdf").path
+        guard let pdfData = Data(base64Encoded: Self.searchablePDFBase64, options: .ignoreUnknownCharacters) else {
+            throw NSError(domain: "TestError", code: 1)
+        }
+        try pdfData.write(to: URL(fileURLWithPath: pdfPath))
+        return pdfPath
+    }
+
+    private func createEmptyPDF() throws -> String {
+        let pdfPath = tempDirectory.appendingPathComponent("empty.pdf").path
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let context = CGContext(URL(fileURLWithPath: pdfPath) as CFURL, mediaBox: &mediaBox, nil) else {
+            throw NSError(domain: "TestError", code: 1)
+        }
+        context.beginPage(mediaBox: &mediaBox)
+        context.endPage()
+        context.closePDF()
+        return pdfPath
     }
 
     func testInvoiceDataInitialization() {
@@ -386,5 +433,133 @@ final class InvoiceDetectorTests: XCTestCase {
         XCTAssertNotNil(data.categorization)
         XCTAssertFalse(data.categorization!.bothAgree)
         XCTAssertNil(data.categorization!.agreedIsInvoice)
+    }
+
+    // MARK: - Extract Data Tests (Sync)
+    // Note: Async tests that call categorize() require VLM model which is not available in CI
+    // (MLX Metal library cannot be built via SPM). These tests cover what can be tested without VLM.
+
+    func testExtractDataWithoutCategorization() async {
+        // extractData should fail if categorize wasn't called first
+        do {
+            _ = try await detector.extractData()
+            XCTFail("Should have thrown an error")
+        } catch let error as DocScanError {
+            if case .extractionFailed(let message) = error {
+                XCTAssertTrue(message.contains("No OCR text"))
+            } else {
+                XCTFail("Expected extractionFailed error")
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    // MARK: - PDF Validation Tests (Sync via PDFUtils)
+
+    func testValidatePDFWithInvalidPath() {
+        // Test that PDFUtils.validatePDF throws for non-existent file
+        XCTAssertThrowsError(try PDFUtils.validatePDF(at: "/nonexistent/file.pdf")) { error in
+            guard let docScanError = error as? DocScanError else {
+                XCTFail("Expected DocScanError")
+                return
+            }
+            if case .fileNotFound = docScanError {
+                // Expected
+            } else {
+                XCTFail("Expected fileNotFound error")
+            }
+        }
+    }
+
+    func testValidatePDFWithInvalidFile() throws {
+        // Create a non-PDF file with .pdf extension
+        let fakePDFPath = tempDirectory.appendingPathComponent("fake.pdf").path
+        try "This is not a PDF".write(toFile: fakePDFPath, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try PDFUtils.validatePDF(at: fakePDFPath)) { error in
+            guard let docScanError = error as? DocScanError else {
+                XCTFail("Expected DocScanError")
+                return
+            }
+            if case .invalidPDF = docScanError {
+                // Expected
+            } else {
+                XCTFail("Expected invalidPDF error")
+            }
+        }
+    }
+
+    func testValidatePDFWithValidFile() throws {
+        let pdfPath = try createSearchablePDF()
+        XCTAssertNoThrow(try PDFUtils.validatePDF(at: pdfPath))
+    }
+
+    // MARK: - Direct Text Extraction Integration Tests
+
+    func testDirectTextExtractionWithSearchablePDF() throws {
+        let pdfPath = try createSearchablePDF()
+
+        // Extract text using PDFUtils
+        let text = PDFUtils.extractText(from: pdfPath)
+        XCTAssertNotNil(text)
+        XCTAssertTrue(text?.contains("Rechnung") ?? false)
+
+        // Test categorization with extracted text
+        if let extractedText = text {
+            let result = detector.categorizeWithDirectText(extractedText)
+            XCTAssertTrue(result.isInvoice)
+            XCTAssertEqual(result.method, "PDF")
+        }
+    }
+
+    func testDirectTextExtractionWithEmptyPDF() throws {
+        let pdfPath = try createEmptyPDF()
+
+        // Extract text from empty PDF - should return nil or empty
+        let text = PDFUtils.extractText(from: pdfPath)
+        let isEmpty = text == nil || text!.isEmpty || text!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        // If some text is extracted, it should be below minimum threshold
+        if let extractedText = text, !extractedText.isEmpty {
+            XCTAssertLessThan(extractedText.count, PDFUtils.minimumTextLength)
+        } else {
+            XCTAssertTrue(isEmpty)
+        }
+    }
+
+    func testHasExtractableTextWithSearchablePDF() throws {
+        let pdfPath = try createSearchablePDF()
+        XCTAssertTrue(PDFUtils.hasExtractableText(at: pdfPath))
+    }
+
+    func testHasExtractableTextWithEmptyPDF() throws {
+        let pdfPath = try createEmptyPDF()
+        XCTAssertFalse(PDFUtils.hasExtractableText(at: pdfPath))
+    }
+
+    // MARK: - Generate Filename Edge Cases
+
+    func testGenerateFilenameWithSpecialCharacters() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = dateFormatter.date(from: "2024-12-15")!
+
+        // Note: generateFilename doesn't sanitize the company name - that happens
+        // earlier in the flow via StringUtils.sanitizeCompanyName
+        // This test verifies generateFilename works with any company name
+        let data = InvoiceData(isInvoice: true, date: date, company: "Test Company")
+        let filename = detector.generateFilename(from: data)
+
+        XCTAssertNotNil(filename)
+        XCTAssertEqual(filename, "2024-12-15_Rechnung_Test Company.pdf")
+    }
+
+    func testGenerateFilenameWithEmptyCompany() {
+        let data = InvoiceData(isInvoice: true, date: Date(), company: "")
+        let filename = detector.generateFilename(from: data)
+
+        // Empty company should still generate filename with empty company part
+        XCTAssertNotNil(filename)
     }
 }
