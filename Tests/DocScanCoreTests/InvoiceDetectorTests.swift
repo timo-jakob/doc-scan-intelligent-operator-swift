@@ -1,11 +1,54 @@
 import XCTest
 import PDFKit
+import AppKit
 @testable import DocScanCore
+
+// MARK: - Mock VLM Provider
+
+/// Mock VLM provider for testing without actual model loading
+final class MockVLMProvider: VLMProvider, @unchecked Sendable {
+    /// Configure the mock response
+    var mockResponse: String = "YES"
+    var shouldThrowError: Bool = false
+    var errorToThrow: Error = DocScanError.modelLoadFailed("Mock error")
+
+    /// Track calls for verification
+    private(set) var generateFromImageCallCount = 0
+    private(set) var lastPrompt: String?
+    private(set) var lastImage: NSImage?
+
+    func generateFromImage(
+        _ image: NSImage,
+        prompt: String,
+        modelName: String?
+    ) async throws -> String {
+        generateFromImageCallCount += 1
+        lastPrompt = prompt
+        lastImage = image
+
+        if shouldThrowError {
+            throw errorToThrow
+        }
+
+        return mockResponse
+    }
+
+    func reset() {
+        generateFromImageCallCount = 0
+        lastPrompt = nil
+        lastImage = nil
+        mockResponse = "YES"
+        shouldThrowError = false
+    }
+}
+
+// MARK: - Invoice Detector Tests
 
 final class InvoiceDetectorTests: XCTestCase {
     var detector: InvoiceDetector!
     var config: Configuration!
     var tempDirectory: URL!
+    var mockVLM: MockVLMProvider!
 
     /// Embedded searchable PDF for testing
     private static let searchablePDFBase64 = """
@@ -26,7 +69,8 @@ final class InvoiceDetectorTests: XCTestCase {
     override func setUp() {
         super.setUp()
         config = Configuration.defaultConfiguration
-        detector = InvoiceDetector(config: config)
+        mockVLM = MockVLMProvider()
+        detector = InvoiceDetector(config: config, vlmProvider: mockVLM)
         tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -34,7 +78,13 @@ final class InvoiceDetectorTests: XCTestCase {
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: tempDirectory)
+        mockVLM = nil
         super.tearDown()
+    }
+
+    /// Create detector without mock for tests that don't need VLM
+    private func createDetectorWithoutMock() -> InvoiceDetector {
+        return InvoiceDetector(config: config)
     }
 
     private func createSearchablePDF() throws -> String {
@@ -476,10 +526,168 @@ final class InvoiceDetectorTests: XCTestCase {
         }
     }
 
-    // Note: Tests that call categorize() with valid PDFs are not possible in CI
-    // because the MLX library fails with a fatal C++ error when Metal is not available.
-    // The categorizeWithDirectText() method is fully tested instead, which covers
-    // the new direct PDF text extraction functionality.
+    // MARK: - Categorize with Mock VLM Tests
+
+    func testCategorizeWithSearchablePDFVLMSaysYes() async throws {
+        // Test categorize() with searchable PDF where VLM says YES
+        let pdfPath = try createSearchablePDF()
+        mockVLM.mockResponse = "YES"
+
+        let result = try await detector.categorize(pdfPath: pdfPath)
+
+        // VLM should have been called
+        XCTAssertEqual(mockVLM.generateFromImageCallCount, 1)
+        XCTAssertNotNil(mockVLM.lastPrompt)
+        XCTAssertTrue(mockVLM.lastPrompt?.contains("INVOICE") ?? false)
+
+        // Both VLM and OCR should agree it's an invoice (PDF contains "Rechnung")
+        XCTAssertTrue(result.vlmResult.isInvoice)
+        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertTrue(result.bothAgree)
+        XCTAssertEqual(result.agreedIsInvoice, true)
+
+        // OCR should use direct PDF extraction
+        XCTAssertEqual(result.ocrResult.method, "PDF")
+    }
+
+    func testCategorizeWithSearchablePDFVLMSaysNo() async throws {
+        // Test categorize() with searchable PDF where VLM says NO (disagrees with OCR)
+        let pdfPath = try createSearchablePDF()
+        mockVLM.mockResponse = "NO"
+
+        let result = try await detector.categorize(pdfPath: pdfPath)
+
+        // VLM says no, OCR says yes (PDF contains "Rechnung")
+        XCTAssertFalse(result.vlmResult.isInvoice)
+        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertFalse(result.bothAgree)
+        XCTAssertNil(result.agreedIsInvoice)
+    }
+
+    func testCategorizeWithEmptyPDFThrowsError() async throws {
+        // Test categorize() with empty PDF (no extractable text)
+        // Empty PDFs cause OCR to throw "No text recognized" error
+        let pdfPath = try createEmptyPDF()
+        mockVLM.mockResponse = "NO"
+
+        do {
+            _ = try await detector.categorize(pdfPath: pdfPath)
+            XCTFail("Should have thrown extractionFailed error for empty PDF")
+        } catch let error as DocScanError {
+            if case .extractionFailed(let message) = error {
+                XCTAssertTrue(message.contains("No text recognized"))
+            } else {
+                XCTFail("Expected extractionFailed error, got: \(error)")
+            }
+        }
+
+        // VLM should still have been called before OCR failed
+        XCTAssertEqual(mockVLM.generateFromImageCallCount, 1)
+    }
+
+    func testCategorizeWithVLMError() async throws {
+        // Test categorize() when VLM throws an error
+        let pdfPath = try createSearchablePDF()
+        mockVLM.shouldThrowError = true
+        mockVLM.errorToThrow = DocScanError.inferenceError("Mock VLM error")
+
+        let result = try await detector.categorize(pdfPath: pdfPath)
+
+        // VLM should return error result
+        XCTAssertFalse(result.vlmResult.isInvoice)
+        XCTAssertEqual(result.vlmResult.confidence, "low")
+        XCTAssertTrue(result.vlmResult.method.contains("error"))
+
+        // OCR should still work (PDF contains "Rechnung")
+        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertEqual(result.ocrResult.method, "PDF")
+
+        // They disagree
+        XCTAssertFalse(result.bothAgree)
+    }
+
+    func testCategorizeVerboseMode() async throws {
+        // Test categorize() with verbose configuration
+        let verboseConfig = Configuration(verbose: true)
+        let verboseDetector = InvoiceDetector(config: verboseConfig, vlmProvider: mockVLM)
+        let pdfPath = try createSearchablePDF()
+        mockVLM.mockResponse = "YES"
+
+        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+
+        // Should complete successfully with verbose output
+        XCTAssertTrue(result.vlmResult.isInvoice)
+        XCTAssertTrue(result.ocrResult.isInvoice)
+    }
+
+    func testCategorizeVerboseModeEmptyPDF() async throws {
+        // Test verbose mode with empty PDF (exercises OCR fallback verbose path)
+        // Empty PDFs cause OCR to throw "No text recognized" error
+        let verboseConfig = Configuration(verbose: true)
+        let verboseDetector = InvoiceDetector(config: verboseConfig, vlmProvider: mockVLM)
+        let pdfPath = try createEmptyPDF()
+        mockVLM.mockResponse = "NO"
+
+        do {
+            _ = try await verboseDetector.categorize(pdfPath: pdfPath)
+            XCTFail("Should have thrown extractionFailed error")
+        } catch let error as DocScanError {
+            if case .extractionFailed(let message) = error {
+                XCTAssertTrue(message.contains("No text recognized"))
+            } else {
+                XCTFail("Expected extractionFailed error, got: \(error)")
+            }
+        }
+    }
+
+    func testCategorizeWithVLMTimeout() async throws {
+        // Test categorize() when VLM times out
+        let pdfPath = try createSearchablePDF()
+        mockVLM.shouldThrowError = true
+        mockVLM.errorToThrow = TimeoutError()
+
+        let result = try await detector.categorize(pdfPath: pdfPath)
+
+        // VLM should return timeout result
+        XCTAssertFalse(result.vlmResult.isInvoice)
+        XCTAssertEqual(result.vlmResult.confidence, "low")
+        XCTAssertTrue(result.vlmResult.method.contains("timeout"))
+        XCTAssertEqual(result.vlmResult.reason, "Timed out")
+
+        // OCR should still work
+        XCTAssertTrue(result.ocrResult.isInvoice)
+    }
+
+    func testCategorizeDirectTextExtractionPath() async throws {
+        // Test that direct text extraction is used for searchable PDFs
+        let pdfPath = try createSearchablePDF()
+        mockVLM.mockResponse = "YES"
+
+        let result = try await detector.categorize(pdfPath: pdfPath)
+
+        // OCR result should indicate PDF method (direct extraction)
+        XCTAssertEqual(result.ocrResult.method, "PDF")
+        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertNotNil(result.ocrResult.reason)
+    }
+
+    func testCategorizeOCRFallbackPathThrowsForEmptyPDF() async throws {
+        // Test that OCR fallback is used for empty PDFs
+        // Empty PDFs throw an error because OCR finds no text
+        let pdfPath = try createEmptyPDF()
+        mockVLM.mockResponse = "NO"
+
+        do {
+            _ = try await detector.categorize(pdfPath: pdfPath)
+            XCTFail("Should have thrown extractionFailed error")
+        } catch let error as DocScanError {
+            if case .extractionFailed(let message) = error {
+                XCTAssertTrue(message.contains("No text recognized"))
+            } else {
+                XCTFail("Expected extractionFailed error, got: \(error)")
+            }
+        }
+    }
 
     // MARK: - Extract Data Tests (Sync)
 

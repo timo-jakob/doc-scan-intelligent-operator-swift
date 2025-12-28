@@ -67,7 +67,7 @@ public struct InvoiceData {
 /// Phase 1: Categorization (VLM + OCR in parallel) - Is this an invoice?
 /// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and company
 public class InvoiceDetector {
-    private let modelManager: ModelManager
+    private let vlmProvider: VLMProvider
     private let ocrEngine: OCREngine
     private let config: Configuration
 
@@ -77,9 +77,17 @@ public class InvoiceDetector {
     private var cachedPDFPath: String?
     private var usedDirectExtraction: Bool = false
 
+    /// Initialize with default ModelManager
     public init(config: Configuration) {
         self.config = config
-        self.modelManager = ModelManager(config: config)
+        self.vlmProvider = ModelManager(config: config)
+        self.ocrEngine = OCREngine(config: config)
+    }
+
+    /// Initialize with custom VLM provider (for testing/dependency injection)
+    public init(config: Configuration, vlmProvider: VLMProvider) {
+        self.config = config
+        self.vlmProvider = vlmProvider
         self.ocrEngine = OCREngine(config: config)
     }
 
@@ -240,7 +248,7 @@ public class InvoiceDetector {
         Answer with ONLY one word: YES or NO
         """
 
-        let response = try await modelManager.generateFromImage(image, prompt: prompt)
+        let response = try await vlmProvider.generateFromImage(image, prompt: prompt)
 
         if config.verbose {
             print("VLM response: \(response)")
