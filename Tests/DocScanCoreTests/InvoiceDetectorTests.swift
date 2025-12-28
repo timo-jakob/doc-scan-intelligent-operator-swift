@@ -476,6 +476,11 @@ final class InvoiceDetectorTests: XCTestCase {
         }
     }
 
+    // Note: Tests that call categorize() with valid PDFs are not possible in CI
+    // because the MLX library fails with a fatal C++ error when Metal is not available.
+    // The categorizeWithDirectText() method is fully tested instead, which covers
+    // the new direct PDF text extraction functionality.
+
     // MARK: - Extract Data Tests (Sync)
 
     func testExtractDataWithoutCategorization() async {
