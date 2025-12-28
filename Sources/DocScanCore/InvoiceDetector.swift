@@ -258,10 +258,11 @@ public class InvoiceDetector {
         return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "VLM", reason: response)
     }
 
-    // MARK: - OCR Categorization
+    // MARK: - Text Categorization
 
     /// Categorize using direct PDF text (no OCR needed - faster and more accurate)
-    private func categorizeWithDirectText(_ text: String) -> CategorizationResult {
+    /// Internal access for testability
+    func categorizeWithDirectText(_ text: String) -> CategorizationResult {
         if config.verbose {
             print("PDF: Using direct text extraction for categorization...")
             print("PDF: Text length: \(text.count) characters")
