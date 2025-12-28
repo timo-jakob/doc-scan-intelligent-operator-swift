@@ -77,7 +77,7 @@ sudo mkdir -p /usr/local/lib/docscan
 sudo cp .build/xcode/Build/Products/Release/docscan /usr/local/lib/docscan/
 sudo cp -R .build/xcode/Build/Products/Release/mlx-swift_Cmlx.bundle /usr/local/lib/docscan/
 
-# Create wrapper script (required: MLX looks for bundle relative to working directory)
+# Create wrapper script (MLX requires the bundle to be in the same directory as the binary or in the working directory)
 sudo tee /usr/local/bin/docscan > /dev/null << 'EOF'
 #!/bin/bash
 cd /usr/local/lib/docscan || exit 1; exec ./docscan "$@"
