@@ -74,6 +74,8 @@ public class InvoiceDetector {
     // Cache the image and OCR text between phases
     private var cachedImage: NSImage?
     private var cachedOCRText: String?
+    private var cachedPDFPath: String?
+    private var usedDirectExtraction: Bool = false
 
     public init(config: Configuration) {
         self.config = config
@@ -88,7 +90,27 @@ public class InvoiceDetector {
         // Validate PDF
         try PDFUtils.validatePDF(at: pdfPath)
 
-        // Convert first page to image
+        // Cache the PDF path for OCR
+        cachedPDFPath = pdfPath
+        usedDirectExtraction = false
+
+        // Try direct PDF text extraction first (faster and more accurate for searchable PDFs)
+        if config.verbose {
+            print("Checking for extractable text in PDF...")
+        }
+
+        var directText: String? = nil
+        if let text = PDFUtils.extractText(from: pdfPath, verbose: config.verbose),
+           text.count >= PDFUtils.minimumTextLength {
+            directText = text
+            cachedOCRText = text
+            usedDirectExtraction = true
+            if config.verbose {
+                print("✅ Using direct PDF text extraction (\(text.count) chars) - faster and more accurate")
+            }
+        }
+
+        // Convert first page to image (needed for VLM, and for OCR fallback)
         if config.verbose {
             print("Converting PDF to image...")
         }
@@ -108,9 +130,14 @@ public class InvoiceDetector {
             try await self.categorizeWithVLM(image: image)
         }
 
-        // OCR categorization task (also caches the OCR text for phase 2)
+        // OCR categorization task
+        // If we have direct text, use it; otherwise fall back to Vision OCR
         let ocrTask = Task {
-            try await self.categorizeWithOCR(image: image)
+            if let text = directText {
+                return self.categorizeWithDirectText(text)
+            } else {
+                return try await self.categorizeWithOCR(image: image)
+            }
         }
 
         // Handle VLM with timeout
@@ -233,10 +260,31 @@ public class InvoiceDetector {
 
     // MARK: - OCR Categorization
 
-    /// Categorize using OCR keyword detection
+    /// Categorize using direct PDF text (no OCR needed - faster and more accurate)
+    private func categorizeWithDirectText(_ text: String) -> CategorizationResult {
+        if config.verbose {
+            print("PDF: Using direct text extraction for categorization...")
+            print("PDF: Text length: \(text.count) characters")
+            print("PDF: Text preview: \(String(text.prefix(500)))")
+        }
+
+        // Use keyword-based detection on the direct text
+        let (isInvoice, confidence, reason) = ocrEngine.detectInvoiceKeywords(from: text)
+
+        if config.verbose {
+            print("PDF: Is invoice = \(isInvoice) (confidence: \(confidence))")
+            if let reason = reason {
+                print("PDF: Reason: \(reason)")
+            }
+        }
+
+        return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "PDF", reason: reason)
+    }
+
+    /// Categorize using Vision OCR (fallback for scanned documents)
     private func categorizeWithOCR(image: NSImage) async throws -> CategorizationResult {
         if config.verbose {
-            print("OCR: Starting categorization...")
+            print("OCR: Starting Vision OCR (scanned document)...")
         }
 
         // Extract text using Vision OCR

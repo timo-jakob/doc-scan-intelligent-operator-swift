@@ -4,6 +4,61 @@ import AppKit
 
 /// Utilities for PDF processing and conversion
 public struct PDFUtils {
+    /// Minimum character count to consider direct PDF text extraction successful
+    /// Below this threshold, we fall back to OCR (likely a scanned document)
+    public static let minimumTextLength = 50
+
+    /// Extract text directly from a PDF without OCR
+    /// This is much faster and more accurate for searchable PDFs
+    /// Returns nil if the PDF has no embedded text (e.g., scanned documents)
+    public static func extractText(from path: String, verbose: Bool = false) -> String? {
+        let url = URL(fileURLWithPath: path)
+
+        guard let document = PDFDocument(url: url) else {
+            if verbose {
+                print("PDF: Could not open document")
+            }
+            return nil
+        }
+
+        guard let page = document.page(at: 0) else {
+            if verbose {
+                print("PDF: Could not get first page")
+            }
+            return nil
+        }
+
+        guard let text = page.string, !text.isEmpty else {
+            if verbose {
+                print("PDF: No embedded text found (scanned document?)")
+            }
+            return nil
+        }
+
+        if verbose {
+            print("PDF: Extracted \(text.count) characters directly from PDF")
+        }
+
+        return text
+    }
+
+    /// Check if a PDF has sufficient embedded text for direct extraction
+    /// Returns true if direct text extraction should be used instead of OCR
+    public static func hasExtractableText(at path: String, verbose: Bool = false) -> Bool {
+        guard let text = extractText(from: path, verbose: verbose) else {
+            return false
+        }
+        let hasSufficientText = text.count >= minimumTextLength
+        if verbose {
+            if hasSufficientText {
+                print("PDF: Has extractable text (\(text.count) chars >= \(minimumTextLength) minimum)")
+            } else {
+                print("PDF: Insufficient text (\(text.count) chars < \(minimumTextLength) minimum), will use OCR")
+            }
+        }
+        return hasSufficientText
+    }
+
     /// Validate that a file is a valid PDF
     public static func validatePDF(at path: String) throws {
         let url = URL(fileURLWithPath: path)
