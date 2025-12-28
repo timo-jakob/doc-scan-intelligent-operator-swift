@@ -36,26 +36,59 @@ This is the Swift version of [doc-scan-intelligent-operator](https://github.com/
 
 ### Building from Source
 
+**Important**: MLX Swift requires Xcode to compile Metal shaders. Using `swift build` will result in runtime errors ("Failed to load the default metallib") when trying to use the VLM.
+
 ```bash
 # Clone the repository
 git clone https://github.com/timo-jakob/doc-scan-intelligent-operator-swift.git
 cd doc-scan-intelligent-operator-swift
 
-# Build the project
-swift build -c release
+# Build with xcodebuild (required for Metal/VLM support)
+xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xcode build
 
-# Install to /usr/local/bin
-sudo cp .build/release/docscan /usr/local/bin/
+# Install binary AND Metal library bundle (must be in same directory)
+sudo mkdir -p /usr/local/lib/docscan
+sudo cp .build/xcode/Build/Products/Release/docscan /usr/local/lib/docscan/
+sudo cp -R .build/xcode/Build/Products/Release/mlx-swift_Cmlx.bundle /usr/local/lib/docscan/
+
+# Create wrapper script (required: MLX looks for bundle relative to working directory)
+sudo tee /usr/local/bin/docscan > /dev/null << 'EOF'
+#!/bin/bash
+cd /usr/local/lib/docscan && exec ./docscan "$@"
+EOF
+sudo chmod +x /usr/local/bin/docscan
 ```
 
-### Using Swift Package Manager
+### Alternative: Shell Alias (simpler, no sudo required)
 
-Add this to your `Package.swift`:
+```bash
+# Build with xcodebuild
+xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' build
 
-```swift
-dependencies: [
-    .package(url: "https://github.com/timo-jakob/doc-scan-intelligent-operator-swift.git", from: "1.0.0")
-]
+# Add function to your shell profile (~/.zshrc or ~/.bashrc)
+cat >> ~/.zshrc << 'EOF'
+docscan() {
+  local build_dir=$(find ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Release -maxdepth 0 2>/dev/null | head -1)
+  if [ -n "$build_dir" ]; then
+    (cd "$build_dir" && ./docscan "$@")
+  else
+    echo "Error: docscan not found. Run: xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' build"
+  fi
+}
+EOF
+source ~/.zshrc
+```
+
+### OCR-Only Mode (No VLM)
+
+If you only need OCR-based detection (no VLM), you can use `swift build`:
+
+```bash
+swift build -c release
+sudo cp .build/release/docscan /usr/local/bin/
+
+# Use with --auto-resolve ocr to skip VLM
+docscan invoice.pdf --auto-resolve ocr
 ```
 
 ## Quick Start
@@ -258,17 +291,16 @@ doc-scan-intelligent-operator-swift/
 ### Building and Running
 
 ```bash
-# Build debug
+# Build with xcodebuild (required for VLM/Metal support)
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build
+
+# Run from Xcode DerivedData directory
+cd ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug
+./docscan invoice.pdf --dry-run -v
+
+# Alternative: Build with swift (OCR-only, no VLM)
 swift build
-
-# Build release
-swift build -c release
-
-# Run directly
-swift run docscan invoice.pdf
-
-# Run with arguments
-swift run docscan invoice.pdf --dry-run -v
+.build/debug/docscan invoice.pdf --dry-run --auto-resolve ocr
 ```
 
 ## Roadmap
