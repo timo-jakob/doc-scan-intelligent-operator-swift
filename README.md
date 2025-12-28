@@ -34,28 +34,69 @@ This is the Swift version of [doc-scan-intelligent-operator](https://github.com/
 
 ## Installation
 
-### Building from Source
+### Quick Install (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/timo-jakob/doc-scan-intelligent-operator-swift.git
 cd doc-scan-intelligent-operator-swift
 
-# Build the project
-swift build -c release
-
-# Install to /usr/local/bin
-sudo cp .build/release/docscan /usr/local/bin/
+# Run the install script
+./install.sh
 ```
 
-### Using Swift Package Manager
+The install script will:
+- Check prerequisites (Xcode, macOS version, Apple Silicon)
+- Build docscan with xcodebuild (required for Metal/VLM support)
+- Install to `/usr/local/lib/docscan` with wrapper script in `/usr/local/bin`
+- Detect and update existing installations
 
-Add this to your `Package.swift`:
+### Install Script Commands
 
-```swift
-dependencies: [
-    .package(url: "https://github.com/timo-jakob/doc-scan-intelligent-operator-swift.git", from: "1.0.0")
-]
+```bash
+./install.sh              # Install or update (prompts if already installed)
+./install.sh install      # Fresh install
+./install.sh update       # Rebuild and update existing installation
+./install.sh uninstall    # Remove docscan from system
+./install.sh status       # Show installation status
+```
+
+### Manual Installation
+
+<details>
+<summary>Click to expand manual installation steps</summary>
+
+**Important**: MLX Swift requires Xcode to compile Metal shaders. Using `swift build` will result in runtime errors ("Failed to load the default metallib") when trying to use the VLM.
+
+```bash
+# Build with xcodebuild (required for Metal/VLM support)
+xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xcode build
+
+# Install binary AND Metal library bundle (must be in same directory)
+sudo mkdir -p /usr/local/lib/docscan
+sudo cp .build/xcode/Build/Products/Release/docscan /usr/local/lib/docscan/
+sudo cp -R .build/xcode/Build/Products/Release/mlx-swift_Cmlx.bundle /usr/local/lib/docscan/
+
+# Create wrapper script (MLX requires the bundle to be in the same directory as the binary or in the working directory)
+sudo tee /usr/local/bin/docscan > /dev/null << 'EOF'
+#!/bin/bash
+cd /usr/local/lib/docscan || exit 1; exec ./docscan "$@"
+EOF
+sudo chmod +x /usr/local/bin/docscan
+```
+
+</details>
+
+### OCR-Only Mode (No VLM)
+
+If you only need OCR-based detection (no VLM), you can use `swift build`:
+
+```bash
+swift build -c release
+sudo cp .build/release/docscan /usr/local/bin/
+
+# Use with --auto-resolve ocr to skip VLM
+docscan invoice.pdf --auto-resolve ocr
 ```
 
 ## Quick Start
@@ -258,17 +299,16 @@ doc-scan-intelligent-operator-swift/
 ### Building and Running
 
 ```bash
-# Build debug
+# Build with xcodebuild (required for VLM/Metal support)
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build
+
+# Run from Xcode DerivedData directory
+cd ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug
+./docscan invoice.pdf --dry-run -v
+
+# Alternative: Build with swift (OCR-only, no VLM)
 swift build
-
-# Build release
-swift build -c release
-
-# Run directly
-swift run docscan invoice.pdf
-
-# Run with arguments
-swift run docscan invoice.pdf --dry-run -v
+.build/debug/docscan invoice.pdf --dry-run --auto-resolve ocr
 ```
 
 ## Roadmap
