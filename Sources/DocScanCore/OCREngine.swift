@@ -106,7 +106,8 @@ public class OCREngine {
 
     /// Extract text strings from Vision observations
     /// Extracted to avoid nested closure complexity
-    private static func extractTextFromObservations(_ observations: [VNRecognizedTextObservation]) -> String {
+    /// Internal access for testability
+    static func extractTextFromObservations(_ observations: [VNRecognizedTextObservation]) -> String {
         observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
     }
 
