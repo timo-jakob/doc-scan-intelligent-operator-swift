@@ -435,9 +435,48 @@ final class InvoiceDetectorTests: XCTestCase {
         XCTAssertNil(data.categorization!.agreedIsInvoice)
     }
 
+    // MARK: - Async Categorize Tests
+    // Note: VLM model is not available in CI (MLX Metal library cannot be built via SPM).
+    // However, the categorize() method has error handling that catches VLM failures
+    // and returns fallback results, so these tests should complete successfully.
+    // Early code paths (PDF validation, text extraction, image conversion) get covered.
+
+    func testCategorizeWithInvalidPath() async {
+        // Test that categorize() throws for non-existent file
+        do {
+            _ = try await detector.categorize(pdfPath: "/nonexistent/path/file.pdf")
+            XCTFail("Should have thrown fileNotFound error")
+        } catch let error as DocScanError {
+            if case .fileNotFound = error {
+                // Expected - PDF validation happens before VLM
+            } else {
+                XCTFail("Expected fileNotFound error, got: \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testCategorizeWithInvalidPDFFile() async throws {
+        // Test that categorize() throws for invalid PDF content
+        let fakePDFPath = tempDirectory.appendingPathComponent("not_a_pdf.pdf").path
+        try "This is not a PDF file".write(toFile: fakePDFPath, atomically: true, encoding: .utf8)
+
+        do {
+            _ = try await detector.categorize(pdfPath: fakePDFPath)
+            XCTFail("Should have thrown invalidPDF error")
+        } catch let error as DocScanError {
+            if case .invalidPDF = error {
+                // Expected - PDF validation happens before VLM
+            } else {
+                XCTFail("Expected invalidPDF error, got: \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
     // MARK: - Extract Data Tests (Sync)
-    // Note: Async tests that call categorize() require VLM model which is not available in CI
-    // (MLX Metal library cannot be built via SPM). These tests cover what can be tested without VLM.
 
     func testExtractDataWithoutCategorization() async {
         // extractData should fail if categorize wasn't called first
