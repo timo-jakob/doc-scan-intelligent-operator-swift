@@ -7,7 +7,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        config = Configuration.default
+        config = Configuration.defaultConfiguration
         detector = InvoiceDetector(config: config)
     }
 
@@ -57,7 +57,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
     func testCustomFilenamePattern() {
         let customConfig = Configuration(
-            filenamePattern: "{company}_{date}_Invoice.pdf"
+            output: OutputSettings(filenamePattern: "{company}_{date}_Invoice.pdf")
         )
         let customDetector = InvoiceDetector(config: customConfig)
 
@@ -73,7 +73,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
     func testCustomDateFormat() {
         let customConfig = Configuration(
-            dateFormat: "dd.MM.yyyy"
+            output: OutputSettings(dateFormat: "dd.MM.yyyy")
         )
         let customDetector = InvoiceDetector(config: customConfig)
 

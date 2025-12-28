@@ -50,7 +50,7 @@ struct DocScanCommand: AsyncParsableCommand {
         if let configPath = config {
             configuration = try Configuration.load(from: configPath)
         } else {
-            configuration = Configuration.default
+            configuration = Configuration.defaultConfiguration
         }
 
         // Override with CLI arguments

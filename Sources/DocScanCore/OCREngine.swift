@@ -48,9 +48,7 @@ public class OCREngine {
                     return
                 }
 
-                let recognizedText = observations.compactMap { observation in
-                    observation.topCandidates(1).first?.string
-                }.joined(separator: "\n")
+                let recognizedText = Self.extractTextFromObservations(observations)
 
                 if recognizedText.isEmpty {
                     continuation.resume(throwing: DocScanError.extractionFailed("No text recognized"))
@@ -104,6 +102,13 @@ public class OCREngine {
         }
 
         return allText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Extract text strings from Vision observations
+    /// Extracted to avoid nested closure complexity
+    /// Internal access for testability
+    static func extractTextFromObservations(_ observations: [VNRecognizedTextObservation]) -> String {
+        observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
     }
 
     /// Detect if text contains invoice indicators (simple boolean)

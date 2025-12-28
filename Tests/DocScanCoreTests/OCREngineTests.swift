@@ -1,4 +1,5 @@
 import XCTest
+import Vision
 @testable import DocScanCore
 
 final class OCREngineTests: XCTestCase {
@@ -7,8 +8,16 @@ final class OCREngineTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        config = Configuration.default
+        config = Configuration.defaultConfiguration
         engine = OCREngine(config: config)
+    }
+
+    // MARK: - Extract Text From Observations Tests
+
+    func testExtractTextFromObservationsEmpty() {
+        // Test with empty observations array
+        let result = OCREngine.extractTextFromObservations([])
+        XCTAssertEqual(result, "")
     }
 
     // MARK: - Invoice Detection Tests
