@@ -6,8 +6,30 @@ import MLXVLM
 import MLXLMCommon
 import AppKit
 
+// MARK: - VLM Provider Protocol
+
+/// Protocol for Vision-Language Model providers
+/// Enables dependency injection and testing without actual VLM models
+public protocol VLMProvider: Sendable {
+    /// Generate text from image and prompt using VLM
+    func generateFromImage(
+        _ image: NSImage,
+        prompt: String,
+        modelName: String?
+    ) async throws -> String
+}
+
+// Default parameter extension
+public extension VLMProvider {
+    func generateFromImage(_ image: NSImage, prompt: String) async throws -> String {
+        try await generateFromImage(image, prompt: prompt, modelName: nil)
+    }
+}
+
+// MARK: - Model Manager
+
 /// Manages Vision-Language Models using mlx-swift-lm
-public class ModelManager {
+public class ModelManager: VLMProvider, @unchecked Sendable {
     private let config: Configuration
     private let fileManager = FileManager.default
 
