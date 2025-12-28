@@ -80,7 +80,7 @@ sudo cp -R .build/xcode/Build/Products/Release/mlx-swift_Cmlx.bundle /usr/local/
 # Create wrapper script (required: MLX looks for bundle relative to working directory)
 sudo tee /usr/local/bin/docscan > /dev/null << 'EOF'
 #!/bin/bash
-cd /usr/local/lib/docscan && exec ./docscan "$@"
+cd /usr/local/lib/docscan || exit 1; exec ./docscan "$@"
 EOF
 sudo chmod +x /usr/local/bin/docscan
 ```
