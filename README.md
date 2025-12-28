@@ -34,15 +34,41 @@ This is the Swift version of [doc-scan-intelligent-operator](https://github.com/
 
 ## Installation
 
-### Building from Source
-
-**Important**: MLX Swift requires Xcode to compile Metal shaders. Using `swift build` will result in runtime errors ("Failed to load the default metallib") when trying to use the VLM.
+### Quick Install (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/timo-jakob/doc-scan-intelligent-operator-swift.git
 cd doc-scan-intelligent-operator-swift
 
+# Run the install script
+./install.sh
+```
+
+The install script will:
+- Check prerequisites (Xcode, macOS version, Apple Silicon)
+- Build docscan with xcodebuild (required for Metal/VLM support)
+- Install to `/usr/local/lib/docscan` with wrapper script in `/usr/local/bin`
+- Detect and update existing installations
+
+### Install Script Commands
+
+```bash
+./install.sh              # Install or update (prompts if already installed)
+./install.sh install      # Fresh install
+./install.sh update       # Rebuild and update existing installation
+./install.sh uninstall    # Remove docscan from system
+./install.sh status       # Show installation status
+```
+
+### Manual Installation
+
+<details>
+<summary>Click to expand manual installation steps</summary>
+
+**Important**: MLX Swift requires Xcode to compile Metal shaders. Using `swift build` will result in runtime errors ("Failed to load the default metallib") when trying to use the VLM.
+
+```bash
 # Build with xcodebuild (required for Metal/VLM support)
 xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' -derivedDataPath .build/xcode build
 
@@ -59,25 +85,7 @@ EOF
 sudo chmod +x /usr/local/bin/docscan
 ```
 
-### Alternative: Shell Alias (simpler, no sudo required)
-
-```bash
-# Build with xcodebuild
-xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' build
-
-# Add function to your shell profile (~/.zshrc or ~/.bashrc)
-cat >> ~/.zshrc << 'EOF'
-docscan() {
-  local build_dir=$(find ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Release -maxdepth 0 2>/dev/null | head -1)
-  if [ -n "$build_dir" ]; then
-    (cd "$build_dir" && ./docscan "$@")
-  else
-    echo "Error: docscan not found. Run: xcodebuild -scheme docscan -configuration Release -destination 'platform=macOS' build"
-  fi
-}
-EOF
-source ~/.zshrc
-```
+</details>
 
 ### OCR-Only Mode (No VLM)
 
