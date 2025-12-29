@@ -19,30 +19,42 @@ public struct CategorizationResult: Sendable {
 
     /// Full display label for the method (e.g., "VLM (Vision Language Model)")
     public var displayLabel: String {
-        switch method {
-        case "VLM":
+        if method.hasPrefix("VLM") {
+            if method.contains("timeout") {
+                return "VLM (Vision Language Model - Timeout)"
+            } else if method.contains("error") {
+                return "VLM (Vision Language Model - Error)"
+            }
             return "VLM (Vision Language Model)"
-        case "PDF":
+        } else if method.hasPrefix("PDF") {
             return "PDF (Direct Text Extraction)"
-        case "OCR":
+        } else if method.hasPrefix("OCR") {
+            if method.contains("timeout") {
+                return "OCR (Vision Framework - Timeout)"
+            }
             return "OCR (Vision Framework)"
-        default:
-            return method
         }
+        return method
     }
 
     /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
     public var shortDisplayLabel: String {
-        switch method {
-        case "VLM":
+        if method.hasPrefix("VLM") {
+            if method.contains("timeout") {
+                return "VLM (timeout)"
+            } else if method.contains("error") {
+                return "VLM (error)"
+            }
             return "VLM"
-        case "PDF":
+        } else if method.hasPrefix("PDF") {
             return "PDF text"
-        case "OCR":
+        } else if method.hasPrefix("OCR") {
+            if method.contains("timeout") {
+                return "OCR (timeout)"
+            }
             return "Vision OCR"
-        default:
-            return method
         }
+        return method
     }
 }
 
