@@ -487,6 +487,28 @@ The workflow includes a Quality Gate check that will:
 - Pass if the code meets quality standards
 - Fail if new code introduces issues above thresholds
 
+### Quality Requirements (MUST follow)
+
+**IMPORTANT**: Before merging any PR, ensure the following requirements are met:
+
+1. **Check SonarQube Status**: Always verify the SonarQube Cloud analysis passes on PRs
+   - Use `gh pr checks <PR_NUMBER>` to check status
+   - Wait for the "SonarQube Code Analysis" check to complete
+
+2. **No Code Smells**: Zero code smells of any category are allowed
+   - Fix all code smells before merging
+   - This includes: complexity, duplication, maintainability issues
+
+3. **Test Coverage**: Minimum **90% test coverage on new code**
+   - All new functions and methods must have tests
+   - Move logic to testable locations (DocScanCore) when needed
+   - Run `swift test` locally before pushing
+
+4. **Workflow**:
+   - Write tests alongside new code, not as an afterthought
+   - If SonarQube fails, fix issues and push again
+   - Never merge with failing quality checks
+
 ## Key Implementation Notes
 
 ### Modifying Configuration
