@@ -120,10 +120,12 @@ struct DocScanCommand: AsyncParsableCommand {
         } else if categorization.bothAgree {
             // Both agree
             isInvoice = categorization.agreedIsInvoice ?? false
+            let vlmLabel = categorization.vlmResult.shortDisplayLabel
+            let textLabel = categorization.ocrResult.shortDisplayLabel
             if isInvoice {
-                print("✅ VLM and OCR agree: This IS an invoice")
+                print("✅ \(vlmLabel) and \(textLabel) agree: This IS an invoice")
             } else {
-                print("✅ VLM and OCR agree: This is NOT an invoice")
+                print("✅ \(vlmLabel) and \(textLabel) agree: This is NOT an invoice")
             }
         } else {
             // Conflict - need resolution
@@ -206,12 +208,12 @@ struct DocScanCommand: AsyncParsableCommand {
 
     private func displayCategorizationResults(_ categorization: CategorizationVerification) {
         print("╔══════════════════════════════════════════════════╗")
-        print("║         Categorization Results                 ║")
+        print("║         Categorization Results                   ║")
         print("╠══════════════════════════════════════════════════╣")
-        print("║ VLM:                                            ║")
+        print("║ \(categorization.vlmResult.displayLabel):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
         displayCategorizationResult(categorization.vlmResult, prefix: "║   ")
-        print("║                                                 ║")
-        print("║ OCR:                                            ║")
+        print("║                                                  ║")
+        print("║ \(categorization.ocrResult.displayLabel):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
         displayCategorizationResult(categorization.ocrResult, prefix: "║   ")
         print("╚══════════════════════════════════════════════════╝")
         print()
@@ -229,10 +231,13 @@ struct DocScanCommand: AsyncParsableCommand {
     // MARK: - Conflict Resolution
 
     private func resolveCategorization(_ categorization: CategorizationVerification, autoResolve: String?) throws -> Bool {
+        let vlmLabel = categorization.vlmResult.shortDisplayLabel
+        let textLabel = categorization.ocrResult.shortDisplayLabel
+
         print("⚠️  CATEGORIZATION CONFLICT")
         print()
-        print("  VLM says: \(categorization.vlmResult.isInvoice ? "Invoice" : "Not an invoice")")
-        print("  OCR says: \(categorization.ocrResult.isInvoice ? "Invoice" : "Not an invoice")")
+        print("  \(vlmLabel) says: \(categorization.vlmResult.isInvoice ? "Invoice" : "Not an invoice")")
+        print("  \(textLabel) says: \(categorization.ocrResult.isInvoice ? "Invoice" : "Not an invoice")")
         print()
 
         // Validate auto-resolve option
@@ -246,14 +251,15 @@ struct DocScanCommand: AsyncParsableCommand {
 
             let useVLM = autoResolveMode.lowercased() == "vlm"
             let result = useVLM ? categorization.vlmResult.isInvoice : categorization.ocrResult.isInvoice
-            print("🤖 Auto-resolve: Using \(autoResolveMode.uppercased()) → \(result ? "Invoice" : "Not an invoice")")
+            let chosenLabel = useVLM ? vlmLabel : textLabel
+            print("🤖 Auto-resolve: Using \(chosenLabel) → \(result ? "Invoice" : "Not an invoice")")
             return result
         }
 
         // Interactive resolution
         print("Which result do you trust?")
-        print("  [1] VLM: \(categorization.vlmResult.isInvoice ? "Invoice" : "Not an invoice")")
-        print("  [2] OCR: \(categorization.ocrResult.isInvoice ? "Invoice" : "Not an invoice")")
+        print("  [1] \(vlmLabel): \(categorization.vlmResult.isInvoice ? "Invoice" : "Not an invoice")")
+        print("  [2] \(textLabel): \(categorization.ocrResult.isInvoice ? "Invoice" : "Not an invoice")")
 
         while true {
             print("Enter your choice (1 or 2): ", terminator: "")

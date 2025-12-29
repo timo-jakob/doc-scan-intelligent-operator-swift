@@ -7,7 +7,7 @@ import AppKit
 public struct CategorizationResult: Sendable {
     public let isInvoice: Bool
     public let confidence: String // "high", "medium", "low"
-    public let method: String // "VLM" or "OCR"
+    public let method: String // "VLM", "OCR", or "PDF"
     public let reason: String? // Optional explanation
 
     public init(isInvoice: Bool, confidence: String = "high", method: String, reason: String? = nil) {
@@ -15,6 +15,46 @@ public struct CategorizationResult: Sendable {
         self.confidence = confidence
         self.method = method
         self.reason = reason
+    }
+
+    /// Full display label for the method (e.g., "VLM (Vision Language Model)")
+    public var displayLabel: String {
+        if method.hasPrefix("VLM") {
+            if method.contains("timeout") {
+                return "VLM (Vision Language Model - Timeout)"
+            } else if method.contains("error") {
+                return "VLM (Vision Language Model - Error)"
+            }
+            return "VLM (Vision Language Model)"
+        } else if method.hasPrefix("PDF") {
+            return "PDF (Direct Text Extraction)"
+        } else if method.hasPrefix("OCR") {
+            if method.contains("timeout") {
+                return "OCR (Vision Framework - Timeout)"
+            }
+            return "OCR (Vision Framework)"
+        }
+        return method
+    }
+
+    /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
+    public var shortDisplayLabel: String {
+        if method.hasPrefix("VLM") {
+            if method.contains("timeout") {
+                return "VLM (timeout)"
+            } else if method.contains("error") {
+                return "VLM (error)"
+            }
+            return "VLM"
+        } else if method.hasPrefix("PDF") {
+            return "PDF text"
+        } else if method.hasPrefix("OCR") {
+            if method.contains("timeout") {
+                return "OCR (timeout)"
+            }
+            return "Vision OCR"
+        }
+        return method
     }
 }
 

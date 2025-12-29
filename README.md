@@ -167,59 +167,72 @@ DocScan uses a unique **dual verification** approach that combines AI and tradit
 6. **Filename Generation**: Creates a standardized filename based on the pattern
 7. **Safe Renaming**: Renames the file with collision detection
 
-### Example Output (Agreement)
+### Example Output (Searchable PDF - Agreement)
 
 ```
-Running dual verification (VLM + OCR in parallel)...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 PHASE 1: Categorization (VLM + OCR in parallel)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ╔══════════════════════════════════════════════════╗
-║         Dual Verification Results              ║
+║         Categorization Results                   ║
 ╠══════════════════════════════════════════════════╣
-║ VLM Results:                                    ║
-║   Is Invoice: ✅ Yes                             ║
-║   Date: 2024-12-15                              ║
-║   Company: Acme Corporation                     ║
-║                                                 ║
-║ OCR Results:                                    ║
-║   Is Invoice: ✅ Yes                             ║
-║   Date: 2024-12-15                              ║
-║   Company: Acme Corporation                     ║
+║ VLM (Vision Language Model):                     ║
+║   ✅ Invoice (confidence: high)                  ║
+║                                                  ║
+║ PDF (Direct Text Extraction):                    ║
+║   ✅ Invoice (confidence: high)                  ║
 ╚══════════════════════════════════════════════════╝
 
-✅ VLM and OCR agree - proceeding automatically
+✅ VLM and PDF text agree: This IS an invoice
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 PHASE 2: Data Extraction (OCR + TextLLM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Extracted data:
+   📅 Date: 2024-12-15
+   🏢 Company: Acme_Corporation
+```
+
+### Example Output (Scanned PDF - Agreement)
+
+```
+╔══════════════════════════════════════════════════╗
+║         Categorization Results                   ║
+╠══════════════════════════════════════════════════╣
+║ VLM (Vision Language Model):                     ║
+║   ✅ Invoice (confidence: high)                  ║
+║                                                  ║
+║ OCR (Vision Framework):                          ║
+║   ✅ Invoice (confidence: high)                  ║
+╚══════════════════════════════════════════════════╝
+
+✅ VLM and Vision OCR agree: This IS an invoice
 ```
 
 ### Example Output (Conflict)
 
 ```
 ╔══════════════════════════════════════════════════╗
-║         Dual Verification Results              ║
+║         Categorization Results                   ║
 ╠══════════════════════════════════════════════════╣
-║ VLM Results:                                    ║
-║   Date: 2024-12-15                              ║
-║   Company: Acme Corp                            ║
-║ OCR Results:                                    ║
-║   Date: 2024-12-16                              ║
-║   Company: Acme Corporation GmbH                ║
+║ VLM (Vision Language Model):                     ║
+║   ✅ Invoice (confidence: high)                  ║
+║                                                  ║
+║ PDF (Direct Text Extraction):                    ║
+║   ❌ Not Invoice (confidence: high)              ║
 ╚══════════════════════════════════════════════════╝
 
-⚠️  CONFLICTS DETECTED:
-   - Date
-   - Company name
+⚠️  CATEGORIZATION CONFLICT
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  CONFLICT RESOLUTION REQUIRED
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  VLM says: Invoice
+  PDF text says: Not an invoice
 
-Conflict: Invoice Date
-  [1] VLM says: 2024-12-15
-  [2] OCR says: 2024-12-16
-Enter your choice: 2
-
-Conflict: Company Name
-  [1] VLM says: Acme Corp
-  [2] OCR says: Acme Corporation GmbH
-Enter your choice: 2
+Which result do you trust?
+  [1] VLM: Invoice
+  [2] PDF text: Not an invoice
+Enter your choice (1 or 2): 1
 ```
 
 ## Architecture
