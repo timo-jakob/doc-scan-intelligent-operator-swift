@@ -30,6 +30,57 @@ final class VerificationTests: XCTestCase {
         XCTAssertNil(result.reason)
     }
 
+    // MARK: - Display Label Tests
+
+    func testDisplayLabelVLM() {
+        let result = CategorizationResult(isInvoice: true, method: "VLM")
+        XCTAssertEqual(result.displayLabel, "VLM (Vision Language Model)")
+    }
+
+    func testDisplayLabelPDF() {
+        let result = CategorizationResult(isInvoice: true, method: "PDF")
+        XCTAssertEqual(result.displayLabel, "PDF (Direct Text Extraction)")
+    }
+
+    func testDisplayLabelOCR() {
+        let result = CategorizationResult(isInvoice: true, method: "OCR")
+        XCTAssertEqual(result.displayLabel, "OCR (Vision Framework)")
+    }
+
+    func testDisplayLabelUnknownMethod() {
+        let result = CategorizationResult(isInvoice: true, method: "CustomMethod")
+        XCTAssertEqual(result.displayLabel, "CustomMethod")
+    }
+
+    func testShortDisplayLabelVLM() {
+        let result = CategorizationResult(isInvoice: true, method: "VLM")
+        XCTAssertEqual(result.shortDisplayLabel, "VLM")
+    }
+
+    func testShortDisplayLabelPDF() {
+        let result = CategorizationResult(isInvoice: true, method: "PDF")
+        XCTAssertEqual(result.shortDisplayLabel, "PDF text")
+    }
+
+    func testShortDisplayLabelOCR() {
+        let result = CategorizationResult(isInvoice: true, method: "OCR")
+        XCTAssertEqual(result.shortDisplayLabel, "Vision OCR")
+    }
+
+    func testShortDisplayLabelUnknownMethod() {
+        let result = CategorizationResult(isInvoice: true, method: "CustomMethod")
+        XCTAssertEqual(result.shortDisplayLabel, "CustomMethod")
+    }
+
+    func testDisplayLabelsWithDifferentInvoiceStatus() {
+        // Verify labels work regardless of isInvoice value
+        let invoiceResult = CategorizationResult(isInvoice: true, method: "PDF")
+        let notInvoiceResult = CategorizationResult(isInvoice: false, method: "PDF")
+
+        XCTAssertEqual(invoiceResult.displayLabel, notInvoiceResult.displayLabel)
+        XCTAssertEqual(invoiceResult.shortDisplayLabel, notInvoiceResult.shortDisplayLabel)
+    }
+
     // MARK: - CategorizationVerification Tests
 
     func testCategorizationVerificationBothAgreeInvoice() {

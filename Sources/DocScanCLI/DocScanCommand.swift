@@ -120,8 +120,8 @@ struct DocScanCommand: AsyncParsableCommand {
         } else if categorization.bothAgree {
             // Both agree
             isInvoice = categorization.agreedIsInvoice ?? false
-            let vlmLabel = shortMethodLabel(categorization.vlmResult.method)
-            let textLabel = shortMethodLabel(categorization.ocrResult.method)
+            let vlmLabel = categorization.vlmResult.shortDisplayLabel
+            let textLabel = categorization.ocrResult.shortDisplayLabel
             if isInvoice {
                 print("✅ \(vlmLabel) and \(textLabel) agree: This IS an invoice")
             } else {
@@ -210,39 +210,13 @@ struct DocScanCommand: AsyncParsableCommand {
         print("╔══════════════════════════════════════════════════╗")
         print("║         Categorization Results                   ║")
         print("╠══════════════════════════════════════════════════╣")
-        print("║ \(methodLabel(categorization.vlmResult.method)):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
+        print("║ \(categorization.vlmResult.displayLabel):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
         displayCategorizationResult(categorization.vlmResult, prefix: "║   ")
         print("║                                                  ║")
-        print("║ \(methodLabel(categorization.ocrResult.method)):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
+        print("║ \(categorization.ocrResult.displayLabel):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
         displayCategorizationResult(categorization.ocrResult, prefix: "║   ")
         print("╚══════════════════════════════════════════════════╝")
         print()
-    }
-
-    private func methodLabel(_ method: String) -> String {
-        switch method {
-        case "VLM":
-            return "VLM (Vision Language Model)"
-        case "PDF":
-            return "PDF (Direct Text Extraction)"
-        case "OCR":
-            return "OCR (Vision Framework)"
-        default:
-            return method
-        }
-    }
-
-    private func shortMethodLabel(_ method: String) -> String {
-        switch method {
-        case "VLM":
-            return "VLM"
-        case "PDF":
-            return "PDF text"
-        case "OCR":
-            return "Vision OCR"
-        default:
-            return method
-        }
     }
 
     private func displayCategorizationResult(_ result: CategorizationResult, prefix: String) {
@@ -257,8 +231,8 @@ struct DocScanCommand: AsyncParsableCommand {
     // MARK: - Conflict Resolution
 
     private func resolveCategorization(_ categorization: CategorizationVerification, autoResolve: String?) throws -> Bool {
-        let vlmLabel = shortMethodLabel(categorization.vlmResult.method)
-        let textLabel = shortMethodLabel(categorization.ocrResult.method)
+        let vlmLabel = categorization.vlmResult.shortDisplayLabel
+        let textLabel = categorization.ocrResult.shortDisplayLabel
 
         print("⚠️  CATEGORIZATION CONFLICT")
         print()

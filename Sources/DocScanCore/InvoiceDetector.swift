@@ -7,7 +7,7 @@ import AppKit
 public struct CategorizationResult: Sendable {
     public let isInvoice: Bool
     public let confidence: String // "high", "medium", "low"
-    public let method: String // "VLM" or "OCR"
+    public let method: String // "VLM", "OCR", or "PDF"
     public let reason: String? // Optional explanation
 
     public init(isInvoice: Bool, confidence: String = "high", method: String, reason: String? = nil) {
@@ -15,6 +15,34 @@ public struct CategorizationResult: Sendable {
         self.confidence = confidence
         self.method = method
         self.reason = reason
+    }
+
+    /// Full display label for the method (e.g., "VLM (Vision Language Model)")
+    public var displayLabel: String {
+        switch method {
+        case "VLM":
+            return "VLM (Vision Language Model)"
+        case "PDF":
+            return "PDF (Direct Text Extraction)"
+        case "OCR":
+            return "OCR (Vision Framework)"
+        default:
+            return method
+        }
+    }
+
+    /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
+    public var shortDisplayLabel: String {
+        switch method {
+        case "VLM":
+            return "VLM"
+        case "PDF":
+            return "PDF text"
+        case "OCR":
+            return "Vision OCR"
+        default:
+            return method
+        }
     }
 }
 
