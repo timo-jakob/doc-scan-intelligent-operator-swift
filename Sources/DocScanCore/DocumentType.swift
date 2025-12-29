@@ -46,7 +46,7 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         case .prescription:
             return [
                 "rezept", "verordnung", "prescription", "ordonnance",
-                "pharmazentralnummer", "pzn"
+                "pharmazentralnummer", "pzn", "privatrezept", "kassenrezept"
             ]
         }
     }
@@ -62,8 +62,8 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         case .prescription:
             return [
                 "arzt", "ärztin", "doctor", "dr.med", "dr. med",
-                "praxis", "medikament", "medication", "apotheke",
-                "pharmacy", "dosierung", "dosage", "patient"
+                "praxis", "medikament", "medication", "apotheke", "apo",
+                "pharmacy", "dosierung", "dosage", "patient", "privat"
             ]
         }
     }
