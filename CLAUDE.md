@@ -320,17 +320,16 @@ Time 3s:   VLM finishes ─────────────────X    
 docscan invoice.pdf -v
 ```
 
-Output shows the two-phase flow:
+Output shows the two-phase flow (searchable PDF example):
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 PHASE 1: Categorization (VLM + OCR in parallel)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 VLM: Starting categorization...
-OCR: Starting categorization...
-OCR: Extracted 1413 characters
+PDF: Using direct text extraction for categorization...
 VLM response: Yes
-✅ VLM and OCR agree: This IS an invoice
+✅ VLM and PDF text agree: This IS an invoice
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 PHASE 2: Data Extraction (OCR + TextLLM)
@@ -339,6 +338,15 @@ VLM response: Yes
 Extracting invoice data (OCR+TextLLM)...
    📅 Date: 2025-06-27
    🏢 Company: DB_Fernverkehr_AG
+```
+
+For scanned PDFs (no extractable text), the output shows:
+```
+VLM: Starting categorization...
+OCR: Starting Vision OCR (scanned document)...
+OCR: Extracted 1413 characters
+VLM response: Yes
+✅ VLM and Vision OCR agree: This IS an invoice
 ```
 
 ### Configuration
