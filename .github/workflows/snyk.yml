@@ -31,17 +31,17 @@ jobs:
 
     - name: Snyk Open Source (Dependency Scan)
       run: |
-        snyk test --all-projects --org=timo-jakob
+        # Fail build on HIGH or CRITICAL vulnerabilities
+        snyk test --all-projects --org=timo-jakob --severity-threshold=high
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      continue-on-error: true  # Don't fail the build, report issues
 
     - name: Snyk Code (Static Analysis)
       run: |
-        snyk code test --org=timo-jakob
+        # Fail build on HIGH or CRITICAL vulnerabilities
+        snyk code test --org=timo-jakob --severity-threshold=high
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      continue-on-error: true  # Don't fail the build, report issues
 
     - name: Monitor dependencies in Snyk
       run: |
