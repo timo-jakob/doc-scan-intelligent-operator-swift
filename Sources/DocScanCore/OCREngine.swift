@@ -123,19 +123,22 @@ public class OCREngine {
     }
 
     /// Detect invoice keywords with confidence and reason (static, shared implementation)
+    /// Legacy method - delegates to generic detectKeywords
     public static func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
+        let result = detectKeywords(for: .invoice, from: text)
+        return (result.isMatch, result.confidence, result.reason)
+    }
+
+    /// Generic keyword detection for any document type
+    /// Returns whether the text matches the document type, confidence level, and reason
+    public static func detectKeywords(
+        for documentType: DocumentType,
+        from text: String
+    ) -> (isMatch: Bool, confidence: String, reason: String?) {
         let lowercased = text.lowercased()
 
-        // Strong indicators (high confidence)
-        let strongIndicators = [
-            "rechnungsnummer", "invoice number", "numéro de facture", "número de factura",
-            "rechnungsdatum", "invoice date"
-        ]
-
-        // Medium indicators
-        let mediumIndicators = [
-            "rechnung", "invoice", "facture", "factura", "quittung", "receipt"
-        ]
+        let strongIndicators = documentType.strongKeywords
+        let mediumIndicators = documentType.mediumKeywords
 
         var foundStrong: [String] = []
         var foundMedium: [String] = []
@@ -158,8 +161,13 @@ public class OCREngine {
         } else if !foundMedium.isEmpty {
             return (true, "medium", "Found: \(foundMedium.joined(separator: ", "))")
         } else {
-            return (false, "high", "No invoice keywords found")
+            return (false, "high", "No \(documentType.displayName.lowercased()) keywords found")
         }
+    }
+
+    /// Instance method for generic keyword detection
+    public func detectKeywords(for documentType: DocumentType, from text: String) -> (isMatch: Bool, confidence: String, reason: String?) {
+        return Self.detectKeywords(for: documentType, from: text)
     }
 
     /// Extract invoice date from OCR text

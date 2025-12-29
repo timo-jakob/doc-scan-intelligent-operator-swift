@@ -34,13 +34,17 @@ Branch naming conventions:
 
 ## Project Overview
 
-**doc-scan-intelligent-operator-swift** - Swift rewrite of the AI-powered invoice detection and renaming system, optimized for Apple Silicon using MLX Vision-Language Models. Built entirely in Swift for maximum performance and native macOS integration.
+**doc-scan-intelligent-operator-swift** - Swift rewrite of the AI-powered document detection and renaming system, optimized for Apple Silicon using MLX Vision-Language Models. Built entirely in Swift for maximum performance and native macOS integration.
 
-**Key Focus**: Native macOS invoice processing with format `YYYY-MM-DD_Rechnung_Company.pdf`
+**Key Focus**: Native macOS document processing with intelligent categorization and data extraction.
+
+**Supported Document Types**:
+- **Invoice** (`--type invoice`): Invoices, bills, receipts → `YYYY-MM-DD_Rechnung_{company}.pdf`
+- **Prescription** (`--type prescription`): Doctor's prescriptions → `YYYY-MM-DD_Rezept_{doctor}.pdf`
 
 **Architecture**: Two-phase verification system:
-- **Phase 1**: Categorization (VLM + OCR in parallel) - "Is this an invoice?"
-- **Phase 2**: Data Extraction (OCR + TextLLM only) - Extract date and company
+- **Phase 1**: Categorization (VLM + OCR in parallel) - "Does this match the document type?"
+- **Phase 2**: Data Extraction (OCR + TextLLM only) - Extract date and secondary field (company/doctor)
 
 ## Technology Stack
 
@@ -164,49 +168,62 @@ The project follows a modular Swift architecture:
 
 4. **Text LLM Manager (`TextLLMManager.swift`)** - Text-based LLM for data extraction
    - Uses Qwen2.5-7B-Instruct for analyzing OCR text
-   - Extracts invoice date and company name from text
+   - `extractData(for:from:)` - Generic extraction for any document type
+   - Extracts date and secondary field (company for invoices, doctor for prescriptions)
    - More accurate than VLM for structured data extraction
    - Separate from VLM to optimize for each task
 
 5. **OCR Engine (`OCREngine.swift`)** - Native text recognition using Apple Vision
    - Extracts text from images using Vision framework
-   - Detects invoice indicators in multiple languages (DE, EN, FR, ES)
-   - `detectInvoiceKeywords()` - Returns confidence and reason for categorization
-   - `extractDateAndCompany()` - Uses TextLLM for accurate data extraction
-   - Provides complete invoice data extraction pipeline
+   - `detectKeywords(for:from:)` - Generic keyword detection for any document type
+   - Supports multiple languages (DE, EN, FR, ES) per document type
+   - Invoice keywords: rechnung, invoice, facture, factura, etc.
+   - Prescription keywords: rezept, verordnung, prescription, arzt, etc.
+   - Provides complete document data extraction pipeline
 
-6. **Invoice Detector (`InvoiceDetector.swift`)** - Two-phase verification system
+6. **Document Detector (`DocumentDetector.swift`)** - Two-phase verification system
+   - Configurable for any `DocumentType` (invoice, prescription, etc.)
    - **Phase 1: Categorization** (VLM + OCR in parallel)
-     - VLM answers: "Is this an invoice? YES/NO"
-     - OCR uses keyword detection (rechnung, invoice, etc.)
+     - VLM answers: "Is this a [document type]? YES/NO"
+     - OCR uses type-specific keyword detection
      - If both agree → proceed automatically
      - If conflict → user chooses (or `--auto-resolve`)
    - **Phase 2: Data Extraction** (OCR + TextLLM only)
      - Uses cached OCR text from Phase 1
-     - TextLLM extracts date and company
+     - TextLLM extracts date and secondary field
      - No VLM involvement (more accurate)
    - Returns `CategorizationVerification` and `ExtractionResult`
-   - Generates standardized filenames from extracted data
+   - Generates type-specific filenames from extracted data
 
-7. **File Renamer (`FileRenamer.swift`)** - Safe file operations
+7. **Document Type (`DocumentType.swift`)** - Document type definitions
+   - Enum defining supported document types (invoice, prescription)
+   - Contains type-specific: keywords, VLM prompts, filename patterns
+   - Easily extensible for new document types
+
+8. **String Utils (`StringUtils.swift`)** - String sanitization utilities
+   - `sanitizeCompanyName()` - Sanitizes company names for filenames
+   - `sanitizeDoctorName()` - Removes titles (Dr., Prof., etc.) and sanitizes for filenames
+
+9. **File Renamer (`FileRenamer.swift`)** - Safe file operations
    - Renames files with extracted data
    - Handles filename collisions (adds _1, _2, etc.)
    - Supports dry-run mode
    - In-place or directory-based renaming
 
-8. **Errors (`Errors.swift`)** - Error handling
-   - Custom `DocScanError` enum
-   - Localized error descriptions
-   - Comprehensive error types for all failure modes
+10. **Errors (`Errors.swift`)** - Error handling
+    - Custom `DocScanError` enum
+    - Localized error descriptions
+    - Comprehensive error types for all failure modes
 
-9. **CLI (`DocScanCommand.swift`)** - Command-line interface
-   - Built with swift-argument-parser
-   - Async/await support
-   - Two-phase display with clear separation
-   - Shows categorization results (Phase 1)
-   - Shows extraction results (Phase 2)
-   - Interactive conflict resolution for categorization disagreements
-   - `--auto-resolve vlm|ocr` for automation/testing
+11. **CLI (`DocScanCommand.swift`)** - Command-line interface
+    - Built with swift-argument-parser
+    - Async/await support
+    - `--type invoice|prescription` to select document type
+    - Two-phase display with clear separation
+    - Shows categorization results (Phase 1)
+    - Shows extraction results (Phase 2)
+    - Interactive conflict resolution for categorization disagreements
+    - `--auto-resolve vlm|ocr` for automation/testing
 
 ### Data Flow
 
@@ -216,8 +233,8 @@ PDF File → PDF Validation → PDF to Image
               ┌─────── PHASE 1: Categorization ───────┐
               │  (VLM + OCR in parallel)              │
               │                                        │
-              │  VLM: "Is this an invoice? YES/NO"    │
-              │  OCR: Keyword detection + cache text   │
+              │  VLM: "Is this a [type]? YES/NO"      │
+              │  OCR: Type-specific keyword detection  │
               │                                        │
               │  Both agree? → Proceed                 │
               │  Conflict?   → User chooses / auto     │
@@ -227,33 +244,38 @@ PDF File → PDF Validation → PDF to Image
               │  (OCR + TextLLM only)                 │
               │                                        │
               │  Use cached OCR text                  │
-              │  TextLLM extracts: date, company      │
+              │  TextLLM extracts: date + secondary   │
+              │  (company for invoice, doctor for Rx) │
               └────────────────────────────────────────┘
                                 ↓
-              Filename Generation → Safe File Renaming
+              Type-specific Filename → Safe Renaming
 ```
 
-### Invoice Processing Workflow (Two-Phase)
+### Document Processing Workflow (Two-Phase)
 
 1. **Validation**: Check if file is valid PDF using PDFKit
 2. **Conversion**: Convert first page to NSImage (configurable DPI)
 
 **PHASE 1: Categorization (Parallel)**
 
-3. **VLM Categorization**: Simple prompt asking "Is this an invoice? YES/NO"
-4. **OCR Categorization**: Extract text + keyword detection (rechnung, invoice, etc.)
+3. **VLM Categorization**: Simple prompt asking "Is this a [document type]? YES/NO"
+4. **OCR Categorization**: Extract text + type-specific keyword detection
+   - Invoice: rechnung, invoice, facture, etc.
+   - Prescription: rezept, verordnung, arzt, etc.
    - OCR text is cached for Phase 2
 5. **Agreement Check**:
-   - **Both agree (invoice)**: Proceed to Phase 2
-   - **Both agree (not invoice)**: Exit
+   - **Both agree (match)**: Proceed to Phase 2
+   - **Both agree (no match)**: Exit
    - **Conflict**: User chooses or `--auto-resolve vlm|ocr`
 
 **PHASE 2: Data Extraction (Sequential)**
 
 6. **TextLLM Extraction**: Analyze cached OCR text to extract:
-   - Invoice date (formatted as YYYY-MM-DD)
-   - Company name (sanitized for filename)
-7. **Filename Generation**: Create `{date}_Rechnung_{company}.pdf`
+   - Document date (formatted as YYYY-MM-DD)
+   - Secondary field (company for invoices, doctor for prescriptions)
+7. **Filename Generation**: Create type-specific filename:
+   - Invoice: `{date}_Rechnung_{company}.pdf`
+   - Prescription: `{date}_Rezept_{doctor}.pdf`
 8. **Renaming**: Safely rename with collision handling
 
 ### How Parallel Processing Works (Phase 1)
@@ -262,7 +284,7 @@ Phase 1 (Categorization) uses Swift's structured concurrency (`Task`) to run VLM
 
 #### Implementation Details
 
-**Location**: `Sources/DocScanCore/InvoiceDetector.swift` - `categorize()` method
+**Location**: `Sources/DocScanCore/DocumentDetector.swift` - `categorize()` method
 
 **Step 1: Both Tasks Start Immediately**
 ```swift
@@ -317,16 +339,20 @@ Time 3s:   VLM finishes ─────────────────X    
 #### Verification in Verbose Mode
 
 ```bash
-docscan invoice.pdf -v
+# Invoice detection
+docscan invoice.pdf -v --type invoice
+
+# Prescription detection
+docscan prescription.pdf -v --type prescription
 ```
 
-Output shows the two-phase flow (searchable PDF example):
+Output shows the two-phase flow (invoice example with searchable PDF):
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 PHASE 1: Categorization (VLM + OCR in parallel)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-VLM: Starting categorization...
+VLM: Starting categorization for invoice...
 PDF: Using direct text extraction for categorization...
 VLM response: Yes
 ✅ VLM and PDF text agree: This IS an invoice
@@ -340,13 +366,22 @@ Extracting invoice data (OCR+TextLLM)...
    🏢 Company: DB_Fernverkehr_AG
 ```
 
-For scanned PDFs (no extractable text), the output shows:
+Prescription example output:
 ```
-VLM: Starting categorization...
-OCR: Starting Vision OCR (scanned document)...
-OCR: Extracted 1413 characters
-VLM response: Yes
-✅ VLM and Vision OCR agree: This IS an invoice
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 PHASE 1: Categorization (VLM + OCR in parallel)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VLM: Starting categorization for prescription...
+✅ VLM and PDF text agree: This IS a prescription
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 PHASE 2: Data Extraction (OCR + TextLLM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Extracting prescription data (OCR+TextLLM)...
+   📅 Date: 2025-04-08
+   👨‍⚕️ Doctor: Gesine_Kaiser
 ```
 
 ### Configuration
@@ -374,16 +409,16 @@ This project leverages MLX Swift for Apple Silicon acceleration with two model t
 
 ### VLM (Vision-Language Model) - Categorization Only
 
-Used in Phase 1 for simple invoice detection (YES/NO):
+Used in Phase 1 for simple document type detection (YES/NO):
 
 - Models: Qwen2-VL series (2B, 7B variants)
-- Task: "Is this an invoice?" → YES/NO
+- Task: "Is this a [document type]?" → YES/NO
 - Loaded via `ModelManager.swift`
 
 ```swift
-// Simple categorization prompt
-let prompt = "Is this document an INVOICE? Answer YES or NO"
-let response = try await session.respond(to: prompt, image: .url(tempURL))
+// Document type determines the prompt
+let prompt = documentType.vlmPrompt  // e.g., "Is this document an INVOICE?"
+let response = try await vlmProvider.generateFromImage(image, prompt: prompt)
 ```
 
 ### Text LLM - Data Extraction
@@ -391,21 +426,22 @@ let response = try await session.respond(to: prompt, image: .url(tempURL))
 Used in Phase 2 for accurate data extraction from OCR text:
 
 - Model: `mlx-community/Qwen2.5-7B-Instruct-4bit`
-- Task: Extract date and company from text
+- Task: Extract date and secondary field from text
 - Loaded via `TextLLMManager.swift`
 
 ```swift
-// Data extraction from OCR text
-let (date, company) = try await textLLM.extractDateAndCompany(from: ocrText)
+// Generic extraction for any document type
+let result = try await textLLM.extractData(for: documentType, from: ocrText)
+// result.date, result.secondaryField (company or doctor)
 ```
 
 ### Why Two Model Types?
 
 | Task | VLM | TextLLM | Winner |
 |------|-----|---------|--------|
-| "Is this an invoice?" | ✅ Good | ✅ Good | Both work |
+| "Is this a [type]?" | ✅ Good | ✅ Good | Both work |
 | Extract date | ❌ Often wrong | ✅ Accurate | TextLLM |
-| Extract company | ❌ Picks wrong text | ✅ Accurate | TextLLM |
+| Extract secondary field | ❌ Picks wrong text | ✅ Accurate | TextLLM |
 
 VLMs excel at visual understanding but struggle with precise text extraction. TextLLMs working on OCR output are more reliable for structured data.
 
@@ -435,15 +471,20 @@ Tests use XCTest with Swift's native testing features:
 
 - `ConfigurationTests.swift` - Configuration loading and defaults
 - `FileRenamerTests.swift` - File operations and collision handling
-- `InvoiceDetectorTests.swift` - Filename generation and data validation
-- `OCREngineTests.swift` - OCR text extraction and parsing
-- `VerificationTests.swift` - Dual verification result comparison
+- `InvoiceDetectorTests.swift` - Document detection, filename generation, multi-type support
+- `OCREngineTests.swift` - OCR text extraction and keyword detection for all document types
+- `VerificationTests.swift` - Categorization result comparison and display labels
+- `DocumentTypeTests.swift` - Document type enum properties and keywords
+- `StringUtilsTests.swift` - Company and doctor name sanitization
 
 **Integration Testing:**
-Full end-to-end testing with real invoices:
+Full end-to-end testing with real documents:
 ```bash
-# Test with auto-resolve for non-interactive testing
+# Test invoice detection
 .build/debug/docscan invoice.pdf -v --dry-run --auto-resolve ocr
+
+# Test prescription detection
+.build/debug/docscan prescription.pdf -v --dry-run --type prescription --auto-resolve ocr
 
 # Test with 7B VLM model
 .build/debug/docscan invoice.pdf -v --dry-run -m "mlx-community/Qwen2-VL-7B-Instruct-4bit" --auto-resolve ocr
@@ -560,14 +601,14 @@ PDFKit integration notes:
 The system uses a two-phase approach for optimal accuracy:
 
 1. **Phase 1: Categorization (Parallel)**
-   - VLM: Simple YES/NO question
-   - OCR: Keyword detection
+   - VLM: Simple YES/NO question ("Is this a [type]?")
+   - OCR: Type-specific keyword detection
    - Both run in parallel using Swift Tasks
    - OCR caches text for Phase 2
 
 2. **Phase 2: Data Extraction (OCR+TextLLM)**
    - Uses cached OCR text (no re-extraction needed)
-   - TextLLM extracts date and company
+   - TextLLM extracts date and secondary field (company/doctor/etc.)
    - More accurate than VLM for structured data
 
 **Key Design Decisions:**
@@ -575,6 +616,7 @@ The system uses a two-phase approach for optimal accuracy:
 - Data extraction uses TextLLM (more accurate)
 - OCR text is cached between phases (efficiency)
 - Conflicts only occur in categorization (simpler resolution)
+- Document types are extensible via `DocumentType` enum
 
 ### Adding New Features
 
@@ -655,6 +697,36 @@ Key differences from the original Python implementation:
 | Testing | XCTest | pytest |
 | Async | async/await | asyncio |
 
+## Adding New Document Types
+
+To add a new document type (e.g., contracts, receipts):
+
+1. **Update `DocumentType.swift`**:
+   ```swift
+   public enum DocumentType: String, CaseIterable, Codable {
+       case invoice
+       case prescription
+       case contract  // New type
+   }
+   ```
+
+2. **Add type-specific properties**:
+   - `displayName` - Human-readable name
+   - `germanName` - German translation for filename
+   - `vlmPrompt` - VLM categorization prompt
+   - `strongKeywords` - High-confidence keywords
+   - `mediumKeywords` - Medium-confidence keywords
+   - `defaultFilenamePattern` - Filename template
+
+3. **Update `TextLLMManager.swift`**:
+   - Add extraction prompt for the new type
+   - Define what secondary field to extract
+
+4. **Update `StringUtils.swift`** (if needed):
+   - Add sanitization function for the secondary field
+
+5. **Add tests** for the new document type
+
 ## Future Enhancements
 
 Potential areas for improvement:
@@ -662,11 +734,11 @@ Potential areas for improvement:
 - macOS Quick Actions integration
 - SwiftUI GUI application
 - Watch folder mode
-- Multi-page invoice support
+- Multi-page document support
 - iCloud Drive integration
 - Finder extension
 - Preview Quick Look plugin
-- Additional document types (receipts, contracts, etc.)
+- Additional document types (contracts, receipts, bank statements, etc.)
 
 ## Code Style
 

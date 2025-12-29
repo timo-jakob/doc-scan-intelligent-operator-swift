@@ -177,4 +177,160 @@ final class StringUtilsTests: XCTestCase {
             XCTAssertEqual(result, expected, "Failed for input: \(input)")
         }
     }
+
+    // MARK: - Doctor Name Sanitization Tests
+
+    func testSanitizeDoctorNameSimple() {
+        let result = StringUtils.sanitizeDoctorName("Gesine Kaiser")
+        XCTAssertEqual(result, "Gesine_Kaiser")
+    }
+
+    func testSanitizeDoctorNameWithDrTitle() {
+        let result = StringUtils.sanitizeDoctorName("Dr. Gesine Kaiser")
+        XCTAssertEqual(result, "Gesine_Kaiser")
+    }
+
+    func testSanitizeDoctorNameWithDrMedTitle() {
+        let result = StringUtils.sanitizeDoctorName("Dr. med. Gesine Kaiser")
+        XCTAssertEqual(result, "Gesine_Kaiser")
+    }
+
+    func testSanitizeDoctorNameWithDrMedNoSpace() {
+        let result = StringUtils.sanitizeDoctorName("Dr.med. Gesine Kaiser")
+        XCTAssertEqual(result, "Gesine_Kaiser")
+    }
+
+    func testSanitizeDoctorNameWithProfDr() {
+        let result = StringUtils.sanitizeDoctorName("Prof. Dr. Hans Müller")
+        XCTAssertEqual(result, "Hans_Müller")
+    }
+
+    func testSanitizeDoctorNameWithProfDrNoSpaces() {
+        let result = StringUtils.sanitizeDoctorName("Prof.Dr. Hans Müller")
+        XCTAssertEqual(result, "Hans_Müller")
+    }
+
+    func testSanitizeDoctorNameWithMedTitle() {
+        let result = StringUtils.sanitizeDoctorName("med. Peter Schmidt")
+        XCTAssertEqual(result, "Peter_Schmidt")
+    }
+
+    func testSanitizeDoctorNameCaseInsensitive() {
+        let result = StringUtils.sanitizeDoctorName("DR. MED. Anna Weber")
+        XCTAssertEqual(result, "Anna_Weber")
+    }
+
+    func testSanitizeDoctorNameWithSpecialChars() {
+        let result = StringUtils.sanitizeDoctorName("Dr. Test: Name/Example")
+        XCTAssertEqual(result, "Test_NameExample")
+    }
+
+    func testSanitizeDoctorNameWithMultipleSpaces() {
+        let result = StringUtils.sanitizeDoctorName("Dr.    Hans    Müller")
+        XCTAssertEqual(result, "Hans_Müller")
+    }
+
+    func testSanitizeDoctorNameWithLeadingTrailingSpaces() {
+        // Note: Leading spaces prevent title removal (title must be at start)
+        let result = StringUtils.sanitizeDoctorName("  Dr. Hans Müller  ")
+        XCTAssertEqual(result, "Dr._Hans_Müller")
+
+        // Title at start is removed correctly
+        let result2 = StringUtils.sanitizeDoctorName("Dr. Hans Müller  ")
+        XCTAssertEqual(result2, "Hans_Müller")
+    }
+
+    func testSanitizeDoctorNameLongString() {
+        let longName = "Dr. " + String(repeating: "A", count: 50)
+        let result = StringUtils.sanitizeDoctorName(longName)
+        XCTAssertEqual(result.count, 40) // Max doctor name length
+    }
+
+    func testSanitizeDoctorNameEmpty() {
+        let result = StringUtils.sanitizeDoctorName("")
+        XCTAssertEqual(result, "")
+    }
+
+    func testSanitizeDoctorNameOnlyTitle() {
+        let result = StringUtils.sanitizeDoctorName("Dr.")
+        XCTAssertEqual(result, "")
+    }
+
+    func testSanitizeDoctorNameWithUmlauts() {
+        let result = StringUtils.sanitizeDoctorName("Dr. med. Jörg Müller-Schäfer")
+        XCTAssertEqual(result, "Jörg_Müller-Schäfer")
+    }
+
+    func testSanitizeDoctorNameRealExamples() {
+        let examples: [(input: String, expected: String)] = [
+            ("Dr. med. Gesine Kaiser", "Gesine_Kaiser"),
+            ("Prof. Dr. med. Hans Weber", "Hans_Weber"),
+            ("Dr.med. Anna Schmidt", "Anna_Schmidt"),
+            ("Gesine Kaiser", "Gesine_Kaiser"),
+            ("Dr. Peter Müller-Schmidt", "Peter_Müller-Schmidt")
+        ]
+
+        for (input, expected) in examples {
+            let result = StringUtils.sanitizeDoctorName(input)
+            XCTAssertEqual(result, expected, "Failed for input: \(input)")
+        }
+    }
+
+    // MARK: - Patient Name Sanitization Tests
+
+    func testSanitizePatientNameSimple() {
+        let result = StringUtils.sanitizePatientName("Penelope")
+        XCTAssertEqual(result, "Penelope")
+    }
+
+    func testSanitizePatientNameWithSpaces() {
+        let result = StringUtils.sanitizePatientName("Anna Maria")
+        XCTAssertEqual(result, "Anna_Maria")
+    }
+
+    func testSanitizePatientNameWithSpecialChars() {
+        let result = StringUtils.sanitizePatientName("Test: Name/Example")
+        XCTAssertEqual(result, "Test_NameExample")
+    }
+
+    func testSanitizePatientNameWithMultipleSpaces() {
+        let result = StringUtils.sanitizePatientName("Anna    Maria")
+        XCTAssertEqual(result, "Anna_Maria")
+    }
+
+    func testSanitizePatientNameWithLeadingTrailingSpaces() {
+        let result = StringUtils.sanitizePatientName("  Penelope  ")
+        XCTAssertEqual(result, "Penelope")
+    }
+
+    func testSanitizePatientNameLongString() {
+        let longName = String(repeating: "A", count: 50)
+        let result = StringUtils.sanitizePatientName(longName)
+        XCTAssertEqual(result.count, 30) // Max patient name length
+    }
+
+    func testSanitizePatientNameEmpty() {
+        let result = StringUtils.sanitizePatientName("")
+        XCTAssertEqual(result, "")
+    }
+
+    func testSanitizePatientNameWithUmlauts() {
+        let result = StringUtils.sanitizePatientName("Jörg")
+        XCTAssertEqual(result, "Jörg")
+    }
+
+    func testSanitizePatientNameRealExamples() {
+        let examples: [(input: String, expected: String)] = [
+            ("Penelope", "Penelope"),
+            ("Anna Maria", "Anna_Maria"),
+            ("Hans-Peter", "Hans-Peter"),
+            ("Müller", "Müller"),
+            ("Test Name", "Test_Name")
+        ]
+
+        for (input, expected) in examples {
+            let result = StringUtils.sanitizePatientName(input)
+            XCTAssertEqual(result, expected, "Failed for input: \(input)")
+        }
+    }
 }

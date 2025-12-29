@@ -3,15 +3,15 @@ import AppKit
 
 // MARK: - Categorization Results (Phase 1: VLM + OCR in parallel)
 
-/// Result of invoice categorization from a single method
+/// Result of document categorization from a single method
 public struct CategorizationResult: Sendable {
-    public let isInvoice: Bool
+    public let isMatch: Bool // Whether document matches the target type
     public let confidence: String // "high", "medium", "low"
     public let method: String // "VLM", "OCR", or "PDF"
     public let reason: String? // Optional explanation
 
-    public init(isInvoice: Bool, confidence: String = "high", method: String, reason: String? = nil) {
-        self.isInvoice = isInvoice
+    public init(isMatch: Bool, confidence: String = "high", method: String, reason: String? = nil) {
+        self.isMatch = isMatch
         self.confidence = confidence
         self.method = method
         self.reason = reason
@@ -63,53 +63,69 @@ public struct CategorizationVerification {
     public let vlmResult: CategorizationResult
     public let ocrResult: CategorizationResult
     public let bothAgree: Bool
-    public let agreedIsInvoice: Bool?
+    public let agreedIsMatch: Bool? // Whether both agree document matches target type
 
     public init(vlmResult: CategorizationResult, ocrResult: CategorizationResult) {
         self.vlmResult = vlmResult
         self.ocrResult = ocrResult
-        self.bothAgree = vlmResult.isInvoice == ocrResult.isInvoice
-        self.agreedIsInvoice = bothAgree ? vlmResult.isInvoice : nil
+        self.bothAgree = vlmResult.isMatch == ocrResult.isMatch
+        self.agreedIsMatch = bothAgree ? vlmResult.isMatch : nil
     }
 }
 
 // MARK: - Extraction Results (Phase 2: OCR+TextLLM only)
 
 /// Result of data extraction (OCR+TextLLM only)
+/// Contains date and a secondary field (company for invoices, doctor for prescriptions)
 public struct ExtractionResult: Sendable {
     public let date: Date?
-    public let company: String?
+    public let secondaryField: String? // company, doctor, etc. depending on document type
+    public let patientName: String? // patient first name (for prescriptions)
 
-    public init(date: Date?, company: String?) {
+    public init(date: Date?, secondaryField: String?, patientName: String? = nil) {
         self.date = date
-        self.company = company
+        self.secondaryField = secondaryField
+        self.patientName = patientName
     }
 }
 
-// MARK: - Final Invoice Data
+// MARK: - Final Document Data
 
 /// Final result combining categorization and extraction
-public struct InvoiceData {
-    public let isInvoice: Bool
+public struct DocumentData {
+    public let documentType: DocumentType
+    public let isMatch: Bool // Whether document matches the target type
     public let date: Date?
-    public let company: String?
+    public let secondaryField: String? // company, doctor, etc.
+    public let patientName: String? // patient first name (for prescriptions)
     public let categorization: CategorizationVerification?
 
-    public init(isInvoice: Bool, date: Date?, company: String?, categorization: CategorizationVerification? = nil) {
-        self.isInvoice = isInvoice
+    public init(
+        documentType: DocumentType,
+        isMatch: Bool,
+        date: Date?,
+        secondaryField: String?,
+        patientName: String? = nil,
+        categorization: CategorizationVerification? = nil
+    ) {
+        self.documentType = documentType
+        self.isMatch = isMatch
         self.date = date
-        self.company = company
+        self.secondaryField = secondaryField
+        self.patientName = patientName
         self.categorization = categorization
     }
 }
 
-/// Detects invoices and extracts key information using two-phase approach:
-/// Phase 1: Categorization (VLM + OCR in parallel) - Is this an invoice?
-/// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and company
-public class InvoiceDetector {
+/// Detects documents of a specific type and extracts key information using two-phase approach:
+/// Phase 1: Categorization (VLM + OCR in parallel) - Does this match the document type?
+/// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and secondary field
+public class DocumentDetector {
     private let vlmProvider: VLMProvider
     private let ocrEngine: OCREngine
+    private let textLLM: TextLLMManager
     private let config: Configuration
+    public let documentType: DocumentType
 
     // Cache the image and OCR text between phases
     private var cachedImage: NSImage?
@@ -117,19 +133,26 @@ public class InvoiceDetector {
     private var cachedPDFPath: String?
     private var usedDirectExtraction: Bool = false
 
-    /// Initialize with default ModelManager
-    public init(config: Configuration) {
+    /// Initialize with default ModelManager for a specific document type
+    public init(config: Configuration, documentType: DocumentType = .invoice) {
         self.config = config
+        self.documentType = documentType
         self.vlmProvider = ModelManager(config: config)
         self.ocrEngine = OCREngine(config: config)
+        self.textLLM = TextLLMManager(config: config)
     }
 
     /// Initialize with custom VLM provider (for testing/dependency injection)
-    public init(config: Configuration, vlmProvider: VLMProvider) {
+    public init(config: Configuration, documentType: DocumentType = .invoice, vlmProvider: VLMProvider) {
         self.config = config
+        self.documentType = documentType
         self.vlmProvider = vlmProvider
         self.ocrEngine = OCREngine(config: config)
+        self.textLLM = TextLLMManager(config: config)
     }
+}
+
+extension DocumentDetector {
 
     // MARK: - Phase 1: Categorization (VLM + OCR in parallel)
 
@@ -199,12 +222,12 @@ public class InvoiceDetector {
                 print("⏱️  VLM timed out after \(Int(timeoutDuration)) seconds")
             }
             vlmTask.cancel()
-            vlm = CategorizationResult(isInvoice: false, confidence: "low", method: "VLM (timeout)", reason: "Timed out")
+            vlm = CategorizationResult(isMatch: false, confidence: "low", method: "VLM (timeout)", reason: "Timed out")
         } catch {
             if config.verbose {
                 print("VLM categorization failed: \(error)")
             }
-            vlm = CategorizationResult(isInvoice: false, confidence: "low", method: "VLM (error)", reason: error.localizedDescription)
+            vlm = CategorizationResult(isMatch: false, confidence: "low", method: "VLM (error)", reason: error.localizedDescription)
         }
 
         // Handle OCR with timeout
@@ -218,7 +241,7 @@ public class InvoiceDetector {
                 print("⏱️  OCR timed out after \(Int(timeoutDuration)) seconds")
             }
             ocrTask.cancel()
-            ocr = CategorizationResult(isInvoice: false, confidence: "low", method: "OCR (timeout)", reason: "Timed out")
+            ocr = CategorizationResult(isMatch: false, confidence: "low", method: "OCR (timeout)", reason: "Timed out")
         } catch {
             if config.verbose {
                 print("OCR categorization failed: \(error)")
@@ -230,11 +253,12 @@ public class InvoiceDetector {
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
         if config.verbose {
+            let typeName = documentType.displayName.lowercased()
             if verification.bothAgree {
-                let result = verification.agreedIsInvoice == true ? "IS an invoice" : "is NOT an invoice"
+                let result = verification.agreedIsMatch == true ? "IS a \(typeName)" : "is NOT a \(typeName)"
                 print("✅ VLM and OCR agree: Document \(result)")
             } else {
-                print("⚠️  Categorization conflict: VLM says \(vlm.isInvoice ? "invoice" : "not invoice"), OCR says \(ocr.isInvoice ? "invoice" : "not invoice")")
+                print("⚠️  Categorization conflict: VLM says \(vlm.isMatch ? typeName : "not \(typeName)"), OCR says \(ocr.isMatch ? typeName : "not \(typeName)")")
             }
         }
 
@@ -243,50 +267,41 @@ public class InvoiceDetector {
 
     // MARK: - Phase 2: Data Extraction (OCR+TextLLM only)
 
-    /// Extract invoice data using OCR+TextLLM only (call after categorization confirms it's an invoice)
+    /// Extract document data using OCR+TextLLM only (call after categorization confirms document type)
     public func extractData() async throws -> ExtractionResult {
         guard let ocrText = cachedOCRText else {
             throw DocScanError.extractionFailed("No OCR text available. Call categorize() first.")
         }
 
         if config.verbose {
-            print("Extracting invoice data (OCR+TextLLM)...")
+            print("Extracting \(documentType.displayName.lowercased()) data (OCR+TextLLM)...")
         }
 
-        // Use TextLLM to extract date and company from cached OCR text
-        let (date, company) = try await ocrEngine.extractDateAndCompany(from: ocrText)
+        // Use TextLLM to extract date and secondary field from cached OCR text
+        let result = try await textLLM.extractData(for: documentType, from: ocrText)
 
         if config.verbose {
+            let fieldName = documentType == .invoice ? "Company" : "Doctor"
             print("Extracted data:")
-            print("  Date: \(date?.description ?? "not found")")
-            print("  Company: \(company ?? "not found")")
+            print("  Date: \(result.date?.description ?? "not found")")
+            print("  \(fieldName): \(result.secondaryField ?? "not found")")
+            if documentType == .prescription {
+                print("  Patient: \(result.patientName ?? "not found")")
+            }
         }
 
-        return ExtractionResult(date: date, company: company)
+        return ExtractionResult(date: result.date, secondaryField: result.secondaryField, patientName: result.patientName)
     }
 
     // MARK: - VLM Categorization
 
-    /// Categorize using VLM - simple yes/no invoice detection
+    /// Categorize using VLM - simple yes/no document type detection
     private func categorizeWithVLM(image: NSImage) async throws -> CategorizationResult {
         if config.verbose {
-            print("VLM: Starting categorization...")
+            print("VLM: Starting categorization for \(documentType.displayName.lowercased())...")
         }
 
-        let prompt = """
-        Look at this document image carefully.
-
-        Is this document an INVOICE, BILL, or RECEIPT?
-
-        Look for these indicators:
-        - Words like "Rechnung", "Invoice", "Facture", "Faktura", "Bill", "Receipt"
-        - Invoice number or receipt number
-        - Itemized charges with prices
-        - Total amount due
-        - Payment terms or due date
-
-        Answer with ONLY one word: YES or NO
-        """
+        let prompt = documentType.vlmPrompt
 
         let response = try await vlmProvider.generateFromImage(image, prompt: prompt)
 
@@ -296,14 +311,14 @@ public class InvoiceDetector {
 
         // Parse response - look for yes/no
         let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let isInvoice = lowercased.contains("yes") || lowercased.hasPrefix("ja")
+        let isMatch = lowercased.contains("yes") || lowercased.hasPrefix("ja")
         let confidence = (lowercased == "yes" || lowercased == "no") ? "high" : "medium"
 
         if config.verbose {
-            print("VLM: Is invoice = \(isInvoice) (confidence: \(confidence))")
+            print("VLM: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
         }
 
-        return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "VLM", reason: response)
+        return CategorizationResult(isMatch: isMatch, confidence: confidence, method: "VLM", reason: response)
     }
 
     // MARK: - Text Categorization
@@ -318,16 +333,16 @@ public class InvoiceDetector {
         }
 
         // Use keyword-based detection on the direct text
-        let (isInvoice, confidence, reason) = ocrEngine.detectInvoiceKeywords(from: text)
+        let (isMatch, confidence, reason) = ocrEngine.detectKeywords(for: documentType, from: text)
 
         if config.verbose {
-            print("PDF: Is invoice = \(isInvoice) (confidence: \(confidence))")
+            print("PDF: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
             if let reason = reason {
                 print("PDF: Reason: \(reason)")
             }
         }
 
-        return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "PDF", reason: reason)
+        return CategorizationResult(isMatch: isMatch, confidence: confidence, method: "PDF", reason: reason)
     }
 
     /// Categorize using Vision OCR (fallback for scanned documents)
@@ -346,16 +361,16 @@ public class InvoiceDetector {
         }
 
         // Use keyword-based detection
-        let (isInvoice, confidence, reason) = ocrEngine.detectInvoiceKeywords(from: text)
+        let (isMatch, confidence, reason) = ocrEngine.detectKeywords(for: documentType, from: text)
 
         if config.verbose {
-            print("OCR: Is invoice = \(isInvoice) (confidence: \(confidence))")
+            print("OCR: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
             if let reason = reason {
                 print("OCR: Reason: \(reason)")
             }
         }
 
-        return CategorizationResult(isInvoice: isInvoice, confidence: confidence, method: "OCR", reason: reason)
+        return CategorizationResult(isMatch: isMatch, confidence: confidence, method: "OCR", reason: reason)
     }
 
     // MARK: - Helper Methods
@@ -387,17 +402,46 @@ public class InvoiceDetector {
         }
     }
 
-    /// Generate filename from invoice data
-    public func generateFilename(from data: InvoiceData) -> String? {
-        guard data.isInvoice else { return nil }
-        guard let date = data.date, let company = data.company else { return nil }
+    /// Generate filename from document data
+    public func generateFilename(from data: DocumentData) -> String? {
+        guard data.isMatch else { return nil }
+        guard let date = data.date else { return nil }
+
+        // For invoices, company is required
+        if documentType == .invoice && data.secondaryField == nil {
+            return nil
+        }
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = config.dateFormat
         let dateString = dateFormatter.string(from: date)
 
-        return config.filenamePattern
-            .replacingOccurrences(of: "{date}", with: dateString)
-            .replacingOccurrences(of: "{company}", with: company)
+        // Use document type's default pattern
+        var pattern = documentType.defaultFilenamePattern
+        pattern = pattern.replacingOccurrences(of: "{date}", with: dateString)
+
+        // Replace the secondary field placeholder based on document type
+        switch documentType {
+        case .invoice:
+            pattern = pattern.replacingOccurrences(of: "{company}", with: data.secondaryField!)
+        case .prescription:
+            // Handle patient name placeholder first (optional)
+            // Must be processed before doctor to handle the case where both are nil
+            if let patientName = data.patientName {
+                pattern = pattern.replacingOccurrences(of: "{patient}", with: patientName)
+            } else {
+                // Remove the "für_{patient}_" part if no patient name available
+                pattern = pattern.replacingOccurrences(of: "für_{patient}_", with: "")
+            }
+            // Handle doctor name placeholder (optional)
+            if let doctor = data.secondaryField {
+                pattern = pattern.replacingOccurrences(of: "{doctor}", with: doctor)
+            } else {
+                // Remove the "_von_{doctor}" part if no doctor name available
+                pattern = pattern.replacingOccurrences(of: "_von_{doctor}", with: "")
+            }
+        }
+
+        return pattern
     }
 }
