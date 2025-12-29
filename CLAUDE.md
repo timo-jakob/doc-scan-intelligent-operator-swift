@@ -509,6 +509,33 @@ The workflow includes a Quality Gate check that will:
    - If SonarQube fails, fix issues and push again
    - Never merge with failing quality checks
 
+## Snyk Security Analysis
+
+The project uses Snyk for security vulnerability scanning. Analysis runs automatically on:
+- Push to `main` branch
+- Pull requests targeting `main`
+- Weekly schedule (Sundays at midnight) to catch new vulnerabilities
+
+### Setup Requirements
+
+1. **Add SNYK_TOKEN secret to GitHub repository:**
+   - Go to [Snyk](https://app.snyk.io) → Account Settings → Auth Token
+   - Copy your API token
+   - Add it to GitHub: Repository → Settings → Secrets → Actions → New secret
+   - Name: `SNYK_TOKEN`, Value: your API token
+
+2. **Organization Configuration:**
+   - Organization: `timo-jakob`
+
+### What Gets Scanned
+
+- **Snyk Open Source**: Scans Swift Package Manager dependencies for known vulnerabilities
+- **Snyk Code**: Static analysis of source code for security issues
+
+### Monitoring
+
+On pushes to `main`, dependencies are monitored in Snyk dashboard for ongoing vulnerability tracking.
+
 ## Key Implementation Notes
 
 ### Modifying Configuration

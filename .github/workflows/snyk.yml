@@ -1,0 +1,51 @@
+name: Snyk Security Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Run weekly to catch new vulnerabilities in dependencies
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday at midnight
+
+jobs:
+  snyk-security:
+    name: Snyk Security Scan
+    runs-on: macos-15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+    - name: Resolve Swift dependencies
+      run: |
+        # Resolve dependencies to generate Package.resolved
+        swift package resolve
+
+    - name: Set up Snyk CLI
+      uses: snyk/actions/setup@v1
+
+    - name: Snyk Open Source (Dependency Scan)
+      run: |
+        # Fail build on HIGH or CRITICAL vulnerabilities
+        snyk test --all-projects --org=timo-jakob --severity-threshold=high
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+    - name: Snyk Code (Static Analysis)
+      run: |
+        # Fail build on HIGH or CRITICAL vulnerabilities
+        snyk code test --org=timo-jakob --severity-threshold=high
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+    - name: Monitor dependencies in Snyk
+      run: |
+        # Upload project to Snyk dashboard for continuous monitoring
+        snyk monitor --all-projects --org=timo-jakob
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
