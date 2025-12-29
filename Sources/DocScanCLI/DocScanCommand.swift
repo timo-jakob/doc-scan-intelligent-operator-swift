@@ -6,10 +6,14 @@ import DocScanCore
 struct DocScanCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "docscan",
-        abstract: "AI-powered invoice detection and renaming using two-phase verification",
+        abstract: "AI-powered document detection and renaming using two-phase verification",
         discussion: """
-        Phase 1: Categorization (VLM + OCR in parallel) - Is this an invoice?
-        Phase 2: Data Extraction (OCR + TextLLM only) - Extract date and company
+        Phase 1: Categorization (VLM + OCR in parallel) - Does this match the document type?
+        Phase 2: Data Extraction (OCR + TextLLM only) - Extract date and secondary field
+
+        Supported document types:
+          invoice      - Invoices, bills, receipts (extracts: date, company)
+          prescription - Doctor's prescriptions (extracts: date, doctor)
         """,
         version: "2.0.0"
     )
@@ -19,6 +23,9 @@ struct DocScanCommand: AsyncParsableCommand {
 
     @Option(name: .shortAndLong, help: "Path to configuration file")
     var config: String?
+
+    @Option(name: .shortAndLong, help: "Document type to detect: 'invoice' (default) or 'prescription'")
+    var type: String = "invoice"
 
     @Option(name: .shortAndLong, help: "VLM model for categorization (e.g., 'mlx-community/Qwen2-VL-2B-Instruct-4bit')")
     var model: String?
@@ -45,6 +52,19 @@ struct DocScanCommand: AsyncParsableCommand {
     var autoResolve: String?
 
     func run() async throws {
+        // Parse document type
+        let documentType: DocumentType
+        switch type.lowercased() {
+        case "invoice":
+            documentType = .invoice
+        case "prescription":
+            documentType = .prescription
+        default:
+            print("❌ Invalid document type: '\(type)'")
+            print("   Valid types: invoice, prescription")
+            throw ExitCode.failure
+        }
+
         // Load configuration
         var configuration: Configuration
         if let configPath = config {
@@ -72,8 +92,9 @@ struct DocScanCommand: AsyncParsableCommand {
         configuration.verbose = verbose
 
         if verbose {
-            print("DocScan - Two-Phase Invoice Detection")
+            print("DocScan - Two-Phase Document Detection")
             print("======================================")
+            print("Document type: \(documentType.displayName)")
             print(configuration)
             print()
         }
@@ -84,9 +105,10 @@ struct DocScanCommand: AsyncParsableCommand {
         }
 
         print("Analyzing: \(pdfPath)")
+        print("Document type: \(documentType.displayName)")
         print()
 
-        let detector = InvoiceDetector(config: configuration)
+        let detector = DocumentDetector(config: configuration, documentType: documentType)
 
         // ============================================================
         // PHASE 1: Categorization (VLM + OCR in parallel)
@@ -99,10 +121,11 @@ struct DocScanCommand: AsyncParsableCommand {
         let categorization = try await detector.categorize(pdfPath: pdfPath)
 
         // Display categorization results
-        displayCategorizationResults(categorization)
+        displayCategorizationResults(categorization, documentType: documentType)
 
         // Determine if we should proceed
-        let isInvoice: Bool
+        let isMatch: Bool
+        let typeName = documentType.displayName.lowercased()
 
         // Check for timeouts
         let vlmTimedOut = categorization.vlmResult.method.contains("timeout")
@@ -113,30 +136,30 @@ struct DocScanCommand: AsyncParsableCommand {
             throw ExitCode.failure
         } else if vlmTimedOut {
             print("⏱️  VLM timed out - using OCR result")
-            isInvoice = categorization.ocrResult.isInvoice
+            isMatch = categorization.ocrResult.isMatch
         } else if ocrTimedOut {
             print("⏱️  OCR timed out - using VLM result")
-            isInvoice = categorization.vlmResult.isInvoice
+            isMatch = categorization.vlmResult.isMatch
         } else if categorization.bothAgree {
             // Both agree
-            isInvoice = categorization.agreedIsInvoice ?? false
+            isMatch = categorization.agreedIsMatch ?? false
             let vlmLabel = categorization.vlmResult.shortDisplayLabel
             let textLabel = categorization.ocrResult.shortDisplayLabel
-            if isInvoice {
-                print("✅ \(vlmLabel) and \(textLabel) agree: This IS an invoice")
+            if isMatch {
+                print("✅ \(vlmLabel) and \(textLabel) agree: This IS a \(typeName)")
             } else {
-                print("✅ \(vlmLabel) and \(textLabel) agree: This is NOT an invoice")
+                print("✅ \(vlmLabel) and \(textLabel) agree: This is NOT a \(typeName)")
             }
         } else {
             // Conflict - need resolution
-            isInvoice = try resolveCategorization(categorization, autoResolve: autoResolve)
+            isMatch = try resolveCategorization(categorization, autoResolve: autoResolve, documentType: documentType)
         }
 
         print()
 
-        // Exit if not an invoice
-        guard isInvoice else {
-            print("❌ Document is not an invoice - exiting")
+        // Exit if document doesn't match type
+        guard isMatch else {
+            print("❌ Document is not a \(typeName) - exiting")
             throw ExitCode.failure
         }
 
@@ -150,32 +173,37 @@ struct DocScanCommand: AsyncParsableCommand {
 
         let extraction = try await detector.extractData()
 
+        // Determine field name based on document type
+        let secondaryFieldName = documentType == .invoice ? "Company" : "Doctor"
+        let secondaryFieldEmoji = documentType == .invoice ? "🏢" : "👨‍⚕️"
+
         // Check extraction results
-        guard let date = extraction.date, let company = extraction.company else {
-            print("⚠️  Could not extract complete invoice data")
+        guard let date = extraction.date, let secondaryField = extraction.secondaryField else {
+            print("⚠️  Could not extract complete \(typeName) data")
             if let date = extraction.date {
                 print("   Date: \(formatDate(date))")
             } else {
                 print("   Date: ❌ Not found")
             }
-            if let company = extraction.company {
-                print("   Company: \(company)")
+            if let field = extraction.secondaryField {
+                print("   \(secondaryFieldName): \(field)")
             } else {
-                print("   Company: ❌ Not found")
+                print("   \(secondaryFieldName): ❌ Not found")
             }
             throw ExitCode.failure
         }
 
         print("Extracted data:")
         print("   📅 Date: \(formatDate(date))")
-        print("   🏢 Company: \(company)")
+        print("   \(secondaryFieldEmoji) \(secondaryFieldName): \(secondaryField)")
         print()
 
-        // Create final invoice data
-        let finalData = InvoiceData(
-            isInvoice: true,
+        // Create final document data
+        let finalData = DocumentData(
+            documentType: documentType,
+            isMatch: true,
             date: date,
-            company: company,
+            secondaryField: secondaryField,
             categorization: categorization
         )
 
@@ -206,22 +234,23 @@ struct DocScanCommand: AsyncParsableCommand {
 
     // MARK: - Display Methods
 
-    private func displayCategorizationResults(_ categorization: CategorizationVerification) {
+    private func displayCategorizationResults(_ categorization: CategorizationVerification, documentType: DocumentType) {
         print("╔══════════════════════════════════════════════════╗")
         print("║         Categorization Results                   ║")
         print("╠══════════════════════════════════════════════════╣")
         print("║ \(categorization.vlmResult.displayLabel):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
-        displayCategorizationResult(categorization.vlmResult, prefix: "║   ")
+        displayCategorizationResult(categorization.vlmResult, prefix: "║   ", documentType: documentType)
         print("║                                                  ║")
         print("║ \(categorization.ocrResult.displayLabel):".padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
-        displayCategorizationResult(categorization.ocrResult, prefix: "║   ")
+        displayCategorizationResult(categorization.ocrResult, prefix: "║   ", documentType: documentType)
         print("╚══════════════════════════════════════════════════╝")
         print()
     }
 
-    private func displayCategorizationResult(_ result: CategorizationResult, prefix: String) {
-        let invoiceStatus = result.isInvoice ? "✅ Invoice" : "❌ Not Invoice"
-        print("\(prefix)\(invoiceStatus) (confidence: \(result.confidence))")
+    private func displayCategorizationResult(_ result: CategorizationResult, prefix: String, documentType: DocumentType) {
+        let typeName = documentType.displayName
+        let matchStatus = result.isMatch ? "✅ \(typeName)" : "❌ Not \(typeName)"
+        print("\(prefix)\(matchStatus) (confidence: \(result.confidence))")
         if let reason = result.reason, verbose {
             let truncated = String(reason.prefix(40))
             print("\(prefix)Reason: \(truncated)")
@@ -230,14 +259,19 @@ struct DocScanCommand: AsyncParsableCommand {
 
     // MARK: - Conflict Resolution
 
-    private func resolveCategorization(_ categorization: CategorizationVerification, autoResolve: String?) throws -> Bool {
+    private func resolveCategorization(
+        _ categorization: CategorizationVerification,
+        autoResolve: String?,
+        documentType: DocumentType
+    ) throws -> Bool {
         let vlmLabel = categorization.vlmResult.shortDisplayLabel
         let textLabel = categorization.ocrResult.shortDisplayLabel
+        let typeName = documentType.displayName
 
         print("⚠️  CATEGORIZATION CONFLICT")
         print()
-        print("  \(vlmLabel) says: \(categorization.vlmResult.isInvoice ? "Invoice" : "Not an invoice")")
-        print("  \(textLabel) says: \(categorization.ocrResult.isInvoice ? "Invoice" : "Not an invoice")")
+        print("  \(vlmLabel) says: \(categorization.vlmResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
+        print("  \(textLabel) says: \(categorization.ocrResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
         print()
 
         // Validate auto-resolve option
@@ -250,24 +284,24 @@ struct DocScanCommand: AsyncParsableCommand {
             }
 
             let useVLM = autoResolveMode.lowercased() == "vlm"
-            let result = useVLM ? categorization.vlmResult.isInvoice : categorization.ocrResult.isInvoice
+            let result = useVLM ? categorization.vlmResult.isMatch : categorization.ocrResult.isMatch
             let chosenLabel = useVLM ? vlmLabel : textLabel
-            print("🤖 Auto-resolve: Using \(chosenLabel) → \(result ? "Invoice" : "Not an invoice")")
+            print("🤖 Auto-resolve: Using \(chosenLabel) → \(result ? typeName : "Not a \(typeName.lowercased())")")
             return result
         }
 
         // Interactive resolution
         print("Which result do you trust?")
-        print("  [1] \(vlmLabel): \(categorization.vlmResult.isInvoice ? "Invoice" : "Not an invoice")")
-        print("  [2] \(textLabel): \(categorization.ocrResult.isInvoice ? "Invoice" : "Not an invoice")")
+        print("  [1] \(vlmLabel): \(categorization.vlmResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
+        print("  [2] \(textLabel): \(categorization.ocrResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
 
         while true {
             print("Enter your choice (1 or 2): ", terminator: "")
             if let input = readLine()?.trimmingCharacters(in: .whitespaces) {
                 if input == "1" {
-                    return categorization.vlmResult.isInvoice
+                    return categorization.vlmResult.isMatch
                 } else if input == "2" {
-                    return categorization.ocrResult.isInvoice
+                    return categorization.ocrResult.isMatch
                 }
             }
             print("Invalid choice. Please enter 1 or 2.")

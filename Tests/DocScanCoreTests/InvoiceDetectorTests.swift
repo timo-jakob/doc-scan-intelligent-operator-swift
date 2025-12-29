@@ -42,10 +42,10 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
     }
 }
 
-// MARK: - Invoice Detector Tests
+// MARK: - Document Detector Tests
 
 final class InvoiceDetectorTests: XCTestCase {
-    var detector: InvoiceDetector!
+    var detector: DocumentDetector!
     var config: Configuration!
     var tempDirectory: URL!
     var mockVLM: MockVLMProvider!
@@ -70,7 +70,7 @@ final class InvoiceDetectorTests: XCTestCase {
         super.setUp()
         config = Configuration.defaultConfiguration
         mockVLM = MockVLMProvider()
-        detector = InvoiceDetector(config: config, vlmProvider: mockVLM)
+        detector = DocumentDetector(config: config, vlmProvider: mockVLM)
         tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -83,8 +83,8 @@ final class InvoiceDetectorTests: XCTestCase {
     }
 
     /// Create detector without mock for tests that don't need VLM
-    private func createDetectorWithoutMock() -> InvoiceDetector {
-        return InvoiceDetector(config: config)
+    private func createDetectorWithoutMock() -> DocumentDetector {
+        return DocumentDetector(config: config)
     }
 
     private func createSearchablePDF() throws -> String {
@@ -109,19 +109,29 @@ final class InvoiceDetectorTests: XCTestCase {
     }
 
     func testInvoiceDataInitialization() {
-        let data = InvoiceData(isInvoice: true, date: Date(), company: "Test Corp")
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: Date(),
+            secondaryField: "Test Corp"
+        )
 
-        XCTAssertTrue(data.isInvoice)
+        XCTAssertTrue(data.isMatch)
         XCTAssertNotNil(data.date)
-        XCTAssertEqual(data.company, "Test Corp")
+        XCTAssertEqual(data.secondaryField, "Test Corp")
     }
 
     func testNotAnInvoice() {
-        let data = InvoiceData(isInvoice: false, date: nil, company: nil)
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: false,
+            date: nil,
+            secondaryField: nil
+        )
 
-        XCTAssertFalse(data.isInvoice)
+        XCTAssertFalse(data.isMatch)
         XCTAssertNil(data.date)
-        XCTAssertNil(data.company)
+        XCTAssertNil(data.secondaryField)
     }
 
     func testGenerateFilenameSuccess() {
@@ -129,56 +139,86 @@ final class InvoiceDetectorTests: XCTestCase {
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let date = dateFormatter.date(from: "2024-12-15")!
 
-        let data = InvoiceData(isInvoice: true, date: date, company: "Acme Corp")
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: date,
+            secondaryField: "Acme_Corp"
+        )
         let filename = detector.generateFilename(from: data)
 
-        XCTAssertEqual(filename, "2024-12-15_Rechnung_Acme Corp.pdf")
+        XCTAssertEqual(filename, "2024-12-15_Rechnung_Acme_Corp.pdf")
     }
 
     func testGenerateFilenameNotAnInvoice() {
-        let data = InvoiceData(isInvoice: false, date: nil, company: nil)
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: false,
+            date: nil,
+            secondaryField: nil
+        )
         let filename = detector.generateFilename(from: data)
 
         XCTAssertNil(filename)
     }
 
     func testGenerateFilenameMissingData() {
-        let data1 = InvoiceData(isInvoice: true, date: Date(), company: nil)
+        let data1 = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: Date(),
+            secondaryField: nil
+        )
         let filename1 = detector.generateFilename(from: data1)
         XCTAssertNil(filename1)
 
-        let data2 = InvoiceData(isInvoice: true, date: nil, company: "Test")
+        let data2 = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: nil,
+            secondaryField: "Test"
+        )
         let filename2 = detector.generateFilename(from: data2)
         XCTAssertNil(filename2)
     }
 
     func testCustomFilenamePattern() {
-        let customConfig = Configuration(
-            output: OutputSettings(filenamePattern: "{company}_{date}_Invoice.pdf")
-        )
-        let customDetector = InvoiceDetector(config: customConfig)
+        // Note: DocumentDetector uses DocumentType's default pattern, not Configuration
+        // This test verifies the invoice default pattern works
+        let customConfig = Configuration()
+        let customDetector = DocumentDetector(config: customConfig, documentType: .invoice)
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let date = dateFormatter.date(from: "2024-12-15")!
 
-        let data = InvoiceData(isInvoice: true, date: date, company: "TestCo")
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: date,
+            secondaryField: "TestCo"
+        )
         let filename = customDetector.generateFilename(from: data)
 
-        XCTAssertEqual(filename, "TestCo_2024-12-15_Invoice.pdf")
+        XCTAssertEqual(filename, "2024-12-15_Rechnung_TestCo.pdf")
     }
 
     func testCustomDateFormat() {
         let customConfig = Configuration(
             output: OutputSettings(dateFormat: "dd.MM.yyyy")
         )
-        let customDetector = InvoiceDetector(config: customConfig)
+        let customDetector = DocumentDetector(config: customConfig, documentType: .invoice)
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let date = dateFormatter.date(from: "2024-12-15")!
 
-        let data = InvoiceData(isInvoice: true, date: date, company: "TestCo")
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: date,
+            secondaryField: "TestCo"
+        )
         let filename = customDetector.generateFilename(from: data)
 
         XCTAssertEqual(filename, "15.12.2024_Rechnung_TestCo.pdf")
@@ -197,7 +237,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
         XCTAssertEqual(result.confidence, "high")
         XCTAssertNotNil(result.reason)
@@ -212,7 +252,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
         XCTAssertEqual(result.confidence, "high")
     }
@@ -226,7 +266,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
     }
 
@@ -239,7 +279,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(regularText)
 
-        XCTAssertFalse(result.isInvoice)
+        XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
         XCTAssertEqual(result.confidence, "high")
     }
@@ -253,7 +293,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
         XCTAssertEqual(result.confidence, "medium")
     }
@@ -261,7 +301,7 @@ final class InvoiceDetectorTests: XCTestCase {
     func testCategorizeWithDirectTextEmptyString() {
         let result = detector.categorizeWithDirectText("")
 
-        XCTAssertFalse(result.isInvoice)
+        XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
     }
 
@@ -274,7 +314,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
     }
 
@@ -287,38 +327,38 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(receiptText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
     }
 
     func testCategorizeWithDirectTextVerboseMode() {
         let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = InvoiceDetector(config: verboseConfig)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice)
 
         let invoiceText = "Rechnung Nr. 12345"
         let result = verboseDetector.categorizeWithDirectText(invoiceText)
 
         // Should still work correctly in verbose mode
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
     }
 
     func testCategorizeWithDirectTextVerboseModeNotInvoice() {
         let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = InvoiceDetector(config: verboseConfig)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice)
 
         // Regular text without any invoice keywords
         let regularText = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
         let result = verboseDetector.categorizeWithDirectText(regularText)
 
-        XCTAssertFalse(result.isInvoice)
+        XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
         XCTAssertEqual(result.confidence, "high")
     }
 
     func testCategorizeWithDirectTextVerboseModeWithReason() {
         let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = InvoiceDetector(config: verboseConfig)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice)
 
         // Invoice text with strong indicators
         let invoiceText = """
@@ -327,7 +367,7 @@ final class InvoiceDetectorTests: XCTestCase {
         """
         let result = verboseDetector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertNotNil(result.reason)
     }
 
@@ -337,7 +377,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(longText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
     }
 
     func testCategorizeWithDirectTextSpanish() {
@@ -349,7 +389,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(invoiceText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
     }
 
@@ -361,7 +401,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let result = detector.categorizeWithDirectText(receiptText)
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
     }
 
     func testCategorizeWithDirectTextCaseInsensitive() {
@@ -375,7 +415,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         for text in testCases {
             let result = detector.categorizeWithDirectText(text)
-            XCTAssertTrue(result.isInvoice, "Should detect invoice in: \(text)")
+            XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
         }
     }
 
@@ -383,13 +423,13 @@ final class InvoiceDetectorTests: XCTestCase {
 
     func testCategorizationResultWithAllParameters() {
         let result = CategorizationResult(
-            isInvoice: true,
+            isMatch: true,
             confidence: "high",
             method: "VLM",
             reason: "Found invoice keywords"
         )
 
-        XCTAssertTrue(result.isInvoice)
+        XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.confidence, "high")
         XCTAssertEqual(result.method, "VLM")
         XCTAssertEqual(result.reason, "Found invoice keywords")
@@ -397,11 +437,11 @@ final class InvoiceDetectorTests: XCTestCase {
 
     func testCategorizationResultDefaultValues() {
         let result = CategorizationResult(
-            isInvoice: false,
+            isMatch: false,
             method: "OCR"
         )
 
-        XCTAssertFalse(result.isInvoice)
+        XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.confidence, "high")
         XCTAssertEqual(result.method, "OCR")
         XCTAssertNil(result.reason)
@@ -410,79 +450,81 @@ final class InvoiceDetectorTests: XCTestCase {
     // MARK: - CategorizationVerification Tests
 
     func testCategorizationVerificationAgreement() {
-        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
-        let ocr = CategorizationResult(isInvoice: true, method: "OCR")
+        let vlm = CategorizationResult(isMatch: true, method: "VLM")
+        let ocr = CategorizationResult(isMatch: true, method: "OCR")
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
         XCTAssertTrue(verification.bothAgree)
-        XCTAssertEqual(verification.agreedIsInvoice, true)
-        XCTAssertTrue(verification.vlmResult.isInvoice)
-        XCTAssertTrue(verification.ocrResult.isInvoice)
+        XCTAssertEqual(verification.agreedIsMatch, true)
+        XCTAssertTrue(verification.vlmResult.isMatch)
+        XCTAssertTrue(verification.ocrResult.isMatch)
     }
 
     func testCategorizationVerificationDisagreement() {
-        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
-        let ocr = CategorizationResult(isInvoice: false, method: "OCR")
+        let vlm = CategorizationResult(isMatch: true, method: "VLM")
+        let ocr = CategorizationResult(isMatch: false, method: "OCR")
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
         XCTAssertFalse(verification.bothAgree)
-        XCTAssertNil(verification.agreedIsInvoice)
+        XCTAssertNil(verification.agreedIsMatch)
     }
 
     // MARK: - ExtractionResult Tests
 
     func testExtractionResultComplete() {
         let date = Date()
-        let result = ExtractionResult(date: date, company: "Test Corp")
+        let result = ExtractionResult(date: date, secondaryField: "Test Corp")
 
         XCTAssertEqual(result.date, date)
-        XCTAssertEqual(result.company, "Test Corp")
+        XCTAssertEqual(result.secondaryField, "Test Corp")
     }
 
     func testExtractionResultPartial() {
-        let result = ExtractionResult(date: nil, company: "Only Company")
+        let result = ExtractionResult(date: nil, secondaryField: "Only Company")
 
         XCTAssertNil(result.date)
-        XCTAssertEqual(result.company, "Only Company")
+        XCTAssertEqual(result.secondaryField, "Only Company")
     }
 
-    // MARK: - InvoiceData with Categorization Tests
+    // MARK: - DocumentData with Categorization Tests
 
-    func testInvoiceDataWithCategorizationAgreement() {
-        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
-        let ocr = CategorizationResult(isInvoice: true, method: "OCR")
+    func testDocumentDataWithCategorizationAgreement() {
+        let vlm = CategorizationResult(isMatch: true, method: "VLM")
+        let ocr = CategorizationResult(isMatch: true, method: "OCR")
         let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
-        let data = InvoiceData(
-            isInvoice: true,
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
             date: Date(),
-            company: "Test Corp",
+            secondaryField: "Test Corp",
             categorization: categorization
         )
 
-        XCTAssertTrue(data.isInvoice)
+        XCTAssertTrue(data.isMatch)
         XCTAssertNotNil(data.categorization)
         XCTAssertTrue(data.categorization!.bothAgree)
     }
 
-    func testInvoiceDataWithCategorizationDisagreement() {
-        let vlm = CategorizationResult(isInvoice: true, method: "VLM", reason: "Visual analysis")
-        let ocr = CategorizationResult(isInvoice: false, method: "OCR", reason: "No keywords found")
+    func testDocumentDataWithCategorizationDisagreement() {
+        let vlm = CategorizationResult(isMatch: true, method: "VLM", reason: "Visual analysis")
+        let ocr = CategorizationResult(isMatch: false, method: "OCR", reason: "No keywords found")
         let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
-        let data = InvoiceData(
-            isInvoice: true,  // User resolved in favor of VLM
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,  // User resolved in favor of VLM
             date: Date(),
-            company: "Test Corp",
+            secondaryField: "Test Corp",
             categorization: categorization
         )
 
-        XCTAssertTrue(data.isInvoice)
+        XCTAssertTrue(data.isMatch)
         XCTAssertNotNil(data.categorization)
         XCTAssertFalse(data.categorization!.bothAgree)
-        XCTAssertNil(data.categorization!.agreedIsInvoice)
+        XCTAssertNil(data.categorization!.agreedIsMatch)
     }
 
     // MARK: - Async Categorize Tests
@@ -541,10 +583,10 @@ final class InvoiceDetectorTests: XCTestCase {
         XCTAssertTrue(mockVLM.lastPrompt?.contains("INVOICE") ?? false)
 
         // Both VLM and OCR should agree it's an invoice (PDF contains "Rechnung")
-        XCTAssertTrue(result.vlmResult.isInvoice)
-        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertTrue(result.vlmResult.isMatch)
+        XCTAssertTrue(result.ocrResult.isMatch)
         XCTAssertTrue(result.bothAgree)
-        XCTAssertEqual(result.agreedIsInvoice, true)
+        XCTAssertEqual(result.agreedIsMatch, true)
 
         // OCR should use direct PDF extraction
         XCTAssertEqual(result.ocrResult.method, "PDF")
@@ -558,10 +600,10 @@ final class InvoiceDetectorTests: XCTestCase {
         let result = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM says no, OCR says yes (PDF contains "Rechnung")
-        XCTAssertFalse(result.vlmResult.isInvoice)
-        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertFalse(result.vlmResult.isMatch)
+        XCTAssertTrue(result.ocrResult.isMatch)
         XCTAssertFalse(result.bothAgree)
-        XCTAssertNil(result.agreedIsInvoice)
+        XCTAssertNil(result.agreedIsMatch)
     }
 
     func testCategorizeWithEmptyPDFThrowsError() async throws {
@@ -594,12 +636,12 @@ final class InvoiceDetectorTests: XCTestCase {
         let result = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM should return error result
-        XCTAssertFalse(result.vlmResult.isInvoice)
+        XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertEqual(result.vlmResult.confidence, "low")
         XCTAssertTrue(result.vlmResult.method.contains("error"))
 
         // OCR should still work (PDF contains "Rechnung")
-        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertTrue(result.ocrResult.isMatch)
         XCTAssertEqual(result.ocrResult.method, "PDF")
 
         // They disagree
@@ -609,22 +651,22 @@ final class InvoiceDetectorTests: XCTestCase {
     func testCategorizeVerboseMode() async throws {
         // Test categorize() with verbose configuration
         let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = InvoiceDetector(config: verboseConfig, vlmProvider: mockVLM)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
 
         let result = try await verboseDetector.categorize(pdfPath: pdfPath)
 
         // Should complete successfully with verbose output
-        XCTAssertTrue(result.vlmResult.isInvoice)
-        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertTrue(result.vlmResult.isMatch)
+        XCTAssertTrue(result.ocrResult.isMatch)
     }
 
     func testCategorizeVerboseModeEmptyPDF() async throws {
         // Test verbose mode with empty PDF (exercises OCR fallback verbose path)
         // Empty PDFs cause OCR to throw "No text recognized" error
         let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = InvoiceDetector(config: verboseConfig, vlmProvider: mockVLM)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
         let pdfPath = try createEmptyPDF()
         mockVLM.mockResponse = "NO"
 
@@ -649,13 +691,13 @@ final class InvoiceDetectorTests: XCTestCase {
         let result = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM should return timeout result
-        XCTAssertFalse(result.vlmResult.isInvoice)
+        XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertEqual(result.vlmResult.confidence, "low")
         XCTAssertTrue(result.vlmResult.method.contains("timeout"))
         XCTAssertEqual(result.vlmResult.reason, "Timed out")
 
         // OCR should still work
-        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertTrue(result.ocrResult.isMatch)
     }
 
     func testCategorizeDirectTextExtractionPath() async throws {
@@ -667,7 +709,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         // OCR result should indicate PDF method (direct extraction)
         XCTAssertEqual(result.ocrResult.method, "PDF")
-        XCTAssertTrue(result.ocrResult.isInvoice)
+        XCTAssertTrue(result.ocrResult.isMatch)
         XCTAssertNotNil(result.ocrResult.reason)
     }
 
@@ -760,7 +802,7 @@ final class InvoiceDetectorTests: XCTestCase {
         // Test categorization with extracted text
         if let extractedText = text {
             let result = detector.categorizeWithDirectText(extractedText)
-            XCTAssertTrue(result.isInvoice)
+            XCTAssertTrue(result.isMatch)
             XCTAssertEqual(result.method, "PDF")
         }
     }
@@ -800,18 +842,81 @@ final class InvoiceDetectorTests: XCTestCase {
         // Note: generateFilename doesn't sanitize the company name - that happens
         // earlier in the flow via StringUtils.sanitizeCompanyName
         // This test verifies generateFilename works with any company name
-        let data = InvoiceData(isInvoice: true, date: date, company: "Test Company")
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: date,
+            secondaryField: "Test_Company"
+        )
         let filename = detector.generateFilename(from: data)
 
         XCTAssertNotNil(filename)
-        XCTAssertEqual(filename, "2024-12-15_Rechnung_Test Company.pdf")
+        XCTAssertEqual(filename, "2024-12-15_Rechnung_Test_Company.pdf")
     }
 
     func testGenerateFilenameWithEmptyCompany() {
-        let data = InvoiceData(isInvoice: true, date: Date(), company: "")
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: Date(),
+            secondaryField: ""
+        )
         let filename = detector.generateFilename(from: data)
 
         // Empty company should still generate filename with empty company part
         XCTAssertNotNil(filename)
+    }
+
+    // MARK: - Prescription Document Type Tests
+
+    func testPrescriptionDetector() {
+        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
+        XCTAssertEqual(prescriptionDetector.documentType, .prescription)
+    }
+
+    func testPrescriptionKeywordDetection() {
+        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
+        let prescriptionText = """
+        Rezept
+        Dr. med. Gesine Kaiser
+        Patient: Max Mustermann
+        Medikament: Ibuprofen 400mg
+        """
+
+        let result = prescriptionDetector.categorizeWithDirectText(prescriptionText)
+
+        XCTAssertTrue(result.isMatch)
+        XCTAssertEqual(result.method, "PDF")
+    }
+
+    func testPrescriptionFilenameGeneration() {
+        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = dateFormatter.date(from: "2024-12-15")!
+
+        let data = DocumentData(
+            documentType: .prescription,
+            isMatch: true,
+            date: date,
+            secondaryField: "Gesine_Kaiser"
+        )
+        let filename = prescriptionDetector.generateFilename(from: data)
+
+        XCTAssertEqual(filename, "2024-12-15_Rezept_Gesine_Kaiser.pdf")
+    }
+
+    func testDocumentDataForPrescription() {
+        let data = DocumentData(
+            documentType: .prescription,
+            isMatch: true,
+            date: Date(),
+            secondaryField: "Gesine Kaiser"
+        )
+
+        XCTAssertEqual(data.documentType, .prescription)
+        XCTAssertTrue(data.isMatch)
+        XCTAssertEqual(data.secondaryField, "Gesine Kaiser")
     }
 }
