@@ -186,10 +186,8 @@ struct DocScanCommand: AsyncParsableCommand {
             if let field = extraction.secondaryField {
                 print("   \(secondaryFieldName): \(field)")
             }
-            if documentType == .prescription {
-                if let patient = extraction.patientName {
-                    print("   Patient: \(patient)")
-                }
+            if documentType == .prescription, let patient = extraction.patientName {
+                print("   Patient: \(patient)")
             }
             throw ExitCode.failure
         }
