@@ -44,9 +44,8 @@ jobs:
       continue-on-error: true  # Don't fail the build, report issues
 
     - name: Monitor dependencies in Snyk
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
-        # Only monitor on main branch pushes (not PRs)
+        # Upload project to Snyk dashboard for continuous monitoring
         snyk monitor --all-projects --org=timo-jakob
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
