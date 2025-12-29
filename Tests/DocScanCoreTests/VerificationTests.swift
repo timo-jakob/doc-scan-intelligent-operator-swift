@@ -133,6 +133,85 @@ final class VerificationTests: XCTestCase {
         XCTAssertTrue(ocrTimeout.displayLabel.contains("Timeout"))
     }
 
+    // MARK: - Additional Display Label Edge Cases
+
+    func testDisplayLabelPDFDoesNotContainTimeout() {
+        // PDF method doesn't have timeout variants in the codebase
+        let pdf = CategorizationResult(isInvoice: true, method: "PDF")
+        XCTAssertEqual(pdf.displayLabel, "PDF (Direct Text Extraction)")
+        XCTAssertFalse(pdf.displayLabel.contains("Timeout"))
+    }
+
+    func testShortDisplayLabelPDFDoesNotContainTimeout() {
+        let pdf = CategorizationResult(isInvoice: true, method: "PDF")
+        XCTAssertEqual(pdf.shortDisplayLabel, "PDF text")
+    }
+
+    func testDisplayLabelVLMWithErrorSubstring() {
+        // Test that error detection works with different casing/formats
+        let vlmError = CategorizationResult(isInvoice: false, method: "VLM (error)")
+        XCTAssertTrue(vlmError.displayLabel.hasPrefix("VLM"))
+        XCTAssertTrue(vlmError.displayLabel.contains("Error"))
+    }
+
+    func testShortDisplayLabelVLMWithErrorSubstring() {
+        let vlmError = CategorizationResult(isInvoice: false, method: "VLM (error)")
+        XCTAssertTrue(vlmError.shortDisplayLabel.hasPrefix("VLM"))
+        XCTAssertTrue(vlmError.shortDisplayLabel.contains("error"))
+    }
+
+    func testDisplayLabelOCRWithTimeoutSubstring() {
+        let ocrTimeout = CategorizationResult(isInvoice: false, method: "OCR (timeout)")
+        XCTAssertTrue(ocrTimeout.displayLabel.hasPrefix("OCR"))
+        XCTAssertTrue(ocrTimeout.displayLabel.contains("Timeout"))
+    }
+
+    func testShortDisplayLabelOCRWithTimeoutSubstring() {
+        let ocrTimeout = CategorizationResult(isInvoice: false, method: "OCR (timeout)")
+        XCTAssertTrue(ocrTimeout.shortDisplayLabel.hasPrefix("OCR"))
+        XCTAssertTrue(ocrTimeout.shortDisplayLabel.contains("timeout"))
+    }
+
+    func testDisplayLabelVLMWithTimeoutSubstring() {
+        let vlmTimeout = CategorizationResult(isInvoice: false, method: "VLM (timeout)")
+        XCTAssertTrue(vlmTimeout.displayLabel.hasPrefix("VLM"))
+        XCTAssertTrue(vlmTimeout.displayLabel.contains("Timeout"))
+    }
+
+    func testShortDisplayLabelVLMWithTimeoutSubstring() {
+        let vlmTimeout = CategorizationResult(isInvoice: false, method: "VLM (timeout)")
+        XCTAssertTrue(vlmTimeout.shortDisplayLabel.hasPrefix("VLM"))
+        XCTAssertTrue(vlmTimeout.shortDisplayLabel.contains("timeout"))
+    }
+
+    func testDisplayLabelUnknownMethodReturnsAsIs() {
+        let unknown = CategorizationResult(isInvoice: true, method: "SomeNewMethod")
+        XCTAssertEqual(unknown.displayLabel, "SomeNewMethod")
+        XCTAssertEqual(unknown.shortDisplayLabel, "SomeNewMethod")
+    }
+
+    func testDisplayLabelEmptyMethod() {
+        let empty = CategorizationResult(isInvoice: true, method: "")
+        XCTAssertEqual(empty.displayLabel, "")
+        XCTAssertEqual(empty.shortDisplayLabel, "")
+    }
+
+    func testAllMethodTypesHaveDistinctLabels() {
+        let vlm = CategorizationResult(isInvoice: true, method: "VLM")
+        let pdf = CategorizationResult(isInvoice: true, method: "PDF")
+        let ocr = CategorizationResult(isInvoice: true, method: "OCR")
+
+        // All display labels should be different
+        XCTAssertNotEqual(vlm.displayLabel, pdf.displayLabel)
+        XCTAssertNotEqual(vlm.displayLabel, ocr.displayLabel)
+        XCTAssertNotEqual(pdf.displayLabel, ocr.displayLabel)
+
+        // All short labels should be different
+        XCTAssertNotEqual(vlm.shortDisplayLabel, pdf.shortDisplayLabel)
+        XCTAssertNotEqual(vlm.shortDisplayLabel, ocr.shortDisplayLabel)
+        XCTAssertNotEqual(pdf.shortDisplayLabel, ocr.shortDisplayLabel)
+    }
+
     // MARK: - CategorizationVerification Tests
 
     func testCategorizationVerificationBothAgreeInvoice() {
