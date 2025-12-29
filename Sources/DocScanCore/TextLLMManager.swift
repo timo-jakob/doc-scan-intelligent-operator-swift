@@ -73,11 +73,11 @@ public class TextLLMManager {
     }
 
     /// Generic data extraction for any document type
-    /// Returns extracted date and secondary field (company for invoices, doctor for prescriptions)
+    /// Returns extracted date, secondary field (company/doctor), and optional patient name
     public func extractData(
         for documentType: DocumentType,
         from text: String
-    ) async throws -> (date: Date?, secondaryField: String?) {
+    ) async throws -> (date: Date?, secondaryField: String?, patientName: String?) {
         let systemPrompt = documentType.extractionSystemPrompt
         let userPrompt = documentType.extractionUserPrompt(for: text)
 
@@ -91,6 +91,7 @@ public class TextLLMManager {
         let lines = response.components(separatedBy: .newlines)
         var date: Date?
         var secondaryField: String?
+        var patientName: String?
 
         // Determine secondary field prefix based on document type
         let secondaryPrefix: String
@@ -120,6 +121,14 @@ public class TextLLMManager {
                 if fieldValue != "UNKNOWN" && fieldValue != "NOT_FOUND" {
                     secondaryField = sanitizeFieldValue(fieldValue, for: documentType)
                 }
+            } else if trimmed.hasPrefix("PATIENT:") && documentType == .prescription {
+                let patientValue = trimmed
+                    .replacingOccurrences(of: "PATIENT:", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+
+                if patientValue != "UNKNOWN" && patientValue != "NOT_FOUND" {
+                    patientName = StringUtils.sanitizePatientName(patientValue)
+                }
             }
         }
 
@@ -134,7 +143,7 @@ public class TextLLMManager {
             }
         }
 
-        return (date, secondaryField)
+        return (date, secondaryField, patientName)
     }
 
     /// Sanitize field value based on document type

@@ -62,8 +62,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         case .prescription:
             return [
                 "arzt", "ärztin", "doctor", "dr.med", "dr. med",
-                "praxis", "medikament", "medication", "apotheke", "apo",
-                "pharmacy", "dosierung", "dosage", "patient", "privat"
+                "praxis", "gemeinschaftspraxis", "medikament", "medication",
+                "apotheke", "apo", "pharmacy", "dosierung", "dosage",
+                "patient", "privat"
             ]
         }
     }
@@ -74,7 +75,7 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         case .invoice:
             return [.date, .company]
         case .prescription:
-            return [.date, .doctor]
+            return [.date, .doctor, .patient]
         }
     }
 
@@ -84,7 +85,7 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         case .invoice:
             return "{date}_Rechnung_{company}.pdf"
         case .prescription:
-            return "{date}_Rezept_{doctor}.pdf"
+            return "{date}_Rezept_für_{patient}_von_{doctor}.pdf"
         }
     }
 
@@ -123,15 +124,27 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
             """
         case .prescription:
             return """
-            Extract the following information from this prescription text:
-            1. Prescription date: Provide in format YYYY-MM-DD
-            2. Prescribing doctor's name (without title like Dr. or Dr.med.)
+            Extract the following information from this German prescription text:
 
-            IMPORTANT RULES:
-            - For date: Look for the prescription/issue date, NOT pharmacy stamp dates. Convert to YYYY-MM-DD format.
-            - For doctor: Extract ONLY the name (e.g., "Gesine Kaiser"), NOT titles like "Dr." or "Dr.med."
-            - If multiple doctors are listed, use the one who signed or is marked as prescriber.
-            - If you cannot find a value with certainty, respond with "NOT_FOUND" for that field.
+            1. Patient's FIRST NAME:
+               - Look for the top-left address block (standard German letter format)
+               - Line 1 = Last name, Line 2 = First name
+               - Extract ONLY the first name (e.g., "Penelope")
+
+            2. Prescription date:
+               - Look for the prescription/issue date (format like 08.04.25)
+               - NOT the birth date, NOT pharmacy stamp dates
+               - Convert to YYYY-MM-DD format
+
+            3. Doctor's name:
+               - Look for name under "Gemeinschaftspraxis" or "Praxis" header
+               - Extract name WITHOUT titles (Dr., Dr.med., Prof., etc.)
+               - Just the name (e.g., "Gesine Kaiser")
+
+            IMPORTANT:
+            - If you cannot find a value with certainty, respond with "NOT_FOUND"
+            - The address block is at top-left, insurance header is at top (ignore it)
+            - Birth dates are in format DD.MM.YY and appear near the patient name - ignore these
 
             Prescription text:
             ---
@@ -139,6 +152,7 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
             ---
 
             Respond in this exact format (no other text):
+            PATIENT: First Name Only
             DATE: YYYY-MM-DD
             DOCTOR: Doctor Name
             """
@@ -151,6 +165,7 @@ public enum ExtractionField: String, CaseIterable, Codable, Sendable {
     case date
     case company
     case doctor
+    case patient
 
     /// Placeholder used in filename patterns
     public var placeholder: String {

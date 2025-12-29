@@ -80,10 +80,12 @@ public struct CategorizationVerification {
 public struct ExtractionResult: Sendable {
     public let date: Date?
     public let secondaryField: String? // company, doctor, etc. depending on document type
+    public let patientName: String? // patient first name (for prescriptions)
 
-    public init(date: Date?, secondaryField: String?) {
+    public init(date: Date?, secondaryField: String?, patientName: String? = nil) {
         self.date = date
         self.secondaryField = secondaryField
+        self.patientName = patientName
     }
 }
 
@@ -95,6 +97,7 @@ public struct DocumentData {
     public let isMatch: Bool // Whether document matches the target type
     public let date: Date?
     public let secondaryField: String? // company, doctor, etc.
+    public let patientName: String? // patient first name (for prescriptions)
     public let categorization: CategorizationVerification?
 
     public init(
@@ -102,12 +105,14 @@ public struct DocumentData {
         isMatch: Bool,
         date: Date?,
         secondaryField: String?,
+        patientName: String? = nil,
         categorization: CategorizationVerification? = nil
     ) {
         self.documentType = documentType
         self.isMatch = isMatch
         self.date = date
         self.secondaryField = secondaryField
+        self.patientName = patientName
         self.categorization = categorization
     }
 }
@@ -280,9 +285,12 @@ extension DocumentDetector {
             print("Extracted data:")
             print("  Date: \(result.date?.description ?? "not found")")
             print("  \(fieldName): \(result.secondaryField ?? "not found")")
+            if documentType == .prescription {
+                print("  Patient: \(result.patientName ?? "not found")")
+            }
         }
 
-        return ExtractionResult(date: result.date, secondaryField: result.secondaryField)
+        return ExtractionResult(date: result.date, secondaryField: result.secondaryField, patientName: result.patientName)
     }
 
     // MARK: - VLM Categorization
@@ -397,7 +405,12 @@ extension DocumentDetector {
     /// Generate filename from document data
     public func generateFilename(from data: DocumentData) -> String? {
         guard data.isMatch else { return nil }
-        guard let date = data.date, let secondaryField = data.secondaryField else { return nil }
+        guard let date = data.date else { return nil }
+
+        // For invoices, company is required
+        if documentType == .invoice && data.secondaryField == nil {
+            return nil
+        }
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = config.dateFormat
@@ -410,9 +423,23 @@ extension DocumentDetector {
         // Replace the secondary field placeholder based on document type
         switch documentType {
         case .invoice:
-            pattern = pattern.replacingOccurrences(of: "{company}", with: secondaryField)
+            pattern = pattern.replacingOccurrences(of: "{company}", with: data.secondaryField!)
         case .prescription:
-            pattern = pattern.replacingOccurrences(of: "{doctor}", with: secondaryField)
+            // Handle patient name placeholder first (optional)
+            // Must be processed before doctor to handle the case where both are nil
+            if let patientName = data.patientName {
+                pattern = pattern.replacingOccurrences(of: "{patient}", with: patientName)
+            } else {
+                // Remove the "für_{patient}_" part if no patient name available
+                pattern = pattern.replacingOccurrences(of: "für_{patient}_", with: "")
+            }
+            // Handle doctor name placeholder (optional)
+            if let doctor = data.secondaryField {
+                pattern = pattern.replacingOccurrences(of: "{doctor}", with: doctor)
+            } else {
+                // Remove the "_von_{doctor}" part if no doctor name available
+                pattern = pattern.replacingOccurrences(of: "_von_{doctor}", with: "")
+            }
         }
 
         return pattern

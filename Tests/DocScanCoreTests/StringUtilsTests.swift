@@ -275,4 +275,62 @@ final class StringUtilsTests: XCTestCase {
             XCTAssertEqual(result, expected, "Failed for input: \(input)")
         }
     }
+
+    // MARK: - Patient Name Sanitization Tests
+
+    func testSanitizePatientNameSimple() {
+        let result = StringUtils.sanitizePatientName("Penelope")
+        XCTAssertEqual(result, "Penelope")
+    }
+
+    func testSanitizePatientNameWithSpaces() {
+        let result = StringUtils.sanitizePatientName("Anna Maria")
+        XCTAssertEqual(result, "Anna_Maria")
+    }
+
+    func testSanitizePatientNameWithSpecialChars() {
+        let result = StringUtils.sanitizePatientName("Test: Name/Example")
+        XCTAssertEqual(result, "Test_NameExample")
+    }
+
+    func testSanitizePatientNameWithMultipleSpaces() {
+        let result = StringUtils.sanitizePatientName("Anna    Maria")
+        XCTAssertEqual(result, "Anna_Maria")
+    }
+
+    func testSanitizePatientNameWithLeadingTrailingSpaces() {
+        let result = StringUtils.sanitizePatientName("  Penelope  ")
+        XCTAssertEqual(result, "Penelope")
+    }
+
+    func testSanitizePatientNameLongString() {
+        let longName = String(repeating: "A", count: 50)
+        let result = StringUtils.sanitizePatientName(longName)
+        XCTAssertEqual(result.count, 30) // Max patient name length
+    }
+
+    func testSanitizePatientNameEmpty() {
+        let result = StringUtils.sanitizePatientName("")
+        XCTAssertEqual(result, "")
+    }
+
+    func testSanitizePatientNameWithUmlauts() {
+        let result = StringUtils.sanitizePatientName("Jörg")
+        XCTAssertEqual(result, "Jörg")
+    }
+
+    func testSanitizePatientNameRealExamples() {
+        let examples: [(input: String, expected: String)] = [
+            ("Penelope", "Penelope"),
+            ("Anna Maria", "Anna_Maria"),
+            ("Hans-Peter", "Hans-Peter"),
+            ("Müller", "Müller"),
+            ("Test Name", "Test_Name")
+        ]
+
+        for (input, expected) in examples {
+            let result = StringUtils.sanitizePatientName(input)
+            XCTAssertEqual(result, expected, "Failed for input: \(input)")
+        }
+    }
 }

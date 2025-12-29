@@ -11,6 +11,9 @@ public enum StringUtils {
     /// Maximum length for doctor names in filenames
     private static let maxDoctorNameLength = 40
 
+    /// Maximum length for patient names in filenames
+    private static let maxPatientNameLength = 30
+
     /// Common doctor title prefixes to remove
     private static let doctorTitles = [
         "dr. med.", "dr.med.", "dr med", "drmed",
@@ -77,5 +80,29 @@ public enum StringUtils {
 
         // Limit length to avoid overly long filenames
         return String(underscored.prefix(maxDoctorNameLength))
+    }
+
+    /// Sanitize a patient name (first name) for use in filenames
+    /// - Parameter name: The raw patient first name
+    /// - Returns: A sanitized string safe for use in filenames
+    public static func sanitizePatientName(_ name: String) -> String {
+        // Remove special characters problematic in filenames
+        let sanitized = name.components(separatedBy: invalidFilenameChars).joined()
+
+        // Replace multiple spaces with single space
+        let singleSpaced = sanitized.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        )
+
+        // Trim whitespace
+        let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
+
+        // Replace spaces with underscores for cleaner filenames
+        let underscored = trimmed.replacingOccurrences(of: " ", with: "_")
+
+        // Limit length to avoid overly long filenames
+        return String(underscored.prefix(maxPatientNameLength))
     }
 }

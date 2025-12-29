@@ -178,24 +178,44 @@ struct DocScanCommand: AsyncParsableCommand {
         let secondaryFieldEmoji = documentType == .invoice ? "🏢" : "👨‍⚕️"
 
         // Check extraction results
-        guard let date = extraction.date, let secondaryField = extraction.secondaryField else {
-            print("⚠️  Could not extract complete \(typeName) data")
-            if let date = extraction.date {
-                print("   Date: \(formatDate(date))")
-            } else {
-                print("   Date: ❌ Not found")
-            }
+        // For invoices: require both date and company
+        // For prescriptions: require date, doctor and patient are optional
+        guard let date = extraction.date else {
+            print("⚠️  Could not extract date from \(typeName)")
+            print("   Date: ❌ Not found")
             if let field = extraction.secondaryField {
                 print("   \(secondaryFieldName): \(field)")
-            } else {
-                print("   \(secondaryFieldName): ❌ Not found")
             }
+            if documentType == .prescription {
+                if let patient = extraction.patientName {
+                    print("   Patient: \(patient)")
+                }
+            }
+            throw ExitCode.failure
+        }
+
+        // For invoices, company is required
+        if documentType == .invoice && extraction.secondaryField == nil {
+            print("⚠️  Could not extract company from invoice")
+            print("   Date: \(formatDate(date))")
+            print("   Company: ❌ Not found")
             throw ExitCode.failure
         }
 
         print("Extracted data:")
         print("   📅 Date: \(formatDate(date))")
-        print("   \(secondaryFieldEmoji) \(secondaryFieldName): \(secondaryField)")
+        if let field = extraction.secondaryField {
+            print("   \(secondaryFieldEmoji) \(secondaryFieldName): \(field)")
+        } else if documentType == .prescription {
+            print("   \(secondaryFieldEmoji) \(secondaryFieldName): Not found (will be excluded from filename)")
+        }
+        if documentType == .prescription {
+            if let patient = extraction.patientName {
+                print("   👤 Patient: \(patient)")
+            } else {
+                print("   👤 Patient: Not found (will be excluded from filename)")
+            }
+        }
         print()
 
         // Create final document data
@@ -203,7 +223,8 @@ struct DocScanCommand: AsyncParsableCommand {
             documentType: documentType,
             isMatch: true,
             date: date,
-            secondaryField: secondaryField,
+            secondaryField: extraction.secondaryField,
+            patientName: extraction.patientName,
             categorization: categorization
         )
 

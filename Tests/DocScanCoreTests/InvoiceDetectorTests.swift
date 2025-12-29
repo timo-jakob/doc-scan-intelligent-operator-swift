@@ -486,6 +486,16 @@ final class InvoiceDetectorTests: XCTestCase {
 
         XCTAssertNil(result.date)
         XCTAssertEqual(result.secondaryField, "Only Company")
+        XCTAssertNil(result.patientName)
+    }
+
+    func testExtractionResultWithPatientName() {
+        let date = Date()
+        let result = ExtractionResult(date: date, secondaryField: "Dr. Kaiser", patientName: "Penelope")
+
+        XCTAssertEqual(result.date, date)
+        XCTAssertEqual(result.secondaryField, "Dr. Kaiser")
+        XCTAssertEqual(result.patientName, "Penelope")
     }
 
     // MARK: - DocumentData with Categorization Tests
@@ -900,11 +910,72 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .prescription,
             isMatch: true,
             date: date,
-            secondaryField: "Gesine_Kaiser"
+            secondaryField: "Gesine_Kaiser",
+            patientName: "Penelope"
         )
         let filename = prescriptionDetector.generateFilename(from: data)
 
-        XCTAssertEqual(filename, "2024-12-15_Rezept_Gesine_Kaiser.pdf")
+        XCTAssertEqual(filename, "2024-12-15_Rezept_für_Penelope_von_Gesine_Kaiser.pdf")
+    }
+
+    func testPrescriptionFilenameGenerationWithoutPatient() {
+        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = dateFormatter.date(from: "2024-12-15")!
+
+        // No patient name - should fallback to simpler pattern
+        let data = DocumentData(
+            documentType: .prescription,
+            isMatch: true,
+            date: date,
+            secondaryField: "Gesine_Kaiser",
+            patientName: nil
+        )
+        let filename = prescriptionDetector.generateFilename(from: data)
+
+        XCTAssertEqual(filename, "2024-12-15_Rezept_von_Gesine_Kaiser.pdf")
+    }
+
+    func testPrescriptionFilenameGenerationWithoutDoctor() {
+        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = dateFormatter.date(from: "2024-12-15")!
+
+        // No doctor name - should fallback to pattern without doctor
+        let data = DocumentData(
+            documentType: .prescription,
+            isMatch: true,
+            date: date,
+            secondaryField: nil,
+            patientName: "Penelope"
+        )
+        let filename = prescriptionDetector.generateFilename(from: data)
+
+        XCTAssertEqual(filename, "2024-12-15_Rezept_für_Penelope.pdf")
+    }
+
+    func testPrescriptionFilenameGenerationWithoutPatientAndDoctor() {
+        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = dateFormatter.date(from: "2024-12-15")!
+
+        // Neither patient nor doctor - minimal pattern
+        let data = DocumentData(
+            documentType: .prescription,
+            isMatch: true,
+            date: date,
+            secondaryField: nil,
+            patientName: nil
+        )
+        let filename = prescriptionDetector.generateFilename(from: data)
+
+        XCTAssertEqual(filename, "2024-12-15_Rezept.pdf")
     }
 
     func testDocumentDataForPrescription() {

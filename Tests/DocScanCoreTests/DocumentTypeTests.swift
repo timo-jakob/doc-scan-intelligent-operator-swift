@@ -83,9 +83,10 @@ final class DocumentTypeTests: XCTestCase {
 
     func testPrescriptionExtractionFields() {
         let fields = DocumentType.prescription.extractionFields
-        XCTAssertEqual(fields.count, 2)
+        XCTAssertEqual(fields.count, 3)
         XCTAssertTrue(fields.contains(.date))
         XCTAssertTrue(fields.contains(.doctor))
+        XCTAssertTrue(fields.contains(.patient))
     }
 
     // MARK: - Default Filename Pattern Tests
@@ -97,7 +98,7 @@ final class DocumentTypeTests: XCTestCase {
 
     func testPrescriptionDefaultFilenamePattern() {
         let pattern = DocumentType.prescription.defaultFilenamePattern
-        XCTAssertEqual(pattern, "{date}_Rezept_{doctor}.pdf")
+        XCTAssertEqual(pattern, "{date}_Rezept_für_{patient}_von_{doctor}.pdf")
     }
 
     // MARK: - Extraction System Prompt Tests
@@ -134,11 +135,15 @@ final class DocumentTypeTests: XCTestCase {
         let prompt = DocumentType.prescription.extractionUserPrompt(for: testText)
 
         XCTAssertTrue(prompt.contains("Prescription date"))
-        XCTAssertTrue(prompt.contains("doctor"))
+        XCTAssertTrue(prompt.contains("Doctor"))
         XCTAssertTrue(prompt.contains("YYYY-MM-DD"))
         XCTAssertTrue(prompt.contains(testText))
         XCTAssertTrue(prompt.contains("DATE:"))
         XCTAssertTrue(prompt.contains("DOCTOR:"))
+        XCTAssertTrue(prompt.contains("PATIENT:"))
+        // Check for German format knowledge
+        XCTAssertTrue(prompt.contains("Gemeinschaftspraxis") || prompt.contains("Praxis"))
+        XCTAssertTrue(prompt.contains("top-left address"))
     }
 
     // MARK: - CaseIterable Tests
@@ -173,20 +178,23 @@ final class DocumentTypeTests: XCTestCase {
         XCTAssertEqual(ExtractionField.date.placeholder, "{date}")
         XCTAssertEqual(ExtractionField.company.placeholder, "{company}")
         XCTAssertEqual(ExtractionField.doctor.placeholder, "{doctor}")
+        XCTAssertEqual(ExtractionField.patient.placeholder, "{patient}")
     }
 
     func testExtractionFieldRawValue() {
         XCTAssertEqual(ExtractionField.date.rawValue, "date")
         XCTAssertEqual(ExtractionField.company.rawValue, "company")
         XCTAssertEqual(ExtractionField.doctor.rawValue, "doctor")
+        XCTAssertEqual(ExtractionField.patient.rawValue, "patient")
     }
 
     func testExtractionFieldAllCases() {
         let allCases = ExtractionField.allCases
-        XCTAssertEqual(allCases.count, 3)
+        XCTAssertEqual(allCases.count, 4)
         XCTAssertTrue(allCases.contains(.date))
         XCTAssertTrue(allCases.contains(.company))
         XCTAssertTrue(allCases.contains(.doctor))
+        XCTAssertTrue(allCases.contains(.patient))
     }
 
     func testExtractionFieldCodable() throws {
