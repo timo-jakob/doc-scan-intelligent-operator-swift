@@ -1,7 +1,23 @@
 import Foundation
 
+/// Environment variable used to pass the original working directory from wrapper scripts
+/// This is needed when the binary is launched via a wrapper that changes directory
+/// (e.g., to find MLX Metal library bundles)
+public let DOCSCAN_ORIGINAL_PWD_ENV = "DOCSCAN_ORIGINAL_PWD"
+
 /// Utilities for resolving and normalizing file paths
 public struct PathUtils {
+    /// Returns the effective current working directory
+    /// Uses DOCSCAN_ORIGINAL_PWD environment variable if set (from wrapper script),
+    /// otherwise falls back to FileManager.default.currentDirectoryPath
+    public static func getCurrentWorkingDirectory() -> String {
+        if let originalPwd = ProcessInfo.processInfo.environment[DOCSCAN_ORIGINAL_PWD_ENV],
+           !originalPwd.isEmpty {
+            return originalPwd
+        }
+        return FileManager.default.currentDirectoryPath
+    }
+
     /// Resolves a path to an absolute, normalized path with symlinks resolved
     ///
     /// This function handles:
@@ -24,7 +40,8 @@ public struct PathUtils {
             absolutePath = path
         } else {
             // Relative path - convert to absolute using URL for proper path handling
-            let currentDirURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            let currentDir = getCurrentWorkingDirectory()
+            let currentDirURL = URL(fileURLWithPath: currentDir)
             absolutePath = currentDirURL.appendingPathComponent(path).path
         }
 
