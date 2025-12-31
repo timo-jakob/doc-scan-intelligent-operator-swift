@@ -99,12 +99,27 @@ struct DocScanCommand: AsyncParsableCommand {
             print()
         }
 
-        // Validate PDF exists
-        guard FileManager.default.fileExists(atPath: pdfPath) else {
-            throw DocScanError.fileNotFound(pdfPath)
+        // Convert relative path to absolute path
+        let absolutePdfPath: String
+        if pdfPath.hasPrefix("/") || pdfPath.hasPrefix("~") {
+            // Already absolute or home directory path
+            if pdfPath.hasPrefix("~") {
+                absolutePdfPath = NSString(string: pdfPath).expandingTildeInPath
+            } else {
+                absolutePdfPath = pdfPath
+            }
+        } else {
+            // Relative path - convert to absolute
+            let currentDir = FileManager.default.currentDirectoryPath
+            absolutePdfPath = NSString(path: currentDir).appendingPathComponent(pdfPath)
         }
 
-        print("Analyzing: \(pdfPath)")
+        // Validate PDF exists
+        guard FileManager.default.fileExists(atPath: absolutePdfPath) else {
+            throw DocScanError.fileNotFound(absolutePdfPath)
+        }
+
+        print("Analyzing: \(absolutePdfPath)")
         print("Document type: \(documentType.displayName)")
         print()
 
@@ -118,7 +133,7 @@ struct DocScanCommand: AsyncParsableCommand {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print()
 
-        let categorization = try await detector.categorize(pdfPath: pdfPath)
+        let categorization = try await detector.categorize(pdfPath: absolutePdfPath)
 
         // Display categorization results
         displayCategorizationResults(categorization, documentType: documentType)
@@ -237,7 +252,7 @@ struct DocScanCommand: AsyncParsableCommand {
         // Rename file
         let renamer = FileRenamer(verbose: verbose)
         let newPath = try renamer.rename(
-            from: pdfPath,
+            from: absolutePdfPath,
             to: newFilename,
             dryRun: dryRun
         )
