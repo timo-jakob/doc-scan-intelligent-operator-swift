@@ -20,6 +20,7 @@ public enum DocScanError: LocalizedError {
     case notAnInvoice
     case extractionFailed(String)
     case insufficientDiskSpace(required: UInt64, available: UInt64)
+    case invalidInput(String)
 
     public var errorDescription: String? {
         switch self {
@@ -48,6 +49,8 @@ public enum DocScanError: LocalizedError {
             let availableGB = Double(available) / 1_000_000_000
             return String(format: "Insufficient disk space: %.2f GB required, %.2f GB available",
                         requiredGB, availableGB)
+        case .invalidInput(let message):
+            return "Invalid input: \(message)"
         }
     }
 }

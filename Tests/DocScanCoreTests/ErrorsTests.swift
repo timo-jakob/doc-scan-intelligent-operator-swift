@@ -77,6 +77,11 @@ final class ErrorsTests: XCTestCase {
         XCTAssertEqual(error.errorDescription, "Insufficient disk space: 2.50 GB required, 0.50 GB available")
     }
 
+    func testInvalidInputErrorDescription() {
+        let error = DocScanError.invalidInput("PDF path cannot be empty. Use '.' to refer to the current directory.")
+        XCTAssertEqual(error.errorDescription, "Invalid input: PDF path cannot be empty. Use '.' to refer to the current directory.")
+    }
+
     // MARK: - LocalizedError Conformance Tests
 
     func testDocScanErrorConformsToLocalizedError() {
@@ -91,7 +96,8 @@ final class ErrorsTests: XCTestCase {
             .configurationError("test"),
             .notAnInvoice,
             .extractionFailed("test"),
-            .insufficientDiskSpace(required: 1, available: 0)
+            .insufficientDiskSpace(required: 1, available: 0),
+            .invalidInput("test")
         ]
 
         for error in errors {

@@ -99,12 +99,20 @@ struct DocScanCommand: AsyncParsableCommand {
             print()
         }
 
-        // Validate PDF exists
-        guard FileManager.default.fileExists(atPath: pdfPath) else {
-            throw DocScanError.fileNotFound(pdfPath)
+        // Validate PDF path is not empty
+        guard !pdfPath.isEmpty else {
+            throw DocScanError.invalidInput("PDF path cannot be empty. Use '.' to refer to the current directory.")
         }
 
-        print("Analyzing: \(pdfPath)")
+        // Convert relative path to absolute path with symlink resolution and normalization
+        let finalPdfPath = PathUtils.resolvePath(pdfPath)
+
+        // Validate PDF exists
+        guard FileManager.default.fileExists(atPath: finalPdfPath) else {
+            throw DocScanError.fileNotFound(finalPdfPath)
+        }
+
+        print("Analyzing: \(finalPdfPath)")
         print("Document type: \(documentType.displayName)")
         print()
 
@@ -118,7 +126,7 @@ struct DocScanCommand: AsyncParsableCommand {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print()
 
-        let categorization = try await detector.categorize(pdfPath: pdfPath)
+        let categorization = try await detector.categorize(pdfPath: finalPdfPath)
 
         // Display categorization results
         displayCategorizationResults(categorization, documentType: documentType)
@@ -237,7 +245,7 @@ struct DocScanCommand: AsyncParsableCommand {
         // Rename file
         let renamer = FileRenamer(verbose: verbose)
         let newPath = try renamer.rename(
-            from: pdfPath,
+            from: finalPdfPath,
             to: newFilename,
             dryRun: dryRun
         )
