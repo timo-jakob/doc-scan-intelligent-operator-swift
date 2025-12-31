@@ -6,6 +6,8 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
+    # Note: This workflow only performs work for issues that mention '@claude' in the title or body.
+    # When opening or assigning issues, include '@claude' to avoid unnecessary no-op workflow runs.
     types: [opened, assigned]
   pull_request_review:
     types: [submitted]
