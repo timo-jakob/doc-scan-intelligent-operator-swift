@@ -99,27 +99,15 @@ struct DocScanCommand: AsyncParsableCommand {
             print()
         }
 
-        // Convert relative path to absolute path
-        let absolutePdfPath: String
-        if pdfPath.hasPrefix("/") || pdfPath.hasPrefix("~") {
-            // Already absolute or home directory path
-            if pdfPath.hasPrefix("~") {
-                absolutePdfPath = NSString(string: pdfPath).expandingTildeInPath
-            } else {
-                absolutePdfPath = pdfPath
-            }
-        } else {
-            // Relative path - convert to absolute
-            let currentDir = FileManager.default.currentDirectoryPath
-            absolutePdfPath = NSString(path: currentDir).appendingPathComponent(pdfPath)
-        }
+        // Convert relative path to absolute path with symlink resolution and normalization
+        let finalPdfPath = PathUtils.resolvePath(pdfPath)
 
         // Validate PDF exists
-        guard FileManager.default.fileExists(atPath: absolutePdfPath) else {
-            throw DocScanError.fileNotFound(absolutePdfPath)
+        guard FileManager.default.fileExists(atPath: finalPdfPath) else {
+            throw DocScanError.fileNotFound(finalPdfPath)
         }
 
-        print("Analyzing: \(absolutePdfPath)")
+        print("Analyzing: \(finalPdfPath)")
         print("Document type: \(documentType.displayName)")
         print()
 
@@ -133,7 +121,7 @@ struct DocScanCommand: AsyncParsableCommand {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print()
 
-        let categorization = try await detector.categorize(pdfPath: absolutePdfPath)
+        let categorization = try await detector.categorize(pdfPath: finalPdfPath)
 
         // Display categorization results
         displayCategorizationResults(categorization, documentType: documentType)
@@ -252,7 +240,7 @@ struct DocScanCommand: AsyncParsableCommand {
         // Rename file
         let renamer = FileRenamer(verbose: verbose)
         let newPath = try renamer.rename(
-            from: absolutePdfPath,
+            from: finalPdfPath,
             to: newFilename,
             dryRun: dryRun
         )
