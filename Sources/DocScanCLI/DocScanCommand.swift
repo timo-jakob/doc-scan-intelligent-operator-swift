@@ -99,6 +99,11 @@ struct DocScanCommand: AsyncParsableCommand {
             print()
         }
 
+        // Validate PDF path is not empty
+        guard !pdfPath.isEmpty else {
+            throw DocScanError.invalidInput("PDF path cannot be empty. Use '.' to refer to the current directory.")
+        }
+
         // Convert relative path to absolute path with symlink resolution and normalization
         let finalPdfPath = PathUtils.resolvePath(pdfPath)
 

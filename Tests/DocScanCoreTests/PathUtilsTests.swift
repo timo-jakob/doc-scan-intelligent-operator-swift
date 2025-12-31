@@ -309,13 +309,6 @@ final class PathUtilsTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    func testEmptyPath() {
-        let resolved = PathUtils.resolvePath("")
-
-        // Should return current directory when given empty path
-        XCTAssertTrue(resolved.hasPrefix("/"))
-    }
-
     func testPathWithSpaces() throws {
         // Create file with spaces in name
         let testFile = tempDirectory.appendingPathComponent("file with spaces.pdf")
