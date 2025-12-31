@@ -158,6 +158,8 @@ install_app() {
 #!/bin/bash
 # DocScan wrapper script
 # Required because MLX looks for Metal library bundle relative to working directory
+# We save the original PWD so the binary can resolve relative paths correctly
+export DOCSCAN_ORIGINAL_PWD="$PWD"
 cd /usr/local/lib/docscan && exec ./docscan "$@"
 WRAPPER
     sudo chmod +x "$BIN_DIR/docscan"
