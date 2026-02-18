@@ -1,9 +1,9 @@
 ---
 name: git-github
-description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main. After opening a PR, waits for all CI checks including SonarQube and fixes any reported issues.
+description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main. Runs SwiftLint before every commit. After opening a PR, waits for all CI checks including SonarQube and fixes any reported issues.
 metadata:
   author: doc-scan-intelligent-operator-swift
-  version: 1.1.0
+  version: 1.2.0
   category: workflow
 ---
 
@@ -13,8 +13,9 @@ metadata:
 
 1. **Never commit directly to `main`** — all changes go through a branch and Pull Request
 2. **Use `git switch`** to change branches — never `git checkout`
-3. **Every commit must have a meaningful message** following the Conventional Commits format
-4. **Include the co-authorship footer** in every commit message
+3. **Run SwiftLint before every commit** — fix all warnings before staging
+4. **Every commit must have a meaningful message** following the Conventional Commits format
+5. **Include the co-authorship footer** in every commit message
 
 ---
 
@@ -62,7 +63,19 @@ If the branch already exists locally:
 git switch <branch-name>
 ```
 
-### Step 3: Stage and commit
+### Step 3: Format, lint, then stage and commit
+
+Before staging, always format and lint the code:
+
+```bash
+# Format code with SwiftFormat
+swiftformat .
+
+# Lint with SwiftLint — fix all warnings before proceeding
+swiftlint
+```
+
+If SwiftLint reports any warnings or errors, fix them now. Do not commit with outstanding lint issues.
 
 Stage specific files — never use `git add .` or `git add -A` to avoid accidentally including build artifacts or credentials:
 
@@ -215,21 +228,25 @@ Actions:
 1. Run `git status` to see what changed and confirm we are not on `main`
 2. Determine the change type from context — ask if unclear
 3. `git switch -c fix/resolve-date-extraction` (or appropriate branch)
-4. Stage specific changed files
-5. Commit with a meaningful message including the co-authorship footer
-6. `git push -u origin <branch-name>`
-7. `gh pr create ...`
-8. `gh pr checks <PR-NUMBER> --watch` — wait for all checks
-9. Read SonarQube results; fix any code smells, hotspots, bugs, or coverage gaps
-10. Commit fixes and push; repeat until all checks are green or 10-commit limit reached
+4. Run `swiftformat .` to format all code
+5. Run `swiftlint` and fix any warnings
+6. Stage specific changed files
+7. Commit with a meaningful message including the co-authorship footer
+8. `git push -u origin <branch-name>`
+9. `gh pr create ...`
+10. `gh pr checks <PR-NUMBER> --watch` — wait for all checks
+11. Read SonarQube results; fix any code smells, hotspots, bugs, or coverage gaps
+12. Commit fixes and push; repeat until all checks are green or 10-commit limit reached
 
 **Example 2: User says "commit this refactoring"**
 
 Actions:
 1. Confirm current branch — create one if on `main`
-2. Stage only the refactored files
-3. Commit: `refactor(detector): simplify two-phase categorization logic`
-4. Push and offer to open a PR
+2. Run `swiftformat .` to format all code
+3. Run `swiftlint` and fix any warnings
+4. Stage only the refactored files
+5. Commit: `refactor(detector): simplify two-phase categorization logic`
+6. Push and offer to open a PR
 
 ---
 
