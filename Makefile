@@ -102,7 +102,7 @@ format:
 lint:
 	@if command -v swiftlint >/dev/null 2>&1; then \
 		echo "Linting code..."; \
-		swiftlint; \
+		swiftlint lint Sources Tests; \
 	else \
 		echo "SwiftLint not installed. Install with: brew install swiftlint"; \
 	fi
@@ -131,7 +131,7 @@ sonar:
 	bash scripts/xccov-to-sonarqube-generic.sh TestResults.xcresult > coverage.xml; \
 	echo "Running SwiftLint report..."; \
 	if command -v swiftlint >/dev/null 2>&1; then \
-		swiftlint --reporter json > swiftlint-report.json 2>/dev/null || true; \
+		swiftlint lint --reporter json Sources Tests > swiftlint-report.json 2>/dev/null || true; \
 	else \
 		echo "[]" > swiftlint-report.json; \
 	fi; \
