@@ -61,51 +61,33 @@ Branch naming conventions:
 
 ### Building
 
-**IMPORTANT: MLX Swift requires Xcode to compile Metal shaders**
+**Always use `xcodebuild`** — it is the only build method for this project.
 
-The `swift build` command cannot compile Metal shaders, which causes the VLM to fail with:
-```
-MLX error: Failed to load the default metallib. library not found
-```
-
-**Use `xcodebuild` for full functionality:**
+MLX requires Metal shaders compiled and bundled at build time. `swift build` skips this step and produces a broken binary. Always build with:
 
 ```bash
-# Build with xcodebuild (required for VLM/Metal support)
 xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build
-
-# The binary will be at:
-# ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan
-
-# Alternative: Open in Xcode and build with ⌘+B
-open Package.swift
 ```
 
-**For OCR-only testing (no VLM):**
-```bash
-# swift build works for OCR-only mode
-swift build
-
-# Run with --auto-resolve ocr to skip VLM
-.build/debug/docscan invoice.pdf --dry-run --auto-resolve ocr
+The binary will be at:
+```
+~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan
 ```
 
 ```bash
 # Clean build artifacts
 swift package clean
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' clean
 ```
 
 ### Running
 
 ```bash
-# Run the Xcode-built binary (full VLM + OCR support)
+# Run the built binary
 ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan invoice.pdf
 
 # Run with arguments
 ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan invoice.pdf --dry-run -v
-
-# Run the release binary
-.build/release/docscan invoice.pdf
 ```
 
 ### Testing

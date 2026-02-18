@@ -1,19 +1,33 @@
-.PHONY: build release test clean install run help
+.PHONY: build release test test-verbose clean install uninstall run update info format lint help
 
 # Default target
 .DEFAULT_GOAL := help
 
+SHELL         := /bin/bash
+SCHEME        := docscan
+DERIVED_DATA  := $(HOME)/Library/Developer/Xcode/DerivedData
+DEBUG_DIR     := $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*/Build/Products/Debug
+RELEASE_DIR   := $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*/Build/Products/Release
+
+# Use xcbeautify to filter xcodebuild output if available, otherwise fall back to -quiet
+XCBEAUTIFY    := $(shell command -v xcbeautify 2>/dev/null)
+ifdef XCBEAUTIFY
+    XCODE_OUTPUT = 2>&1 | xcbeautify
+else
+    XCODE_OUTPUT = -quiet
+endif
+
 # Build debug version
 build:
 	@echo "Building debug version..."
-	swift build
+	set -o pipefail && xcodebuild -scheme $(SCHEME) -configuration Debug -destination 'platform=macOS' build $(XCODE_OUTPUT)
 
 # Build release version (optimized)
 release:
 	@echo "Building release version..."
-	swift build -c release
+	set -o pipefail && xcodebuild -scheme $(SCHEME) -configuration Release -destination 'platform=macOS' build $(XCODE_OUTPUT)
 
-# Run tests
+# Run tests (swift test is correct here — tests mock all MLX inference)
 test:
 	@echo "Running tests..."
 	swift test
@@ -23,16 +37,22 @@ test-verbose:
 	@echo "Running tests (verbose)..."
 	swift test --verbose
 
-# Clean build artifacts
+# Clean all build artifacts including DerivedData
 clean:
 	@echo "Cleaning build artifacts..."
 	swift package clean
 	rm -rf .build
+	rm -rf $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*
 
 # Install to /usr/local/bin (requires sudo)
 install: release
 	@echo "Installing to /usr/local/bin..."
-	sudo cp .build/release/docscan /usr/local/bin/
+	@BINARY=$$(ls $(RELEASE_DIR)/docscan 2>/dev/null | head -1); \
+	if [ -z "$$BINARY" ]; then \
+		echo "Release binary not found. Run 'make release' first."; \
+		exit 1; \
+	fi; \
+	sudo cp "$$BINARY" /usr/local/bin/docscan
 	@echo "Installation complete!"
 
 # Uninstall from /usr/local/bin
@@ -41,13 +61,18 @@ uninstall:
 	sudo rm -f /usr/local/bin/docscan
 	@echo "Uninstall complete!"
 
-# Run with example file (set FILE variable)
+# Run with a document file: make run FILE=path/to/doc.pdf [ARGS='--dry-run -v']
 run:
 	@if [ -z "$(FILE)" ]; then \
-		echo "Usage: make run FILE=path/to/invoice.pdf"; \
+		echo "Usage: make run FILE=path/to/document.pdf"; \
 		exit 1; \
 	fi
-	swift run docscan "$(FILE)" $(ARGS)
+	@BINARY=$$(ls $(DEBUG_DIR)/docscan 2>/dev/null | head -1); \
+	if [ -z "$$BINARY" ]; then \
+		echo "Debug binary not found. Run 'make build' first."; \
+		exit 1; \
+	fi; \
+	"$$BINARY" "$(FILE)" $(ARGS)
 
 # Update dependencies
 update:
@@ -82,15 +107,15 @@ help:
 	@echo "DocScan - Makefile commands"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make build           Build debug version"
-	@echo "  make release         Build release version (optimized)"
-	@echo "  make test            Run tests"
-	@echo "  make test-verbose    Run tests with verbose output"
-	@echo "  make clean           Clean build artifacts"
-	@echo "  make install         Install to /usr/local/bin (requires sudo)"
-	@echo "  make uninstall       Uninstall from /usr/local/bin"
-	@echo "  make run FILE=...    Run with specified file"
-	@echo "  make update          Update dependencies"
+	@echo "  make build           Build debug version (xcodebuild)"
+	@echo "  make release         Build release version (xcodebuild, optimized)"
+	@echo "  make test            Run unit tests"
+	@echo "  make test-verbose    Run unit tests with verbose output"
+	@echo "  make clean           Clean all build artifacts including DerivedData"
+	@echo "  make install         Build release and install to /usr/local/bin"
+	@echo "  make uninstall       Remove from /usr/local/bin"
+	@echo "  make run FILE=...    Run debug binary with specified file"
+	@echo "  make update          Update Swift package dependencies"
 	@echo "  make info            Show package information"
 	@echo "  make format          Format code (requires SwiftFormat)"
 	@echo "  make lint            Lint code (requires SwiftLint)"
@@ -99,3 +124,6 @@ help:
 	@echo "Examples:"
 	@echo "  make run FILE=invoice.pdf"
 	@echo "  make run FILE=invoice.pdf ARGS='--dry-run -v'"
+	@echo ""
+	@echo "Tip: Install xcbeautify for cleaner build output:"
+	@echo "  brew install xcbeautify"
