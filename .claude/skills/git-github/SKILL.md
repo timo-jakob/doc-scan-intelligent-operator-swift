@@ -1,9 +1,9 @@
 ---
 name: git-github
-description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main. Runs SwiftLint before every commit. After opening a PR, waits for all CI checks including SonarQube and fixes any reported issues.
+description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main. Runs SwiftFormat, SwiftLint, and SonarQube locally before pushing. After opening a PR, waits for all CI checks and fixes any reported issues.
 metadata:
   author: doc-scan-intelligent-operator-swift
-  version: 1.2.0
+  version: 2.0.0
   category: workflow
 ---
 
@@ -13,9 +13,11 @@ metadata:
 
 1. **Never commit directly to `main`** — all changes go through a branch and Pull Request
 2. **Use `git switch`** to change branches — never `git checkout`
-3. **Run SwiftLint before every commit** — fix all warnings before staging
-4. **Every commit must have a meaningful message** following the Conventional Commits format
-5. **Include the co-authorship footer** in every commit message
+3. **Format with SwiftFormat before every commit** — run `make format`
+4. **Lint with SwiftLint before every commit** — fix all warnings before staging
+5. **Run SonarQube locally before every push** — push only when analysis is clean
+6. **Every commit must have a meaningful message** following the Conventional Commits format
+7. **Include the co-authorship footer** in every commit message
 
 ---
 
@@ -69,10 +71,10 @@ Before staging, always format and lint the code:
 
 ```bash
 # Format code with SwiftFormat
-swiftformat .
+make format
 
 # Lint with SwiftLint — fix all warnings before proceeding
-swiftlint
+make lint
 ```
 
 If SwiftLint reports any warnings or errors, fix them now. Do not commit with outstanding lint issues.
@@ -107,7 +109,35 @@ Bad commit messages (never use):
 - `changes`
 - `update`
 
-### Step 4: Push the branch
+### Step 4: Run SonarQube locally
+
+Before pushing, run the full SonarQube analysis locally. This builds the project, runs tests with coverage, and sends results to SonarCloud — catching issues before they ever reach GitHub.
+
+```bash
+make sonar
+```
+
+This will:
+1. Build and run tests with code coverage (`xcodebuild`)
+2. Convert coverage to SonarQube format
+3. Generate a SwiftLint JSON report
+4. Send everything to SonarCloud and wait for analysis
+
+When it completes, it prints the SonarCloud URL. Open it and check for:
+
+| Issue type | What to do |
+|---|---|
+| **Code Smells** | Refactor the flagged code — complexity, duplication, naming, etc. |
+| **Security Hotspots** | Review each one; fix if it represents a real risk |
+| **Bugs** | Fix immediately — these are definite defects |
+| **Vulnerabilities** | Fix immediately |
+| **Coverage below threshold** | Add tests for the uncovered code paths |
+
+If issues are found: fix them, run `make format && make lint` again, stage the fixes, add a new commit, then re-run `make sonar`. Repeat until the analysis is clean.
+
+Only push when SonarCloud shows zero new issues.
+
+### Step 5: Push the branch
 
 First push sets the upstream tracking:
 
@@ -121,7 +151,7 @@ Subsequent pushes on the same branch:
 git push
 ```
 
-### Step 5: Open a Pull Request
+### Step 6: Open a Pull Request
 
 ```bash
 gh pr create --title "<type>: <summary>" --body "$(cat <<'EOF'
@@ -130,6 +160,7 @@ gh pr create --title "<type>: <summary>" --body "$(cat <<'EOF'
 
 ## Test plan
 - [ ] `make test` passes
+- [ ] `make sonar` passes with zero new issues
 - [ ] Tested manually with a real document
 - [ ] No regressions in existing document types
 
@@ -140,83 +171,49 @@ EOF
 
 PR title follows the same Conventional Commits format as the commit message.
 
-### Step 6: Wait for CI and fix all issues
+### Step 7: Wait for CI and fix all issues
 
-After the PR is open, wait for all GitHub Actions to complete and fix every reported issue before the PR is considered ready. Apply the following loop with a hard limit of **10 fix commits**.
-
-#### 6a — Wait for checks to finish
+After the PR is open, wait for all GitHub Actions to complete:
 
 ```bash
 gh pr checks <PR-NUMBER> --watch
 ```
 
-This blocks until all checks complete. Once done, review the final status:
+Once done, review the final status:
 
 ```bash
 gh pr checks <PR-NUMBER>
 ```
 
-#### 6b — Inspect SonarQube results
+Current CI checks:
+- **Build and Test** — xcodebuild + swift test
+- **Code Quality** — static analysis
+- **Snyk Security Scan** — dependency vulnerability scan
+- **claude-review** — AI code review
 
-If the SonarQube Cloud check failed or reported issues, fetch the details:
+If any check fails, fix the reported issues, commit, push, and wait for the next CI run. Apply a hard limit of **10 fix commits** — if issues remain after that, stop and report to the user which checks are still failing and why.
 
-```bash
-gh pr checks <PR-NUMBER> | grep -i sonar
-```
+When all checks pass, inform the user that the PR is clean and ready for review.
 
-Then read the SonarQube analysis URL from the check output and fetch its findings. Issues to look for and fix:
+---
 
-| Issue type | What to do |
-|---|---|
-| **Code Smells** | Refactor the flagged code — complexity, duplication, naming, etc. |
-| **Security Hotspots** | Review each one; fix if it represents a real risk |
-| **Bugs** | Fix immediately — these are definite defects |
-| **Vulnerabilities** | Fix immediately |
-| **Coverage below threshold** | Add tests for the uncovered code paths |
+## Setup: SONAR_TOKEN in macOS Keychain
 
-#### 6c — Fix, commit, push — repeat
-
-For each round of fixes:
-
-1. Fix the reported issues in the source files
-2. Run `make test` locally to confirm nothing is broken
-3. Stage only the changed files:
-   ```bash
-   git add <changed-files>
-   git status
-   ```
-4. Commit with a descriptive message referencing the issue type:
-   ```
-   fix(sonar): resolve code smell in DocumentDetector complexity
-   fix(sonar): address security hotspot in file path handling
-   test(coverage): add missing tests for TextLLMManager error paths
-   ```
-5. Push:
-   ```bash
-   git push
-   ```
-6. Go back to Step 6a and wait for the next CI run
-
-#### 6d — Timeout after 10 fix commits
-
-Keep a mental count of fix commits made after the PR was opened. If issues are still present after **10 fix commits**, stop and report to the user:
-
-- Which checks are still failing
-- What issues remain unresolved and why
-- Whether manual intervention is needed (e.g. a SonarQube false positive to suppress, a test requiring real infrastructure)
-
-Do not continue pushing blindly — surface the blocker and ask for guidance.
-
-#### 6e — All checks green
-
-When `gh pr checks <PR-NUMBER>` shows all checks passing with no SonarQube issues:
+`make sonar` reads the SonarCloud token from the macOS Keychain — never from a plaintext file or environment variable. Store it once:
 
 ```bash
-gh pr checks <PR-NUMBER>
-# All green — PR is ready for review
+security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN
 ```
 
-Inform the user that the PR is clean and ready.
+Replace `YOUR_TOKEN` with your token from [SonarCloud → Account → Security](https://sonarcloud.io/account/security).
+
+macOS will prompt for your login password. When `make sonar` later retrieves it, grant "Always Allow" to Terminal so it never prompts again.
+
+To verify the token is stored:
+
+```bash
+security find-generic-password -a sonar -s sonar-token -w
+```
 
 ---
 
@@ -228,25 +225,26 @@ Actions:
 1. Run `git status` to see what changed and confirm we are not on `main`
 2. Determine the change type from context — ask if unclear
 3. `git switch -c fix/resolve-date-extraction` (or appropriate branch)
-4. Run `swiftformat .` to format all code
-5. Run `swiftlint` and fix any warnings
+4. Run `make format` to format all code
+5. Run `make lint` and fix any warnings
 6. Stage specific changed files
 7. Commit with a meaningful message including the co-authorship footer
-8. `git push -u origin <branch-name>`
-9. `gh pr create ...`
-10. `gh pr checks <PR-NUMBER> --watch` — wait for all checks
-11. Read SonarQube results; fix any code smells, hotspots, bugs, or coverage gaps
-12. Commit fixes and push; repeat until all checks are green or 10-commit limit reached
+8. Run `make sonar` — wait for SonarCloud result, fix any issues
+9. `git push -u origin <branch-name>`
+10. `gh pr create ...`
+11. `gh pr checks <PR-NUMBER> --watch` — wait for all CI checks
+12. Fix any remaining CI failures; repeat until all checks are green or 10-commit limit reached
 
 **Example 2: User says "commit this refactoring"**
 
 Actions:
 1. Confirm current branch — create one if on `main`
-2. Run `swiftformat .` to format all code
-3. Run `swiftlint` and fix any warnings
+2. Run `make format` to format all code
+3. Run `make lint` and fix any warnings
 4. Stage only the refactored files
 5. Commit: `refactor(detector): simplify two-phase categorization logic`
-6. Push and offer to open a PR
+6. Run `make sonar` and fix any issues
+7. Push and offer to open a PR
 
 ---
 
@@ -281,3 +279,13 @@ git push
 gh pr view  # check existing PR
 gh pr edit  # update title or body if needed
 ```
+
+**`make sonar` fails: SONAR_TOKEN not found**
+
+```bash
+security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN
+```
+
+**`make sonar` fails: keychain access prompt keeps appearing**
+
+In the macOS Keychain access dialog, click "Always Allow" for Terminal (or your shell). This grants permanent access without repeated prompts.
