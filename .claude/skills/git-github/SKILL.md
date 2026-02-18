@@ -1,9 +1,9 @@
 ---
 name: git-github
-description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main.
+description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main. After opening a PR, waits for all CI checks including SonarQube and fixes any reported issues.
 metadata:
   author: doc-scan-intelligent-operator-swift
-  version: 1.0.0
+  version: 1.1.0
   category: workflow
 ---
 
@@ -127,6 +127,84 @@ EOF
 
 PR title follows the same Conventional Commits format as the commit message.
 
+### Step 6: Wait for CI and fix all issues
+
+After the PR is open, wait for all GitHub Actions to complete and fix every reported issue before the PR is considered ready. Apply the following loop with a hard limit of **10 fix commits**.
+
+#### 6a — Wait for checks to finish
+
+```bash
+gh pr checks <PR-NUMBER> --watch
+```
+
+This blocks until all checks complete. Once done, review the final status:
+
+```bash
+gh pr checks <PR-NUMBER>
+```
+
+#### 6b — Inspect SonarQube results
+
+If the SonarQube Cloud check failed or reported issues, fetch the details:
+
+```bash
+gh pr checks <PR-NUMBER> | grep -i sonar
+```
+
+Then read the SonarQube analysis URL from the check output and fetch its findings. Issues to look for and fix:
+
+| Issue type | What to do |
+|---|---|
+| **Code Smells** | Refactor the flagged code — complexity, duplication, naming, etc. |
+| **Security Hotspots** | Review each one; fix if it represents a real risk |
+| **Bugs** | Fix immediately — these are definite defects |
+| **Vulnerabilities** | Fix immediately |
+| **Coverage below threshold** | Add tests for the uncovered code paths |
+
+#### 6c — Fix, commit, push — repeat
+
+For each round of fixes:
+
+1. Fix the reported issues in the source files
+2. Run `make test` locally to confirm nothing is broken
+3. Stage only the changed files:
+   ```bash
+   git add <changed-files>
+   git status
+   ```
+4. Commit with a descriptive message referencing the issue type:
+   ```
+   fix(sonar): resolve code smell in DocumentDetector complexity
+   fix(sonar): address security hotspot in file path handling
+   test(coverage): add missing tests for TextLLMManager error paths
+   ```
+5. Push:
+   ```bash
+   git push
+   ```
+6. Go back to Step 6a and wait for the next CI run
+
+#### 6d — Timeout after 10 fix commits
+
+Keep a mental count of fix commits made after the PR was opened. If issues are still present after **10 fix commits**, stop and report to the user:
+
+- Which checks are still failing
+- What issues remain unresolved and why
+- Whether manual intervention is needed (e.g. a SonarQube false positive to suppress, a test requiring real infrastructure)
+
+Do not continue pushing blindly — surface the blocker and ask for guidance.
+
+#### 6e — All checks green
+
+When `gh pr checks <PR-NUMBER>` shows all checks passing with no SonarQube issues:
+
+```bash
+gh pr checks <PR-NUMBER>
+# All green — PR is ready for review
+```
+
+Inform the user that the PR is clean and ready.
+
 ---
 
 ## Examples
@@ -141,6 +219,9 @@ Actions:
 5. Commit with a meaningful message including the co-authorship footer
 6. `git push -u origin <branch-name>`
 7. `gh pr create ...`
+8. `gh pr checks <PR-NUMBER> --watch` — wait for all checks
+9. Read SonarQube results; fix any code smells, hotspots, bugs, or coverage gaps
+10. Commit fixes and push; repeat until all checks are green or 10-commit limit reached
 
 **Example 2: User says "commit this refactoring"**
 
