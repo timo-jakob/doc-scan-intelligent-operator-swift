@@ -2,36 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Workflow
-
-**IMPORTANT: Always use GitHub Flow for bug fixes and feature development**
-
-When fixing bugs or implementing features, you MUST:
-
-1. **Create a new branch** from `main` with a descriptive name:
-   ```bash
-   git checkout -b fix/issue-description
-   # or
-   git checkout -b feature/feature-name
-   ```
-
-2. **Commit changes** to the branch (NOT directly to `main`)
-   - Use clear, descriptive commit messages
-   - Include the Claude Code co-authorship footer
-
-3. **Open a Pull Request** when ready for review:
-   ```bash
-   gh pr create --title "Fix: Description" --body "..."
-   ```
-
-4. **Do NOT commit directly to `main`** - all changes should go through Pull Requests
-
-Branch naming conventions:
-- Bug fixes: `fix/short-description`
-- Features: `feature/short-description`
-- Refactoring: `refactor/short-description`
-- Documentation: `docs/short-description`
-
 ## Project Overview
 
 **doc-scan-intelligent-operator-swift** - Swift rewrite of the AI-powered document detection and renaming system, optimized for Apple Silicon using MLX Vision-Language Models. Built entirely in Swift for maximum performance and native macOS integration.
@@ -509,28 +479,6 @@ The project uses SonarQube Cloud for code quality analysis. Analysis runs automa
 The workflow includes a Quality Gate check that will:
 - Pass if the code meets quality standards
 - Fail if new code introduces issues above thresholds
-
-### Quality Requirements (MUST follow)
-
-**IMPORTANT**: Before merging any PR, ensure the following requirements are met:
-
-1. **Check SonarQube Status**: Always verify the SonarQube Cloud analysis passes on PRs
-   - Use `gh pr checks <PR_NUMBER>` to check status
-   - Wait for the "SonarQube Code Analysis" check to complete
-
-2. **No Code Smells**: Zero code smells of any category are allowed
-   - Fix all code smells before merging
-   - This includes: complexity, duplication, maintainability issues
-
-3. **Test Coverage**: Minimum **90% test coverage on new code**
-   - All new functions and methods must have tests
-   - Move logic to testable locations (DocScanCore) when needed
-   - Run `swift test` locally before pushing
-
-4. **Workflow**:
-   - Write tests alongside new code, not as an afterthought
-   - If SonarQube fails, fix issues and push again
-   - Never merge with failing quality checks
 
 ## Snyk Security Analysis
 
