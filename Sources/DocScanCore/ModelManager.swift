@@ -1,10 +1,10 @@
+import AppKit
 import Foundation
 import MLX
-import MLXNN
 import MLXLLM
-import MLXVLM
 import MLXLMCommon
-import AppKit
+import MLXNN
+import MLXVLM
 
 // MARK: - VLM Provider Protocol
 
@@ -19,7 +19,7 @@ public protocol VLMProvider: Sendable {
     ) async throws -> String
 }
 
-// Default parameter extension
+/// Default parameter extension
 public extension VLMProvider {
     func generateFromImage(_ image: NSImage, prompt: String) async throws -> String {
         try await generateFromImage(image, prompt: prompt, modelName: nil)
@@ -117,7 +117,7 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
             let model = try await loadModel(
                 id: modelName
             ) { [self] progress in
-                if self.config.verbose {
+                if config.verbose {
                     let percent = Int(progress.fractionCompleted * 100)
                     print("Downloading VLM: \(percent)%")
                 }

@@ -1,5 +1,5 @@
-import Foundation
 import AppKit
+import Foundation
 
 // MARK: - Categorization Results (Phase 1: VLM + OCR in parallel)
 
@@ -68,8 +68,8 @@ public struct CategorizationVerification {
     public init(vlmResult: CategorizationResult, ocrResult: CategorizationResult) {
         self.vlmResult = vlmResult
         self.ocrResult = ocrResult
-        self.bothAgree = vlmResult.isMatch == ocrResult.isMatch
-        self.agreedIsMatch = bothAgree ? vlmResult.isMatch : nil
+        bothAgree = vlmResult.isMatch == ocrResult.isMatch
+        agreedIsMatch = bothAgree ? vlmResult.isMatch : nil
     }
 }
 
@@ -137,9 +137,9 @@ public class DocumentDetector {
     public init(config: Configuration, documentType: DocumentType = .invoice) {
         self.config = config
         self.documentType = documentType
-        self.vlmProvider = ModelManager(config: config)
-        self.ocrEngine = OCREngine(config: config)
-        self.textLLM = TextLLMManager(config: config)
+        vlmProvider = ModelManager(config: config)
+        ocrEngine = OCREngine(config: config)
+        textLLM = TextLLMManager(config: config)
     }
 
     /// Initialize with custom VLM provider (for testing/dependency injection)
@@ -147,13 +147,12 @@ public class DocumentDetector {
         self.config = config
         self.documentType = documentType
         self.vlmProvider = vlmProvider
-        self.ocrEngine = OCREngine(config: config)
-        self.textLLM = TextLLMManager(config: config)
+        ocrEngine = OCREngine(config: config)
+        textLLM = TextLLMManager(config: config)
     }
 }
 
 extension DocumentDetector {
-
     // MARK: - Phase 1: Categorization (VLM + OCR in parallel)
 
     /// Categorize a PDF - determine if it's an invoice using VLM + OCR in parallel
@@ -170,7 +169,7 @@ extension DocumentDetector {
             print("Checking for extractable text in PDF...")
         }
 
-        var directText: String? = nil
+        var directText: String?
         if let text = PDFUtils.extractText(from: pdfPath, verbose: config.verbose),
            text.count >= PDFUtils.minimumTextLength {
             directText = text
@@ -205,9 +204,9 @@ extension DocumentDetector {
         // If we have direct text, use it; otherwise fall back to Vision OCR
         let ocrTask = Task {
             if let text = directText {
-                return self.categorizeWithDirectText(text)
+                self.categorizeWithDirectText(text)
             } else {
-                return try await self.categorizeWithOCR(image: image)
+                try await self.categorizeWithOCR(image: image)
             }
         }
 
@@ -337,7 +336,7 @@ extension DocumentDetector {
 
         if config.verbose {
             print("PDF: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
-            if let reason = reason {
+            if let reason {
                 print("PDF: Reason: \(reason)")
             }
         }
@@ -365,7 +364,7 @@ extension DocumentDetector {
 
         if config.verbose {
             print("OCR: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
-            if let reason = reason {
+            if let reason {
                 print("OCR: Reason: \(reason)")
             }
         }
@@ -408,7 +407,7 @@ extension DocumentDetector {
         guard let date = data.date else { return nil }
 
         // For invoices, company is required
-        if documentType == .invoice && data.secondaryField == nil {
+        if documentType == .invoice, data.secondaryField == nil {
             return nil
         }
 

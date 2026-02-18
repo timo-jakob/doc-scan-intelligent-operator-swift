@@ -1,8 +1,7 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class StringUtilsTests: XCTestCase {
-
     // MARK: - Basic Sanitization Tests
 
     func testSanitizeCompanyNameSimple() {
@@ -169,7 +168,7 @@ final class StringUtilsTests: XCTestCase {
             ("Amazon EU S.a.r.l.", "Amazon_EU_S.a.r.l."),
             ("Apple Inc.", "Apple_Inc."),
             ("Bayerische Landesbrandversicherung", "Bayerische_Landesbrandversicherung"),
-            ("Burger King GmbH", "Burger_King_GmbH")
+            ("Burger King GmbH", "Burger_King_GmbH"),
         ]
 
         for (input, expected) in examples {
@@ -267,7 +266,7 @@ final class StringUtilsTests: XCTestCase {
             ("Prof. Dr. med. Hans Weber", "Hans_Weber"),
             ("Dr.med. Anna Schmidt", "Anna_Schmidt"),
             ("Gesine Kaiser", "Gesine_Kaiser"),
-            ("Dr. Peter Müller-Schmidt", "Peter_Müller-Schmidt")
+            ("Dr. Peter Müller-Schmidt", "Peter_Müller-Schmidt"),
         ]
 
         for (input, expected) in examples {
@@ -325,7 +324,7 @@ final class StringUtilsTests: XCTestCase {
             ("Anna Maria", "Anna_Maria"),
             ("Hans-Peter", "Hans-Peter"),
             ("Müller", "Müller"),
-            ("Test Name", "Test_Name")
+            ("Test Name", "Test_Name"),
         ]
 
         for (input, expected) in examples {

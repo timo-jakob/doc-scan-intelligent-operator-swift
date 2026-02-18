@@ -1,8 +1,7 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class DocumentTypeTests: XCTestCase {
-
     // MARK: - Display Name Tests
 
     func testInvoiceDisplayName() {

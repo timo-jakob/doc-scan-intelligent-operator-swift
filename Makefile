@@ -1,10 +1,14 @@
-.PHONY: build release test test-verbose clean install uninstall run update info format lint help
+.PHONY: build release test test-verbose clean install uninstall run update info format lint sonar help
 
 # Default target
 .DEFAULT_GOAL := help
 
 SHELL         := /bin/bash
 SCHEME        := docscan
+SONAR_SCHEME   := DocScan-Package
+SONAR_URL      := https://sonarcloud.io
+SONAR_PROJECT  := timo-jakob_doc-scan-intelligent-operator-swift
+SONAR_KEYCHAIN := sonar-doc-scan-intelligent-operator-swift
 DERIVED_DATA  := $(HOME)/Library/Developer/Xcode/DerivedData
 DEBUG_DIR     := $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*/Build/Products/Debug
 RELEASE_DIR   := $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*/Build/Products/Release
@@ -37,12 +41,13 @@ test-verbose:
 	@echo "Running tests (verbose)..."
 	swift test --verbose
 
-# Clean all build artifacts including DerivedData
+# Clean all build artifacts including DerivedData and sonar artifacts
 clean:
 	@echo "Cleaning build artifacts..."
 	swift package clean
 	rm -rf .build
 	rm -rf $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*
+	rm -rf TestResults.xcresult coverage.xml swiftlint-report.json
 
 # Install to /usr/local/bin (requires sudo)
 install: release
@@ -97,10 +102,45 @@ format:
 lint:
 	@if command -v swiftlint >/dev/null 2>&1; then \
 		echo "Linting code..."; \
-		swiftlint; \
+		swiftlint lint Sources Tests; \
 	else \
 		echo "SwiftLint not installed. Install with: brew install swiftlint"; \
 	fi
+
+# Run SonarQube analysis locally (sends results to SonarCloud)
+# Requires SONAR_TOKEN stored in macOS Keychain:
+#   security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN
+sonar:
+	@echo "Running local SonarQube analysis..."
+	@SONAR_TOKEN=$$(security find-generic-password -a sonar -s $(SONAR_KEYCHAIN) -w 2>/dev/null); \
+	if [ -z "$$SONAR_TOKEN" ]; then \
+		echo "❌  SONAR_TOKEN not found in Keychain."; \
+		echo "    Store it once with:"; \
+		echo "    security add-generic-password -a sonar -s $(SONAR_KEYCHAIN) -w YOUR_TOKEN"; \
+		exit 1; \
+	fi; \
+	echo "Building and running tests with coverage..."; \
+	set -o pipefail && xcodebuild test \
+		-scheme $(SONAR_SCHEME) \
+		-destination 'platform=macOS' \
+		-enableCodeCoverage YES \
+		-resultBundlePath TestResults.xcresult \
+		$(XCODE_OUTPUT) || exit 1; \
+	echo "Converting coverage report..."; \
+	export REPO_ROOT="$$(pwd)"; \
+	bash scripts/xccov-to-sonarqube-generic.sh TestResults.xcresult > coverage.xml; \
+	echo "Running SwiftLint report..."; \
+	if command -v swiftlint >/dev/null 2>&1; then \
+		swiftlint lint --reporter json Sources Tests > swiftlint-report.json 2>/dev/null || true; \
+	else \
+		echo "[]" > swiftlint-report.json; \
+	fi; \
+	echo "Sending to SonarCloud..."; \
+	SONAR_TOKEN="$$SONAR_TOKEN" sonar-scanner \
+		-Dsonar.host.url=$(SONAR_URL); \
+	echo ""; \
+	echo "✅ Analysis complete — view results at:"; \
+	echo "   https://sonarcloud.io/project/overview?id=$(SONAR_PROJECT)"
 
 # Help
 help:
@@ -119,11 +159,13 @@ help:
 	@echo "  make info            Show package information"
 	@echo "  make format          Format code (requires SwiftFormat)"
 	@echo "  make lint            Lint code (requires SwiftLint)"
+	@echo "  make sonar           Run SonarQube analysis locally (sends to SonarCloud)"
 	@echo "  make help            Show this help message"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run FILE=invoice.pdf"
 	@echo "  make run FILE=invoice.pdf ARGS='--dry-run -v'"
 	@echo ""
-	@echo "Tip: Install xcbeautify for cleaner build output:"
-	@echo "  brew install xcbeautify"
+	@echo "Tips:"
+	@echo "  Install xcbeautify for cleaner build output:  brew install xcbeautify"
+	@echo "  Store SonarCloud token in Keychain (once):    security add-generic-password -a sonar -s $(SONAR_KEYCHAIN) -w YOUR_TOKEN"

@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "DocScan",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     products: [
         .executable(

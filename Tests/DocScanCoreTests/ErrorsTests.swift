@@ -1,8 +1,7 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class ErrorsTests: XCTestCase {
-
     // MARK: - TimeoutError Tests
 
     func testTimeoutErrorDescription() {
@@ -97,7 +96,7 @@ final class ErrorsTests: XCTestCase {
             .notAnInvoice,
             .extractionFailed("test"),
             .insufficientDiskSpace(required: 1, available: 0),
-            .invalidInput("test")
+            .invalidInput("test"),
         ]
 
         for error in errors {
@@ -126,7 +125,7 @@ final class ErrorsTests: XCTestCase {
                 XCTFail("Expected DocScanError")
                 return
             }
-            if case .fileNotFound(let path) = docScanError {
+            if case let .fileNotFound(path) = docScanError {
                 XCTAssertEqual(path, "/test/path")
             } else {
                 XCTFail("Expected fileNotFound error")

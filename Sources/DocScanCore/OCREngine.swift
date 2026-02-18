@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import Vision
-import AppKit
 
 /// OCR engine using Apple's Vision framework for text recognition + Text-LLM for analysis
 public class OCREngine {
@@ -9,7 +9,7 @@ public class OCREngine {
 
     public init(config: Configuration) {
         self.config = config
-        self.textLLM = TextLLMManager(config: config)
+        textLLM = TextLLMManager(config: config)
     }
 
     /// Extract text from an image using Vision OCR
@@ -36,9 +36,9 @@ public class OCREngine {
 
     /// Extract text from a single image (standard OCR)
     private func extractTextSingle(from cgImage: CGImage) async throws -> String {
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
-                if let error = error {
+                if let error {
                     continuation.resume(throwing: DocScanError.extractionFailed("OCR failed: \(error.localizedDescription)"))
                     return
                 }
@@ -75,7 +75,7 @@ public class OCREngine {
     private func extractTextTiled(from cgImage: CGImage) async throws -> String {
         let width = cgImage.width
         let height = cgImage.height
-        let tileHeight = 800  // Tile height in pixels
+        let tileHeight = 800 // Tile height in pixels
         var allText = ""
 
         for tileY in stride(from: 0, to: height, by: tileHeight) {
@@ -119,7 +119,7 @@ public class OCREngine {
 
     /// Detect invoice keywords with confidence and reason (instance method)
     public func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
-        return Self.detectInvoiceKeywords(from: text)
+        Self.detectInvoiceKeywords(from: text)
     }
 
     /// Detect invoice keywords with confidence and reason (static, shared implementation)
@@ -143,16 +143,12 @@ public class OCREngine {
         var foundStrong: [String] = []
         var foundMedium: [String] = []
 
-        for indicator in strongIndicators {
-            if lowercased.contains(indicator) {
-                foundStrong.append(indicator)
-            }
+        for indicator in strongIndicators where lowercased.contains(indicator) {
+            foundStrong.append(indicator)
         }
 
-        for indicator in mediumIndicators {
-            if lowercased.contains(indicator) {
-                foundMedium.append(indicator)
-            }
+        for indicator in mediumIndicators where lowercased.contains(indicator) {
+            foundMedium.append(indicator)
         }
 
         // Determine result
@@ -167,13 +163,13 @@ public class OCREngine {
 
     /// Instance method for generic keyword detection
     public func detectKeywords(for documentType: DocumentType, from text: String) -> (isMatch: Bool, confidence: String, reason: String?) {
-        return Self.detectKeywords(for: documentType, from: text)
+        Self.detectKeywords(for: documentType, from: text)
     }
 
     /// Extract invoice date from OCR text
     /// Uses shared DateUtils for consistent date extraction across the codebase
     public func extractDate(from text: String) -> Date? {
-        return DateUtils.extractDateFromText(text)
+        DateUtils.extractDateFromText(text)
     }
 
     /// Extract company name from OCR text
@@ -187,7 +183,7 @@ public class OCREngine {
         // Strategy 1: Look for company indicators
         let companyKeywords = [
             "gmbh", "ag", "inc", "ltd", "llc", "corp", "corporation",
-            "sarl", "s.a.", "kg", "ohg"
+            "sarl", "s.a.", "kg", "ohg",
         ]
 
         for line in lines.prefix(10) { // Check first 10 lines
@@ -206,7 +202,7 @@ public class OCREngine {
     }
 
     private func sanitizeCompanyName(_ name: String) -> String {
-        return StringUtils.sanitizeCompanyName(name)
+        StringUtils.sanitizeCompanyName(name)
     }
 
     /// Extract all invoice data from OCR text using Text-LLM (legacy method)

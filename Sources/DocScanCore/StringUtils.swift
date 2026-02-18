@@ -19,7 +19,7 @@ public enum StringUtils {
         "dr. med.", "dr.med.", "dr med", "drmed",
         "dr.", "dr",
         "prof. dr.", "prof.dr.", "prof dr",
-        "med.", "med"
+        "med.", "med",
     ]
 
     /// Sanitize a company name for use in filenames
@@ -54,12 +54,9 @@ public enum StringUtils {
         var sanitized = name
 
         // Remove doctor titles (case-insensitive)
-        for title in doctorTitles {
-            // Match title at start of string (case-insensitive)
-            if sanitized.lowercased().hasPrefix(title) {
-                sanitized = String(sanitized.dropFirst(title.count))
-                    .trimmingCharacters(in: .whitespaces)
-            }
+        for title in doctorTitles where sanitized.lowercased().hasPrefix(title) {
+            sanitized = String(sanitized.dropFirst(title.count))
+                .trimmingCharacters(in: .whitespaces)
         }
 
         // Remove special characters problematic in filenames

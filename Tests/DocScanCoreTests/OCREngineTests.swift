@@ -1,6 +1,6 @@
-import XCTest
-import Vision
 @testable import DocScanCore
+import Vision
+import XCTest
 
 final class OCREngineTests: XCTestCase {
     var engine: OCREngine!
@@ -59,25 +59,25 @@ final class OCREngineTests: XCTestCase {
 
     // MARK: - Date Extraction Tests
 
-    func testExtractDateISO() {
+    func testExtractDateISO() throws {
         let text = "Invoice Date: 2024-12-22"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2024)
         XCTAssertEqual(components.month, 12)
         XCTAssertEqual(components.day, 22)
     }
 
-    func testExtractDateEuropean() {
+    func testExtractDateEuropean() throws {
         let text = "Rechnungsdatum: 22.12.2024"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2024)
         XCTAssertEqual(components.month, 12)
         XCTAssertEqual(components.day, 22)
@@ -90,38 +90,38 @@ final class OCREngineTests: XCTestCase {
         XCTAssertNil(date)
     }
 
-    func testExtractDateColonSeparated() {
+    func testExtractDateColonSeparated() throws {
         // OCR sometimes reads dots as colons
         let text = "Datum:13:11:2025"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2025)
         XCTAssertEqual(components.month, 11)
         XCTAssertEqual(components.day, 13)
     }
 
-    func testExtractDateGermanMonth() {
+    func testExtractDateGermanMonth() throws {
         let text = "Beitragsrechnung September 2022"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2022)
         XCTAssertEqual(components.month, 9)
         XCTAssertEqual(components.day, 1) // First of month for month-only dates
     }
 
-    func testExtractDateGermanMonthAbbreviated() {
+    func testExtractDateGermanMonthAbbreviated() throws {
         let text = "Rechnung Okt 2023"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2023)
         XCTAssertEqual(components.month, 10)
     }
@@ -150,7 +150,7 @@ final class OCREngineTests: XCTestCase {
 
     // MARK: - Company Extraction Tests
 
-    func testExtractCompanyWithKeywords() {
+    func testExtractCompanyWithKeywords() throws {
         let text = """
         Acme Corporation GmbH
         Musterstraße 123
@@ -159,7 +159,7 @@ final class OCREngineTests: XCTestCase {
 
         let company = engine.extractCompany(from: text)
         XCTAssertNotNil(company)
-        XCTAssertTrue(company!.contains("Acme"))
+        XCTAssertTrue(try XCTUnwrap(company?.contains("Acme")))
     }
 
     func testExtractCompanyFirstLine() {
@@ -174,7 +174,7 @@ final class OCREngineTests: XCTestCase {
         XCTAssertEqual(company, "My_Company_Name")
     }
 
-    func testExtractCompanyWithLegalSuffix() {
+    func testExtractCompanyWithLegalSuffix() throws {
         let text = """
         Some Random Text
         Another Line
@@ -184,10 +184,10 @@ final class OCREngineTests: XCTestCase {
 
         let company = engine.extractCompany(from: text)
         XCTAssertNotNil(company)
-        XCTAssertTrue(company!.contains("BigCorp"))
+        XCTAssertTrue(try XCTUnwrap(company?.contains("BigCorp")))
     }
 
-    func testExtractCompanyWithLLC() {
+    func testExtractCompanyWithLLC() throws {
         let text = """
         Random Header
         Tech Solutions LLC
@@ -196,11 +196,11 @@ final class OCREngineTests: XCTestCase {
 
         let company = engine.extractCompany(from: text)
         XCTAssertNotNil(company)
-        XCTAssertTrue(company!.contains("Tech"))
-        XCTAssertTrue(company!.contains("LLC"))
+        XCTAssertTrue(try XCTUnwrap(company?.contains("Tech")))
+        XCTAssertTrue(try XCTUnwrap(company?.contains("LLC")))
     }
 
-    func testExtractCompanyWithCorporation() {
+    func testExtractCompanyWithCorporation() throws {
         let text = """
         Some text
         Apple Corporation
@@ -209,7 +209,7 @@ final class OCREngineTests: XCTestCase {
 
         let company = engine.extractCompany(from: text)
         XCTAssertNotNil(company)
-        XCTAssertTrue(company!.contains("Apple"))
+        XCTAssertTrue(try XCTUnwrap(company?.contains("Apple")))
     }
 
     func testExtractCompanyEmptyText() {
@@ -243,7 +243,7 @@ final class OCREngineTests: XCTestCase {
             "Numéro de facture: 98765",
             "Número de factura: FAC-2024",
             "Rechnungsdatum: 15.12.2024",
-            "Invoice Date: December 15, 2024"
+            "Invoice Date: December 15, 2024",
         ]
 
         for text in strongTexts {
@@ -260,7 +260,7 @@ final class OCREngineTests: XCTestCase {
             "La facture",
             "La factura",
             "Quittung",
-            "Receipt for your purchase"
+            "Receipt for your purchase",
         ]
 
         for text in mediumTexts {
@@ -275,7 +275,7 @@ final class OCREngineTests: XCTestCase {
             "Hello world",
             "This is a regular document",
             "Meeting notes for December",
-            "Project plan and timeline"
+            "Project plan and timeline",
         ]
 
         for text in nonInvoiceTexts {
@@ -293,7 +293,7 @@ final class OCREngineTests: XCTestCase {
             "Rechnung",
             "INVOICE",
             "Invoice",
-            "invoice"
+            "invoice",
         ]
 
         for text in testCases {
@@ -304,26 +304,26 @@ final class OCREngineTests: XCTestCase {
 
     // MARK: - Additional Date Extraction Tests
 
-    func testExtractDateUSFormat() {
+    func testExtractDateUSFormat() throws {
         // US format MM/dd/yyyy
         let text = "Date: 12/22/2024"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2024)
         XCTAssertEqual(components.month, 12)
         XCTAssertEqual(components.day, 22)
     }
 
-    func testExtractDateSlashSeparated() {
+    func testExtractDateSlashSeparated() throws {
         let text = "Datum: 22/12/2024"
         let date = engine.extractDate(from: text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        let components = try calendar.dateComponents([.year, .month, .day], from: XCTUnwrap(date))
         XCTAssertEqual(components.year, 2024)
         XCTAssertEqual(components.month, 12)
         XCTAssertEqual(components.day, 22)
@@ -373,13 +373,13 @@ final class OCREngineTests: XCTestCase {
             ("French SARL\nParis", "SARL"),
             ("Spanish S.A.\nMadrid", "S.A."),
             ("German KG\nBerlin", "KG"),
-            ("Another OHG\nMunich", "OHG")
+            ("Another OHG\nMunich", "OHG"),
         ]
 
         for (text, expectedContains) in testCases {
             let company = engine.extractCompany(from: text)
             XCTAssertNotNil(company, "Should extract company from: \(text)")
-            if let company = company {
+            if let company {
                 XCTAssertTrue(company.contains(expectedContains), "Company '\(company)' should contain '\(expectedContains)'")
             }
         }
@@ -387,7 +387,7 @@ final class OCREngineTests: XCTestCase {
 
     // MARK: - Multiple Keywords in Same Text
 
-    func testDetectInvoiceMultipleKeywords() {
+    func testDetectInvoiceMultipleKeywords() throws {
         let text = """
         Rechnung
         Rechnungsnummer: 12345
@@ -400,10 +400,21 @@ final class OCREngineTests: XCTestCase {
         XCTAssertEqual(confidence, "high") // Strong indicators present
         XCTAssertNotNil(reason)
         // Should contain multiple keywords in reason
-        XCTAssertTrue(reason!.contains("rechnungsnummer") || reason!.contains("invoice date"))
+        XCTAssertTrue(try XCTUnwrap(reason?.contains("rechnungsnummer")) || reason!.contains("invoice date"))
     }
+}
 
-    // MARK: - Generic detectKeywords Tests (Multi-Document Type Support)
+// MARK: - Generic detectKeywords Tests (Multi-Document Type Support)
+
+final class OCREngineKeywordsTests: XCTestCase {
+    var engine: OCREngine!
+    var config: Configuration!
+
+    override func setUp() {
+        super.setUp()
+        config = Configuration.defaultConfiguration
+        engine = OCREngine(config: config)
+    }
 
     func testDetectKeywordsInvoiceStrongIndicators() {
         let text = "Rechnungsnummer: 12345\nInvoice Date: 2024-12-15"
@@ -440,7 +451,7 @@ final class OCREngineTests: XCTestCase {
             "Verordnung für Patient",
             "Prescription #123",
             "PZN: 1234567",
-            "Kassenärztliche Verordnung"
+            "Kassenärztliche Verordnung",
         ]
 
         for text in strongTexts {
@@ -455,7 +466,7 @@ final class OCREngineTests: XCTestCase {
             "Dr. med. Hans Müller - Arzt",
             "Praxis für Allgemeinmedizin",
             "Medikament: Ibuprofen 400mg",
-            "Apotheke zur Rose"
+            "Apotheke zur Rose",
         ]
 
         for text in mediumTexts {
@@ -482,7 +493,7 @@ final class OCREngineTests: XCTestCase {
             "Rezept",
             "VERORDNUNG",
             "Verordnung",
-            "verordnung"
+            "verordnung",
         ]
 
         for text in testCases {
@@ -508,7 +519,7 @@ final class OCREngineTests: XCTestCase {
             ("Kassenrezept\nPZN 04356752\nIbuprofen 400mg", true),
             ("Privatrezept\nVerordnung für Max Mustermann", true),
             ("Rechnung für Arztbesuch\nBetrag: 50 EUR", true), // Contains "arzt"
-            ("Einkaufsliste:\n- Milch\n- Brot", false)
+            ("Einkaufsliste:\n- Milch\n- Brot", false),
         ]
 
         for (text, shouldMatch) in examples {

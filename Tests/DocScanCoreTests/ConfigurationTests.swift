@@ -1,5 +1,5 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class ConfigurationTests: XCTestCase {
     var tempDirectory: URL!
@@ -165,7 +165,7 @@ final class ConfigurationTests: XCTestCase {
                 XCTFail("Expected DocScanError")
                 return
             }
-            if case .fileNotFound(let path) = docScanError {
+            if case let .fileNotFound(path) = docScanError {
                 XCTAssertEqual(path, nonExistentPath)
             } else {
                 XCTFail("Expected fileNotFound error")

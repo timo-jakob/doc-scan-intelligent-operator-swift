@@ -1,5 +1,5 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class VerificationTests: XCTestCase {
     // MARK: - CategorizationResult Tests
@@ -296,7 +296,7 @@ final class VerificationTests: XCTestCase {
         XCTAssertNil(documentData.categorization)
     }
 
-    func testDocumentDataWithCategorization() {
+    func testDocumentDataWithCategorization() throws {
         let date = Date()
         let vlm = CategorizationResult(isMatch: true, method: "VLM")
         let ocr = CategorizationResult(isMatch: true, method: "OCR")
@@ -314,7 +314,7 @@ final class VerificationTests: XCTestCase {
         XCTAssertEqual(documentData.date, date)
         XCTAssertEqual(documentData.secondaryField, "Test Corp")
         XCTAssertNotNil(documentData.categorization)
-        XCTAssertTrue(documentData.categorization!.bothAgree)
+        XCTAssertTrue(try XCTUnwrap(documentData.categorization?.bothAgree))
     }
 
     func testDocumentDataNotMatch() {

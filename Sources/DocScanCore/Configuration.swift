@@ -100,6 +100,7 @@ public struct Configuration: Codable {
 }
 
 // MARK: - CustomStringConvertible
+
 extension Configuration: CustomStringConvertible {
     public var description: String {
         """

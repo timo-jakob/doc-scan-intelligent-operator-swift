@@ -1,0 +1,4 @@
+# SwiftLint configuration
+# trailing_comma disabled: SwiftFormat (Swift 6 mode) adds trailing commas
+disabled_rules:
+  - trailing_comma

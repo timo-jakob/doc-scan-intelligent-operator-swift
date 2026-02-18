@@ -3,7 +3,7 @@ import Foundation
 /// Timeout error for async operations
 public struct TimeoutError: Error, LocalizedError {
     public var errorDescription: String? {
-        return "Operation timed out"
+        "Operation timed out"
     }
 }
 
@@ -24,32 +24,32 @@ public enum DocScanError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidPDF(let message):
+        case let .invalidPDF(message):
             return "Invalid PDF: \(message)"
-        case .pdfConversionFailed(let message):
+        case let .pdfConversionFailed(message):
             return "Failed to convert PDF: \(message)"
-        case .modelLoadFailed(let message):
+        case let .modelLoadFailed(message):
             return "Failed to load model: \(message)"
-        case .modelNotFound(let message):
+        case let .modelNotFound(message):
             return "Model not found: \(message)"
-        case .inferenceError(let message):
+        case let .inferenceError(message):
             return "Inference error: \(message)"
-        case .fileNotFound(let path):
+        case let .fileNotFound(path):
             return "File not found: \(path)"
-        case .fileOperationFailed(let message):
+        case let .fileOperationFailed(message):
             return "File operation failed: \(message)"
-        case .configurationError(let message):
+        case let .configurationError(message):
             return "Configuration error: \(message)"
         case .notAnInvoice:
             return "Document is not an invoice"
-        case .extractionFailed(let message):
+        case let .extractionFailed(message):
             return "Failed to extract invoice data: \(message)"
-        case .insufficientDiskSpace(let required, let available):
+        case let .insufficientDiskSpace(required, available):
             let requiredGB = Double(required) / 1_000_000_000
             let availableGB = Double(available) / 1_000_000_000
             return String(format: "Insufficient disk space: %.2f GB required, %.2f GB available",
-                        requiredGB, availableGB)
-        case .invalidInput(let message):
+                          requiredGB, availableGB)
+        case let .invalidInput(message):
             return "Invalid input: \(message)"
         }
     }

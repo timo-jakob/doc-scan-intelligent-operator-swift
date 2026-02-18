@@ -1,9 +1,9 @@
+import AppKit
 import Foundation
 import PDFKit
-import AppKit
 
 /// Utilities for PDF processing and conversion
-public struct PDFUtils {
+public enum PDFUtils {
     /// Minimum character count to consider direct PDF text extraction successful
     /// Below this threshold, we fall back to OCR (likely a scanned document)
     public static let minimumTextLength = 50
@@ -90,7 +90,7 @@ public struct PDFUtils {
 
         // Calculate size based on DPI
         let pageRect = page.bounds(for: .mediaBox)
-        let scale = CGFloat(dpi) / 72.0  // 72 DPI is the default
+        let scale = CGFloat(dpi) / 72.0 // 72 DPI is the default
         let scaledSize = CGSize(
             width: pageRect.width * scale,
             height: pageRect.height * scale
@@ -142,7 +142,8 @@ public struct PDFUtils {
     public static func imageToData(_ image: NSImage) throws -> Data {
         guard let tiffData = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+              let pngData = bitmap.representation(using: .png, properties: [:])
+        else {
             throw DocScanError.pdfConversionFailed("Unable to convert image to PNG data")
         }
         return pngData
