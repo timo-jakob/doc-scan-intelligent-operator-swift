@@ -185,11 +185,13 @@ Once done, review the final status:
 gh pr checks <PR-NUMBER>
 ```
 
-Current CI checks:
+Current CI checks on PRs:
 - **Build and Test** — xcodebuild + swift test
 - **Code Quality** — static analysis
 - **Snyk Security Scan** — dependency vulnerability scan
 - **claude-review** — AI code review
+
+SonarQube does **not** run on PRs — it runs only on pushes to `main` as a final audit after merge. You already ran `make sonar` locally before pushing, so no surprises.
 
 If any check fails, fix the reported issues, commit, push, and wait for the next CI run. Apply a hard limit of **10 fix commits** — if issues remain after that, stop and report to the user which checks are still failing and why.
 
@@ -199,10 +201,10 @@ When all checks pass, inform the user that the PR is clean and ready for review.
 
 ## Setup: SONAR_TOKEN in macOS Keychain
 
-`make sonar` reads the SonarCloud token from the macOS Keychain — never from a plaintext file or environment variable. Store it once:
+`make sonar` reads the SonarCloud token from the macOS Keychain — never from a plaintext file or environment variable. The keychain entry is named after this project so multiple projects can each have their own token. Store it once:
 
 ```bash
-security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN
+security add-generic-password -a sonar -s sonar-doc-scan-intelligent-operator-swift -w YOUR_TOKEN
 ```
 
 Replace `YOUR_TOKEN` with your token from [SonarCloud → Account → Security](https://sonarcloud.io/account/security).
@@ -212,7 +214,7 @@ macOS will prompt for your login password. When `make sonar` later retrieves it,
 To verify the token is stored:
 
 ```bash
-security find-generic-password -a sonar -s sonar-token -w
+security find-generic-password -a sonar -s sonar-doc-scan-intelligent-operator-swift -w
 ```
 
 ---
@@ -283,7 +285,7 @@ gh pr edit  # update title or body if needed
 **`make sonar` fails: SONAR_TOKEN not found**
 
 ```bash
-security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN
+security add-generic-password -a sonar -s sonar-doc-scan-intelligent-operator-swift -w YOUR_TOKEN
 ```
 
 **`make sonar` fails: keychain access prompt keeps appearing**

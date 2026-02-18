@@ -5,9 +5,10 @@
 
 SHELL         := /bin/bash
 SCHEME        := docscan
-SONAR_SCHEME  := DocScan-Package
-SONAR_URL     := https://sonarcloud.io
-SONAR_PROJECT := timo-jakob_doc-scan-intelligent-operator-swift
+SONAR_SCHEME   := DocScan-Package
+SONAR_URL      := https://sonarcloud.io
+SONAR_PROJECT  := timo-jakob_doc-scan-intelligent-operator-swift
+SONAR_KEYCHAIN := sonar-doc-scan-intelligent-operator-swift
 DERIVED_DATA  := $(HOME)/Library/Developer/Xcode/DerivedData
 DEBUG_DIR     := $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*/Build/Products/Debug
 RELEASE_DIR   := $(DERIVED_DATA)/doc-scan-intelligent-operator-swift-*/Build/Products/Release
@@ -111,11 +112,11 @@ lint:
 #   security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN
 sonar:
 	@echo "Running local SonarQube analysis..."
-	@SONAR_TOKEN=$$(security find-generic-password -a sonar -s sonar-token -w 2>/dev/null); \
+	@SONAR_TOKEN=$$(security find-generic-password -a sonar -s $(SONAR_KEYCHAIN) -w 2>/dev/null); \
 	if [ -z "$$SONAR_TOKEN" ]; then \
 		echo "❌  SONAR_TOKEN not found in Keychain."; \
 		echo "    Store it once with:"; \
-		echo "    security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN"; \
+		echo "    security add-generic-password -a sonar -s $(SONAR_KEYCHAIN) -w YOUR_TOKEN"; \
 		exit 1; \
 	fi; \
 	echo "Building and running tests with coverage..."; \
@@ -167,4 +168,4 @@ help:
 	@echo ""
 	@echo "Tips:"
 	@echo "  Install xcbeautify for cleaner build output:  brew install xcbeautify"
-	@echo "  Store SonarCloud token in Keychain (once):    security add-generic-password -a sonar -s sonar-token -w YOUR_TOKEN"
+	@echo "  Store SonarCloud token in Keychain (once):    security add-generic-password -a sonar -s $(SONAR_KEYCHAIN) -w YOUR_TOKEN"
