@@ -2,36 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Workflow
-
-**IMPORTANT: Always use GitHub Flow for bug fixes and feature development**
-
-When fixing bugs or implementing features, you MUST:
-
-1. **Create a new branch** from `main` with a descriptive name:
-   ```bash
-   git checkout -b fix/issue-description
-   # or
-   git checkout -b feature/feature-name
-   ```
-
-2. **Commit changes** to the branch (NOT directly to `main`)
-   - Use clear, descriptive commit messages
-   - Include the Claude Code co-authorship footer
-
-3. **Open a Pull Request** when ready for review:
-   ```bash
-   gh pr create --title "Fix: Description" --body "..."
-   ```
-
-4. **Do NOT commit directly to `main`** - all changes should go through Pull Requests
-
-Branch naming conventions:
-- Bug fixes: `fix/short-description`
-- Features: `feature/short-description`
-- Refactoring: `refactor/short-description`
-- Documentation: `docs/short-description`
-
 ## Project Overview
 
 **doc-scan-intelligent-operator-swift** - Swift rewrite of the AI-powered document detection and renaming system, optimized for Apple Silicon using MLX Vision-Language Models. Built entirely in Swift for maximum performance and native macOS integration.
@@ -61,51 +31,33 @@ Branch naming conventions:
 
 ### Building
 
-**IMPORTANT: MLX Swift requires Xcode to compile Metal shaders**
+**Always use `xcodebuild`** — it is the only build method for this project.
 
-The `swift build` command cannot compile Metal shaders, which causes the VLM to fail with:
-```
-MLX error: Failed to load the default metallib. library not found
-```
-
-**Use `xcodebuild` for full functionality:**
+MLX requires Metal shaders compiled and bundled at build time. `swift build` skips this step and produces a broken binary. Always build with:
 
 ```bash
-# Build with xcodebuild (required for VLM/Metal support)
 xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build
-
-# The binary will be at:
-# ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan
-
-# Alternative: Open in Xcode and build with ⌘+B
-open Package.swift
 ```
 
-**For OCR-only testing (no VLM):**
-```bash
-# swift build works for OCR-only mode
-swift build
-
-# Run with --auto-resolve ocr to skip VLM
-.build/debug/docscan invoice.pdf --dry-run --auto-resolve ocr
+The binary will be at:
+```
+~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan
 ```
 
 ```bash
 # Clean build artifacts
 swift package clean
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' clean
 ```
 
 ### Running
 
 ```bash
-# Run the Xcode-built binary (full VLM + OCR support)
+# Run the built binary
 ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan invoice.pdf
 
 # Run with arguments
 ~/Library/Developer/Xcode/DerivedData/doc-scan-intelligent-operator-swift-*/Build/Products/Debug/docscan invoice.pdf --dry-run -v
-
-# Run the release binary
-.build/release/docscan invoice.pdf
 ```
 
 ### Testing
@@ -527,28 +479,6 @@ The project uses SonarQube Cloud for code quality analysis. Analysis runs automa
 The workflow includes a Quality Gate check that will:
 - Pass if the code meets quality standards
 - Fail if new code introduces issues above thresholds
-
-### Quality Requirements (MUST follow)
-
-**IMPORTANT**: Before merging any PR, ensure the following requirements are met:
-
-1. **Check SonarQube Status**: Always verify the SonarQube Cloud analysis passes on PRs
-   - Use `gh pr checks <PR_NUMBER>` to check status
-   - Wait for the "SonarQube Code Analysis" check to complete
-
-2. **No Code Smells**: Zero code smells of any category are allowed
-   - Fix all code smells before merging
-   - This includes: complexity, duplication, maintainability issues
-
-3. **Test Coverage**: Minimum **90% test coverage on new code**
-   - All new functions and methods must have tests
-   - Move logic to testable locations (DocScanCore) when needed
-   - Run `swift test` locally before pushing
-
-4. **Workflow**:
-   - Write tests alongside new code, not as an afterthought
-   - If SonarQube fails, fix issues and push again
-   - Never merge with failing quality checks
 
 ## Snyk Security Analysis
 
