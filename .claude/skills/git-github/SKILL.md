@@ -1,6 +1,6 @@
 ---
 name: git-github
-description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Enforces branch-based workflow — never commits directly to main. Runs SwiftFormat, SwiftLint, and SonarQube locally before pushing. After opening a PR, waits for all CI checks and fixes any reported issues.
+description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Also use proactively whenever about to run `git push` as part of any autonomous workflow — even mid-task. Enforces branch-based workflow — never commits directly to main. Runs SwiftFormat, SwiftLint, and SonarQube locally before pushing. After opening a PR, waits for all CI checks and fixes any reported issues.
 metadata:
   author: doc-scan-intelligent-operator-swift
   version: 2.0.0
@@ -14,7 +14,7 @@ metadata:
 1. **Never commit directly to `main`** — all changes go through a branch and Pull Request
 2. **Use `git switch`** to change branches — never `git checkout`
 3. **Format with SwiftFormat before every commit** — run `make format`
-4. **Lint with SwiftLint before every commit** — fix all warnings before staging
+4. **Lint with SwiftLint before every commit** — fix all **errors** before staging (warnings in `Sources/` are pre-existing and tracked; do not introduce new ones)
 5. **Run SonarQube locally before every push** — push only when analysis is clean
 6. **Every commit must have a meaningful message** following the Conventional Commits format
 7. **Include the co-authorship footer** in every commit message
@@ -73,11 +73,11 @@ Before staging, always format and lint the code:
 # Format code with SwiftFormat
 make format
 
-# Lint with SwiftLint — fix all warnings before proceeding
+# Lint with SwiftLint — fix all errors before proceeding
 make lint
 ```
 
-If SwiftLint reports any warnings or errors, fix them now. Do not commit with outstanding lint issues.
+If `make lint` reports any **errors**, fix them before staging. Pre-existing warnings in `Sources/` (`line_length`, `large_tuple`, etc.) are tracked and acceptable — do not introduce new ones.
 
 Stage specific files — never use `git add .` or `git add -A` to avoid accidentally including build artifacts or credentials:
 
