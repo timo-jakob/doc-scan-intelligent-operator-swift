@@ -8,19 +8,19 @@ public enum DateUtils {
     /// - Colon-separated (OCR sometimes reads dots as colons)
     /// - Slash formats last (ambiguous between US/EU)
     private static let dateFormats = [
-        "yyyy-MM-dd",   // ISO: 2024-12-22
-        "dd.MM.yyyy",   // European: 22.12.2024
-        "dd:MM:yyyy",   // Colon-separated (OCR artifact): 22:12:2024
-        "dd/MM/yyyy",   // European with slashes: 22/12/2024
-        "MM/dd/yyyy"    // US format: 12/22/2024
+        "yyyy-MM-dd", // ISO: 2024-12-22
+        "dd.MM.yyyy", // European: 22.12.2024
+        "dd:MM:yyyy", // Colon-separated (OCR artifact): 22:12:2024
+        "dd/MM/yyyy", // European with slashes: 22/12/2024
+        "MM/dd/yyyy" // US format: 12/22/2024
     ]
 
     /// Regex patterns for extracting dates from text
     private static let datePatterns = [
-        "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b",       // ISO: 2024-12-22
+        "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b", // ISO: 2024-12-22
         "\\b(\\d{2})[./](\\d{2})[./](\\d{4})\\b", // European: 22.12.2024
-        "\\b(\\d{2}):(\\d{2}):(\\d{4})\\b",       // Colon-separated: 22:12:2024
-        "\\b(\\d{2})/(\\d{2})/(\\d{4})\\b"        // US: 12/22/2024
+        "\\b(\\d{2}):(\\d{2}):(\\d{4})\\b", // Colon-separated: 22:12:2024
+        "\\b(\\d{2})/(\\d{2})/(\\d{4})\\b" // US: 12/22/2024
     ]
 
     /// Keywords that typically precede invoice dates
@@ -66,7 +66,7 @@ public enum DateUtils {
             formatter.locale = Locale(identifier: "en_US_POSIX")
 
             if let date = formatter.date(from: trimmed) {
-                if validate && !isValidDate(date) {
+                if validate, !isValidDate(date) {
                     continue // Try other formats
                 }
                 return date
@@ -75,7 +75,7 @@ public enum DateUtils {
 
         // Try German month name format: "September 2022" or "Sep 2022"
         if let date = parseGermanMonthYear(trimmed) {
-            if validate && !isValidDate(date) {
+            if validate, !isValidDate(date) {
                 return nil
             }
             return date
@@ -88,27 +88,26 @@ public enum DateUtils {
     private static func parseGermanMonthYear(_ text: String) -> Date? {
         let lowercased = text.lowercased()
 
-        for (monthName, monthNumber) in germanMonths {
-            if lowercased.contains(monthName) {
-                // Extract year (4 digits)
-                let yearPattern = "\\b(20\\d{2})\\b"
-                guard let regex = try? NSRegularExpression(pattern: yearPattern),
-                      let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-                      let range = Range(match.range(at: 1), in: text) else {
-                    continue
-                }
-
-                let yearString = String(text[range])
-                guard let year = Int(yearString) else { continue }
-
-                // Create date for first of that month
-                var components = DateComponents()
-                components.year = year
-                components.month = monthNumber
-                components.day = 1
-
-                return Calendar.current.date(from: components)
+        for (monthName, monthNumber) in germanMonths where lowercased.contains(monthName) {
+            // Extract year (4 digits)
+            let yearPattern = "\\b(20\\d{2})\\b"
+            guard let regex = try? NSRegularExpression(pattern: yearPattern),
+                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let range = Range(match.range(at: 1), in: text)
+            else {
+                continue
             }
+
+            let yearString = String(text[range])
+            guard let year = Int(yearString) else { continue }
+
+            // Create date for first of that month
+            var components = DateComponents()
+            components.year = year
+            components.month = monthNumber
+            components.day = 1
+
+            return Calendar.current.date(from: components)
         }
 
         return nil
@@ -208,7 +207,8 @@ public enum DateUtils {
             let monthPattern = "\\b\(NSRegularExpression.escapedPattern(for: month))\\b"
             guard let monthRegex = try? NSRegularExpression(pattern: monthPattern, options: .caseInsensitive),
                   let monthMatch = monthRegex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)),
-                  let monthRange = Range(monthMatch.range, in: lowercased) else {
+                  let monthRange = Range(monthMatch.range, in: lowercased)
+            else {
                 continue
             }
 
@@ -218,7 +218,8 @@ public enum DateUtils {
 
             guard let yearRegex = try? NSRegularExpression(pattern: yearPattern),
                   let yearMatch = yearRegex.firstMatch(in: afterMonthString, range: NSRange(afterMonthString.startIndex..., in: afterMonthString)),
-                  let yearRange = Range(yearMatch.range, in: afterMonthString) else {
+                  let yearRange = Range(yearMatch.range, in: afterMonthString)
+            else {
                 continue
             }
 

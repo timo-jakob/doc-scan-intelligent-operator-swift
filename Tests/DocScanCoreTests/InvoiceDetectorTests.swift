@@ -1,7 +1,7 @@
-import XCTest
-import PDFKit
 import AppKit
 @testable import DocScanCore
+import PDFKit
+import XCTest
 
 // MARK: - Mock VLM Provider
 
@@ -20,7 +20,7 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
     func generateFromImage(
         _ image: NSImage,
         prompt: String,
-        modelName: String?
+        modelName _: String?
     ) async throws -> String {
         generateFromImageCallCount += 1
         lastPrompt = prompt
@@ -50,8 +50,8 @@ final class InvoiceDetectorTests: XCTestCase {
     var tempDirectory: URL!
     var mockVLM: MockVLMProvider!
 
-    /// Embedded searchable PDF for testing
-    private static let searchablePDFBase64 = """
+    /// Embedded searchable PDF for testing (also shared with InvoiceDetectorAsyncTests)
+    static let sharedSearchablePDFBase64 = """
     JVBERi0xLjQKJcOkw7zDtsOfCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBS
     Cj4+CmVuZG9iagoKMiAwIG9iago8PAovVHlwZSAvUGFnZXMKL0tpZHMgWzMgMCBSXQovQ291bnQg
     MQo+PgplbmRvYmoKCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFC
@@ -84,12 +84,15 @@ final class InvoiceDetectorTests: XCTestCase {
 
     /// Create detector without mock for tests that don't need VLM
     private func createDetectorWithoutMock() -> DocumentDetector {
-        return DocumentDetector(config: config)
+        DocumentDetector(config: config)
     }
 
     private func createSearchablePDF() throws -> String {
         let pdfPath = tempDirectory.appendingPathComponent("test_invoice.pdf").path
-        guard let pdfData = Data(base64Encoded: Self.searchablePDFBase64, options: .ignoreUnknownCharacters) else {
+        guard let pdfData = Data(
+            base64Encoded: Self.sharedSearchablePDFBase64,
+            options: .ignoreUnknownCharacters
+        ) else {
             throw NSError(domain: "TestError", code: 1)
         }
         try pdfData.write(to: URL(fileURLWithPath: pdfPath))
@@ -134,10 +137,10 @@ final class InvoiceDetectorTests: XCTestCase {
         XCTAssertNil(data.secondaryField)
     }
 
-    func testGenerateFilenameSuccess() {
+    func testGenerateFilenameSuccess() throws {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
+        let date = try XCTUnwrap(dateFormatter.date(from: "2024-12-15"))
 
         let data = DocumentData(
             documentType: .invoice,
@@ -182,7 +185,7 @@ final class InvoiceDetectorTests: XCTestCase {
         XCTAssertNil(filename2)
     }
 
-    func testCustomFilenamePattern() {
+    func testCustomFilenamePattern() throws {
         // Note: DocumentDetector uses DocumentType's default pattern, not Configuration
         // This test verifies the invoice default pattern works
         let customConfig = Configuration()
@@ -190,7 +193,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
+        let date = try XCTUnwrap(dateFormatter.date(from: "2024-12-15"))
 
         let data = DocumentData(
             documentType: .invoice,
@@ -203,7 +206,7 @@ final class InvoiceDetectorTests: XCTestCase {
         XCTAssertEqual(filename, "2024-12-15_Rechnung_TestCo.pdf")
     }
 
-    func testCustomDateFormat() {
+    func testCustomDateFormat() throws {
         let customConfig = Configuration(
             output: OutputSettings(dateFormat: "dd.MM.yyyy")
         )
@@ -211,7 +214,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
+        let date = try XCTUnwrap(dateFormatter.date(from: "2024-12-15"))
 
         let data = DocumentData(
             documentType: .invoice,
@@ -410,584 +413,12 @@ final class InvoiceDetectorTests: XCTestCase {
             "rechnung nr 12345",
             "Rechnung Nr 12345",
             "INVOICE NUMBER 12345",
-            "invoice number 12345"
+            "invoice number 12345",
         ]
 
         for text in testCases {
             let result = detector.categorizeWithDirectText(text)
             XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
         }
-    }
-
-    // MARK: - CategorizationResult Tests
-
-    func testCategorizationResultWithAllParameters() {
-        let result = CategorizationResult(
-            isMatch: true,
-            confidence: "high",
-            method: "VLM",
-            reason: "Found invoice keywords"
-        )
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
-        XCTAssertEqual(result.method, "VLM")
-        XCTAssertEqual(result.reason, "Found invoice keywords")
-    }
-
-    func testCategorizationResultDefaultValues() {
-        let result = CategorizationResult(
-            isMatch: false,
-            method: "OCR"
-        )
-
-        XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
-        XCTAssertEqual(result.method, "OCR")
-        XCTAssertNil(result.reason)
-    }
-
-    // MARK: - CategorizationVerification Tests
-
-    func testCategorizationVerificationAgreement() {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM")
-        let ocr = CategorizationResult(isMatch: true, method: "OCR")
-
-        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
-
-        XCTAssertTrue(verification.bothAgree)
-        XCTAssertEqual(verification.agreedIsMatch, true)
-        XCTAssertTrue(verification.vlmResult.isMatch)
-        XCTAssertTrue(verification.ocrResult.isMatch)
-    }
-
-    func testCategorizationVerificationDisagreement() {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM")
-        let ocr = CategorizationResult(isMatch: false, method: "OCR")
-
-        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
-
-        XCTAssertFalse(verification.bothAgree)
-        XCTAssertNil(verification.agreedIsMatch)
-    }
-
-    // MARK: - ExtractionResult Tests
-
-    func testExtractionResultComplete() {
-        let date = Date()
-        let result = ExtractionResult(date: date, secondaryField: "Test Corp")
-
-        XCTAssertEqual(result.date, date)
-        XCTAssertEqual(result.secondaryField, "Test Corp")
-    }
-
-    func testExtractionResultPartial() {
-        let result = ExtractionResult(date: nil, secondaryField: "Only Company")
-
-        XCTAssertNil(result.date)
-        XCTAssertEqual(result.secondaryField, "Only Company")
-        XCTAssertNil(result.patientName)
-    }
-
-    func testExtractionResultWithPatientName() {
-        let date = Date()
-        let result = ExtractionResult(date: date, secondaryField: "Dr. Kaiser", patientName: "Penelope")
-
-        XCTAssertEqual(result.date, date)
-        XCTAssertEqual(result.secondaryField, "Dr. Kaiser")
-        XCTAssertEqual(result.patientName, "Penelope")
-    }
-
-    // MARK: - DocumentData with Categorization Tests
-
-    func testDocumentDataWithCategorizationAgreement() {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM")
-        let ocr = CategorizationResult(isMatch: true, method: "OCR")
-        let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
-
-        let data = DocumentData(
-            documentType: .invoice,
-            isMatch: true,
-            date: Date(),
-            secondaryField: "Test Corp",
-            categorization: categorization
-        )
-
-        XCTAssertTrue(data.isMatch)
-        XCTAssertNotNil(data.categorization)
-        XCTAssertTrue(data.categorization!.bothAgree)
-    }
-
-    func testDocumentDataWithCategorizationDisagreement() {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM", reason: "Visual analysis")
-        let ocr = CategorizationResult(isMatch: false, method: "OCR", reason: "No keywords found")
-        let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
-
-        let data = DocumentData(
-            documentType: .invoice,
-            isMatch: true,  // User resolved in favor of VLM
-            date: Date(),
-            secondaryField: "Test Corp",
-            categorization: categorization
-        )
-
-        XCTAssertTrue(data.isMatch)
-        XCTAssertNotNil(data.categorization)
-        XCTAssertFalse(data.categorization!.bothAgree)
-        XCTAssertNil(data.categorization!.agreedIsMatch)
-    }
-
-    // MARK: - Async Categorize Tests
-    // Note: VLM model is not available in CI (MLX Metal library cannot be built via SPM).
-    // However, the categorize() method has error handling that catches VLM failures
-    // and returns fallback results, so these tests should complete successfully.
-    // Early code paths (PDF validation, text extraction, image conversion) get covered.
-
-    func testCategorizeWithInvalidPath() async {
-        // Test that categorize() throws for non-existent file
-        do {
-            _ = try await detector.categorize(pdfPath: "/nonexistent/path/file.pdf")
-            XCTFail("Should have thrown fileNotFound error")
-        } catch let error as DocScanError {
-            if case .fileNotFound = error {
-                // Expected - PDF validation happens before VLM
-            } else {
-                XCTFail("Expected fileNotFound error, got: \(error)")
-            }
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
-        }
-    }
-
-    func testCategorizeWithInvalidPDFFile() async throws {
-        // Test that categorize() throws for invalid PDF content
-        let fakePDFPath = tempDirectory.appendingPathComponent("not_a_pdf.pdf").path
-        try "This is not a PDF file".write(toFile: fakePDFPath, atomically: true, encoding: .utf8)
-
-        do {
-            _ = try await detector.categorize(pdfPath: fakePDFPath)
-            XCTFail("Should have thrown invalidPDF error")
-        } catch let error as DocScanError {
-            if case .invalidPDF = error {
-                // Expected - PDF validation happens before VLM
-            } else {
-                XCTFail("Expected invalidPDF error, got: \(error)")
-            }
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
-        }
-    }
-
-    // MARK: - Categorize with Mock VLM Tests
-
-    func testCategorizeWithSearchablePDFVLMSaysYes() async throws {
-        // Test categorize() with searchable PDF where VLM says YES
-        let pdfPath = try createSearchablePDF()
-        mockVLM.mockResponse = "YES"
-
-        let result = try await detector.categorize(pdfPath: pdfPath)
-
-        // VLM should have been called
-        XCTAssertEqual(mockVLM.generateFromImageCallCount, 1)
-        XCTAssertNotNil(mockVLM.lastPrompt)
-        XCTAssertTrue(mockVLM.lastPrompt?.contains("INVOICE") ?? false)
-
-        // Both VLM and OCR should agree it's an invoice (PDF contains "Rechnung")
-        XCTAssertTrue(result.vlmResult.isMatch)
-        XCTAssertTrue(result.ocrResult.isMatch)
-        XCTAssertTrue(result.bothAgree)
-        XCTAssertEqual(result.agreedIsMatch, true)
-
-        // OCR should use direct PDF extraction
-        XCTAssertEqual(result.ocrResult.method, "PDF")
-    }
-
-    func testCategorizeWithSearchablePDFVLMSaysNo() async throws {
-        // Test categorize() with searchable PDF where VLM says NO (disagrees with OCR)
-        let pdfPath = try createSearchablePDF()
-        mockVLM.mockResponse = "NO"
-
-        let result = try await detector.categorize(pdfPath: pdfPath)
-
-        // VLM says no, OCR says yes (PDF contains "Rechnung")
-        XCTAssertFalse(result.vlmResult.isMatch)
-        XCTAssertTrue(result.ocrResult.isMatch)
-        XCTAssertFalse(result.bothAgree)
-        XCTAssertNil(result.agreedIsMatch)
-    }
-
-    func testCategorizeWithEmptyPDFThrowsError() async throws {
-        // Test categorize() with empty PDF (no extractable text)
-        // Empty PDFs cause OCR to throw "No text recognized" error
-        let pdfPath = try createEmptyPDF()
-        mockVLM.mockResponse = "NO"
-
-        do {
-            _ = try await detector.categorize(pdfPath: pdfPath)
-            XCTFail("Should have thrown extractionFailed error for empty PDF")
-        } catch let error as DocScanError {
-            if case .extractionFailed(let message) = error {
-                XCTAssertTrue(message.contains("No text recognized"))
-            } else {
-                XCTFail("Expected extractionFailed error, got: \(error)")
-            }
-        }
-
-        // VLM should still have been called before OCR failed
-        XCTAssertEqual(mockVLM.generateFromImageCallCount, 1)
-    }
-
-    func testCategorizeWithVLMError() async throws {
-        // Test categorize() when VLM throws an error
-        let pdfPath = try createSearchablePDF()
-        mockVLM.shouldThrowError = true
-        mockVLM.errorToThrow = DocScanError.inferenceError("Mock VLM error")
-
-        let result = try await detector.categorize(pdfPath: pdfPath)
-
-        // VLM should return error result
-        XCTAssertFalse(result.vlmResult.isMatch)
-        XCTAssertEqual(result.vlmResult.confidence, "low")
-        XCTAssertTrue(result.vlmResult.method.contains("error"))
-
-        // OCR should still work (PDF contains "Rechnung")
-        XCTAssertTrue(result.ocrResult.isMatch)
-        XCTAssertEqual(result.ocrResult.method, "PDF")
-
-        // They disagree
-        XCTAssertFalse(result.bothAgree)
-    }
-
-    func testCategorizeVerboseMode() async throws {
-        // Test categorize() with verbose configuration
-        let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
-        let pdfPath = try createSearchablePDF()
-        mockVLM.mockResponse = "YES"
-
-        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
-
-        // Should complete successfully with verbose output
-        XCTAssertTrue(result.vlmResult.isMatch)
-        XCTAssertTrue(result.ocrResult.isMatch)
-    }
-
-    func testCategorizeVerboseModeEmptyPDF() async throws {
-        // Test verbose mode with empty PDF (exercises OCR fallback verbose path)
-        // Empty PDFs cause OCR to throw "No text recognized" error
-        let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
-        let pdfPath = try createEmptyPDF()
-        mockVLM.mockResponse = "NO"
-
-        do {
-            _ = try await verboseDetector.categorize(pdfPath: pdfPath)
-            XCTFail("Should have thrown extractionFailed error")
-        } catch let error as DocScanError {
-            if case .extractionFailed(let message) = error {
-                XCTAssertTrue(message.contains("No text recognized"))
-            } else {
-                XCTFail("Expected extractionFailed error, got: \(error)")
-            }
-        }
-    }
-
-    func testCategorizeWithVLMTimeout() async throws {
-        // Test categorize() when VLM times out
-        let pdfPath = try createSearchablePDF()
-        mockVLM.shouldThrowError = true
-        mockVLM.errorToThrow = TimeoutError()
-
-        let result = try await detector.categorize(pdfPath: pdfPath)
-
-        // VLM should return timeout result
-        XCTAssertFalse(result.vlmResult.isMatch)
-        XCTAssertEqual(result.vlmResult.confidence, "low")
-        XCTAssertTrue(result.vlmResult.method.contains("timeout"))
-        XCTAssertEqual(result.vlmResult.reason, "Timed out")
-
-        // OCR should still work
-        XCTAssertTrue(result.ocrResult.isMatch)
-    }
-
-    func testCategorizeDirectTextExtractionPath() async throws {
-        // Test that direct text extraction is used for searchable PDFs
-        let pdfPath = try createSearchablePDF()
-        mockVLM.mockResponse = "YES"
-
-        let result = try await detector.categorize(pdfPath: pdfPath)
-
-        // OCR result should indicate PDF method (direct extraction)
-        XCTAssertEqual(result.ocrResult.method, "PDF")
-        XCTAssertTrue(result.ocrResult.isMatch)
-        XCTAssertNotNil(result.ocrResult.reason)
-    }
-
-    func testCategorizeOCRFallbackPathThrowsForEmptyPDF() async throws {
-        // Test that OCR fallback is used for empty PDFs
-        // Empty PDFs throw an error because OCR finds no text
-        let pdfPath = try createEmptyPDF()
-        mockVLM.mockResponse = "NO"
-
-        do {
-            _ = try await detector.categorize(pdfPath: pdfPath)
-            XCTFail("Should have thrown extractionFailed error")
-        } catch let error as DocScanError {
-            if case .extractionFailed(let message) = error {
-                XCTAssertTrue(message.contains("No text recognized"))
-            } else {
-                XCTFail("Expected extractionFailed error, got: \(error)")
-            }
-        }
-    }
-
-    // MARK: - Extract Data Tests (Sync)
-
-    func testExtractDataWithoutCategorization() async {
-        // extractData should fail if categorize wasn't called first
-        do {
-            _ = try await detector.extractData()
-            XCTFail("Should have thrown an error")
-        } catch let error as DocScanError {
-            if case .extractionFailed(let message) = error {
-                XCTAssertTrue(message.contains("No OCR text"))
-            } else {
-                XCTFail("Expected extractionFailed error")
-            }
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-    }
-
-    // MARK: - PDF Validation Tests (Sync via PDFUtils)
-
-    func testValidatePDFWithInvalidPath() {
-        // Test that PDFUtils.validatePDF throws for non-existent file
-        XCTAssertThrowsError(try PDFUtils.validatePDF(at: "/nonexistent/file.pdf")) { error in
-            guard let docScanError = error as? DocScanError else {
-                XCTFail("Expected DocScanError")
-                return
-            }
-            if case .fileNotFound = docScanError {
-                // Expected
-            } else {
-                XCTFail("Expected fileNotFound error")
-            }
-        }
-    }
-
-    func testValidatePDFWithInvalidFile() throws {
-        // Create a non-PDF file with .pdf extension
-        let fakePDFPath = tempDirectory.appendingPathComponent("fake.pdf").path
-        try "This is not a PDF".write(toFile: fakePDFPath, atomically: true, encoding: .utf8)
-
-        XCTAssertThrowsError(try PDFUtils.validatePDF(at: fakePDFPath)) { error in
-            guard let docScanError = error as? DocScanError else {
-                XCTFail("Expected DocScanError")
-                return
-            }
-            if case .invalidPDF = docScanError {
-                // Expected
-            } else {
-                XCTFail("Expected invalidPDF error")
-            }
-        }
-    }
-
-    func testValidatePDFWithValidFile() throws {
-        let pdfPath = try createSearchablePDF()
-        XCTAssertNoThrow(try PDFUtils.validatePDF(at: pdfPath))
-    }
-
-    // MARK: - Direct Text Extraction Integration Tests
-
-    func testDirectTextExtractionWithSearchablePDF() throws {
-        let pdfPath = try createSearchablePDF()
-
-        // Extract text using PDFUtils
-        let text = PDFUtils.extractText(from: pdfPath)
-        XCTAssertNotNil(text)
-        XCTAssertTrue(text?.contains("Rechnung") ?? false)
-
-        // Test categorization with extracted text
-        if let extractedText = text {
-            let result = detector.categorizeWithDirectText(extractedText)
-            XCTAssertTrue(result.isMatch)
-            XCTAssertEqual(result.method, "PDF")
-        }
-    }
-
-    func testDirectTextExtractionWithEmptyPDF() throws {
-        let pdfPath = try createEmptyPDF()
-
-        // Extract text from empty PDF - should return nil or empty
-        let text = PDFUtils.extractText(from: pdfPath)
-        let isEmpty = text == nil || text!.isEmpty || text!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-
-        // If some text is extracted, it should be below minimum threshold
-        if let extractedText = text, !extractedText.isEmpty {
-            XCTAssertLessThan(extractedText.count, PDFUtils.minimumTextLength)
-        } else {
-            XCTAssertTrue(isEmpty)
-        }
-    }
-
-    func testHasExtractableTextWithSearchablePDF() throws {
-        let pdfPath = try createSearchablePDF()
-        XCTAssertTrue(PDFUtils.hasExtractableText(at: pdfPath))
-    }
-
-    func testHasExtractableTextWithEmptyPDF() throws {
-        let pdfPath = try createEmptyPDF()
-        XCTAssertFalse(PDFUtils.hasExtractableText(at: pdfPath))
-    }
-
-    // MARK: - Generate Filename Edge Cases
-
-    func testGenerateFilenameWithSpecialCharacters() {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
-
-        // Note: generateFilename doesn't sanitize the company name - that happens
-        // earlier in the flow via StringUtils.sanitizeCompanyName
-        // This test verifies generateFilename works with any company name
-        let data = DocumentData(
-            documentType: .invoice,
-            isMatch: true,
-            date: date,
-            secondaryField: "Test_Company"
-        )
-        let filename = detector.generateFilename(from: data)
-
-        XCTAssertNotNil(filename)
-        XCTAssertEqual(filename, "2024-12-15_Rechnung_Test_Company.pdf")
-    }
-
-    func testGenerateFilenameWithEmptyCompany() {
-        let data = DocumentData(
-            documentType: .invoice,
-            isMatch: true,
-            date: Date(),
-            secondaryField: ""
-        )
-        let filename = detector.generateFilename(from: data)
-
-        // Empty company should still generate filename with empty company part
-        XCTAssertNotNil(filename)
-    }
-
-    // MARK: - Prescription Document Type Tests
-
-    func testPrescriptionDetector() {
-        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
-        XCTAssertEqual(prescriptionDetector.documentType, .prescription)
-    }
-
-    func testPrescriptionKeywordDetection() {
-        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
-        let prescriptionText = """
-        Rezept
-        Dr. med. Gesine Kaiser
-        Patient: Max Mustermann
-        Medikament: Ibuprofen 400mg
-        """
-
-        let result = prescriptionDetector.categorizeWithDirectText(prescriptionText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testPrescriptionFilenameGeneration() {
-        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
-
-        let data = DocumentData(
-            documentType: .prescription,
-            isMatch: true,
-            date: date,
-            secondaryField: "Gesine_Kaiser",
-            patientName: "Penelope"
-        )
-        let filename = prescriptionDetector.generateFilename(from: data)
-
-        XCTAssertEqual(filename, "2024-12-15_Rezept_für_Penelope_von_Gesine_Kaiser.pdf")
-    }
-
-    func testPrescriptionFilenameGenerationWithoutPatient() {
-        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
-
-        // No patient name - should fallback to simpler pattern
-        let data = DocumentData(
-            documentType: .prescription,
-            isMatch: true,
-            date: date,
-            secondaryField: "Gesine_Kaiser",
-            patientName: nil
-        )
-        let filename = prescriptionDetector.generateFilename(from: data)
-
-        XCTAssertEqual(filename, "2024-12-15_Rezept_von_Gesine_Kaiser.pdf")
-    }
-
-    func testPrescriptionFilenameGenerationWithoutDoctor() {
-        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
-
-        // No doctor name - should fallback to pattern without doctor
-        let data = DocumentData(
-            documentType: .prescription,
-            isMatch: true,
-            date: date,
-            secondaryField: nil,
-            patientName: "Penelope"
-        )
-        let filename = prescriptionDetector.generateFilename(from: data)
-
-        XCTAssertEqual(filename, "2024-12-15_Rezept_für_Penelope.pdf")
-    }
-
-    func testPrescriptionFilenameGenerationWithoutPatientAndDoctor() {
-        let prescriptionDetector = DocumentDetector(config: config, documentType: .prescription)
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: "2024-12-15")!
-
-        // Neither patient nor doctor - minimal pattern
-        let data = DocumentData(
-            documentType: .prescription,
-            isMatch: true,
-            date: date,
-            secondaryField: nil,
-            patientName: nil
-        )
-        let filename = prescriptionDetector.generateFilename(from: data)
-
-        XCTAssertEqual(filename, "2024-12-15_Rezept.pdf")
-    }
-
-    func testDocumentDataForPrescription() {
-        let data = DocumentData(
-            documentType: .prescription,
-            isMatch: true,
-            date: Date(),
-            secondaryField: "Gesine Kaiser"
-        )
-
-        XCTAssertEqual(data.documentType, .prescription)
-        XCTAssertTrue(data.isMatch)
-        XCTAssertEqual(data.secondaryField, "Gesine Kaiser")
     }
 }

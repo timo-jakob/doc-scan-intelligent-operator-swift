@@ -1,5 +1,5 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class FileRenamerTests: XCTestCase {
     var tempDirectory: URL!

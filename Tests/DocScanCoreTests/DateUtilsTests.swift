@@ -1,8 +1,7 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class DateUtilsTests: XCTestCase {
-
     // MARK: - isValidDate Tests
 
     func testIsValidDateWithinRange() {
@@ -30,7 +29,7 @@ final class DateUtilsTests: XCTestCase {
     func testIsValidDateBelowLowerBoundary() {
         // Dates before 2000 should be rejected
         let invalidDates = [
-            createDate(year: 1999, month: 12, day: 31),  // Just before boundary
+            createDate(year: 1999, month: 12, day: 31), // Just before boundary
             createDate(year: 1999, month: 1, day: 1),
             createDate(year: 1990, month: 6, day: 15),
             createDate(year: 1980, month: 1, day: 1)
@@ -56,7 +55,7 @@ final class DateUtilsTests: XCTestCase {
         let currentYear = Calendar.current.component(.year, from: Date())
 
         let invalidDates = [
-            createDate(year: currentYear + 3, month: 1, day: 1),   // Just above boundary
+            createDate(year: currentYear + 3, month: 1, day: 1), // Just above boundary
             createDate(year: currentYear + 5, month: 6, day: 15),
             createDate(year: currentYear + 10, month: 12, day: 31)
         ]
@@ -86,7 +85,7 @@ final class DateUtilsTests: XCTestCase {
     func testParseDateRejectsInvalidYears() {
         // When validation is enabled (default), dates outside valid range should return nil
         let invalidDateStrings = [
-            "1999-12-31",  // Before 2000
+            "1999-12-31", // Before 2000
             "1990-06-15",
             "01.01.1999"
         ]
@@ -99,7 +98,7 @@ final class DateUtilsTests: XCTestCase {
     func testParseDateAcceptsValidYears() {
         // Valid dates should parse successfully
         let validDateStrings = [
-            "2000-01-01",  // Lower boundary
+            "2000-01-01", // Lower boundary
             "2020-06-15",
             "2024-12-31"
         ]
@@ -193,7 +192,7 @@ final class DateUtilsTests: XCTestCase {
     func testParseDateInvalidFormat() {
         let invalidDates = [
             "not a date",
-            "2024/13/45",  // Invalid month/day
+            "2024/13/45", // Invalid month/day
             "hello world",
             ""
         ]
@@ -312,8 +311,20 @@ final class DateUtilsTests: XCTestCase {
         }
     }
 
-    // MARK: - extractDateWithPattern Tests
+    // MARK: - Helper Methods
 
+    private func createDate(year: Int, month: Int, day: Int) -> Date {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        return Calendar.current.date(from: components)!
+    }
+}
+
+// MARK: - extractDateWithPattern and extractGermanMonthFromText Tests
+
+final class DateUtilsPatternTests: XCTestCase {
     func testExtractDateWithPatternISO() {
         let text = "Date is 2024-12-22 here"
         let pattern = "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b"
@@ -476,15 +487,5 @@ final class DateUtilsTests: XCTestCase {
         let text = "email 2023"
         let date = DateUtils.extractGermanMonthFromText(text)
         XCTAssertNil(date, "Should not match 'mai' within 'email'")
-    }
-
-    // MARK: - Helper Methods
-
-    private func createDate(year: Int, month: Int, day: Int) -> Date {
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = day
-        return Calendar.current.date(from: components)!
     }
 }

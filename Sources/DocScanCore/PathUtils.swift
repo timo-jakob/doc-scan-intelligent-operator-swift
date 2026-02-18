@@ -3,15 +3,15 @@ import Foundation
 /// Environment variable used to pass the original working directory from wrapper scripts
 /// This is needed when the binary is launched via a wrapper that changes directory
 /// (e.g., to find MLX Metal library bundles)
-public let DOCSCAN_ORIGINAL_PWD_ENV = "DOCSCAN_ORIGINAL_PWD"
+public let docScanOriginalPwdKey = "DOCSCAN_ORIGINAL_PWD"
 
 /// Utilities for resolving and normalizing file paths
-public struct PathUtils {
+public enum PathUtils {
     /// Returns the effective current working directory
     /// Uses DOCSCAN_ORIGINAL_PWD environment variable if set (from wrapper script),
     /// otherwise falls back to FileManager.default.currentDirectoryPath
     public static func getCurrentWorkingDirectory() -> String {
-        if let originalPwd = ProcessInfo.processInfo.environment[DOCSCAN_ORIGINAL_PWD_ENV],
+        if let originalPwd = ProcessInfo.processInfo.environment[docScanOriginalPwdKey],
            !originalPwd.isEmpty {
             return originalPwd
         }

@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import Vision
-import AppKit
 
 /// OCR engine using Apple's Vision framework for text recognition + Text-LLM for analysis
 public class OCREngine {
@@ -9,7 +9,7 @@ public class OCREngine {
 
     public init(config: Configuration) {
         self.config = config
-        self.textLLM = TextLLMManager(config: config)
+        textLLM = TextLLMManager(config: config)
     }
 
     /// Extract text from an image using Vision OCR
@@ -75,7 +75,7 @@ public class OCREngine {
     private func extractTextTiled(from cgImage: CGImage) async throws -> String {
         let width = cgImage.width
         let height = cgImage.height
-        let tileHeight = 800  // Tile height in pixels
+        let tileHeight = 800 // Tile height in pixels
         var allText = ""
 
         for tileY in stride(from: 0, to: height, by: tileHeight) {
@@ -143,16 +143,12 @@ public class OCREngine {
         var foundStrong: [String] = []
         var foundMedium: [String] = []
 
-        for indicator in strongIndicators {
-            if lowercased.contains(indicator) {
-                foundStrong.append(indicator)
-            }
+        for indicator in strongIndicators where lowercased.contains(indicator) {
+            foundStrong.append(indicator)
         }
 
-        for indicator in mediumIndicators {
-            if lowercased.contains(indicator) {
-                foundMedium.append(indicator)
-            }
+        for indicator in mediumIndicators where lowercased.contains(indicator) {
+            foundMedium.append(indicator)
         }
 
         // Determine result

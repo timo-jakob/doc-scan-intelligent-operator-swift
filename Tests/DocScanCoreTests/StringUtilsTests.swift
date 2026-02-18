@@ -1,8 +1,7 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class StringUtilsTests: XCTestCase {
-
     // MARK: - Basic Sanitization Tests
 
     func testSanitizeCompanyNameSimple() {

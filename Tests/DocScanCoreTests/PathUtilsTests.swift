@@ -1,5 +1,5 @@
-import XCTest
 @testable import DocScanCore
+import XCTest
 
 final class PathUtilsTests: XCTestCase {
     var tempDirectory: URL!
@@ -202,7 +202,7 @@ final class PathUtilsTests: XCTestCase {
 
         XCTAssertEqual(resolved, testFile.path)
         XCTAssertFalse(resolved.contains(".."))
-        XCTAssertFalse(resolved.contains("/./" ))
+        XCTAssertFalse(resolved.contains("/./"))
     }
 
     // MARK: - Symlink Resolution Tests
@@ -372,7 +372,7 @@ final class PathUtilsTests: XCTestCase {
         XCTAssertFalse(resolved.contains("subdir"))
     }
 
-    func testTildeWithNormalizationAndSymlink() throws {
+    func testTildeWithNormalizationAndSymlink() {
         // This test verifies that tilde expansion works with our path resolution
         let homePath = FileManager.default.homeDirectoryForCurrentUser.path
         let resolved = PathUtils.resolvePath("~/Documents/../Documents/test.pdf")
@@ -387,7 +387,7 @@ final class PathUtilsTests: XCTestCase {
 
     func testGetCurrentWorkingDirectoryWithoutEnvVar() {
         // Ensure env var is not set
-        unsetenv(DOCSCAN_ORIGINAL_PWD_ENV)
+        unsetenv(docScanOriginalPwdKey)
 
         let cwd = PathUtils.getCurrentWorkingDirectory()
 
@@ -399,12 +399,12 @@ final class PathUtilsTests: XCTestCase {
         let testPath = "/test/original/path"
 
         // Set the environment variable
-        setenv(DOCSCAN_ORIGINAL_PWD_ENV, testPath, 1)
+        setenv(docScanOriginalPwdKey, testPath, 1)
 
         let cwd = PathUtils.getCurrentWorkingDirectory()
 
         // Clean up
-        unsetenv(DOCSCAN_ORIGINAL_PWD_ENV)
+        unsetenv(docScanOriginalPwdKey)
 
         // Should return the env var value
         XCTAssertEqual(cwd, testPath)
@@ -412,12 +412,12 @@ final class PathUtilsTests: XCTestCase {
 
     func testGetCurrentWorkingDirectoryWithEmptyEnvVar() {
         // Set empty environment variable
-        setenv(DOCSCAN_ORIGINAL_PWD_ENV, "", 1)
+        setenv(docScanOriginalPwdKey, "", 1)
 
         let cwd = PathUtils.getCurrentWorkingDirectory()
 
         // Clean up
-        unsetenv(DOCSCAN_ORIGINAL_PWD_ENV)
+        unsetenv(docScanOriginalPwdKey)
 
         // Should fall back to FileManager's current directory
         XCTAssertEqual(cwd, FileManager.default.currentDirectoryPath)
@@ -429,13 +429,13 @@ final class PathUtilsTests: XCTestCase {
         try "test content".write(to: testFile, atomically: true, encoding: .utf8)
 
         // Set the original PWD to temp directory (simulating wrapper script behavior)
-        setenv(DOCSCAN_ORIGINAL_PWD_ENV, tempDirectory.path, 1)
+        setenv(docScanOriginalPwdKey, tempDirectory.path, 1)
 
         // Resolve relative path - should use the env var, not current directory
         let resolved = PathUtils.resolvePath("env_test.pdf")
 
         // Clean up
-        unsetenv(DOCSCAN_ORIGINAL_PWD_ENV)
+        unsetenv(docScanOriginalPwdKey)
 
         // Should resolve relative to the env var path
         XCTAssertEqual(resolved, testFile.path)
@@ -452,13 +452,13 @@ final class PathUtilsTests: XCTestCase {
         FileManager.default.changeCurrentDirectoryPath("/tmp")
 
         // Set the original PWD to temp directory
-        setenv(DOCSCAN_ORIGINAL_PWD_ENV, tempDirectory.path, 1)
+        setenv(docScanOriginalPwdKey, tempDirectory.path, 1)
 
         // Resolve relative path
         let resolved = PathUtils.resolvePath("different_dir_test.pdf")
 
         // Clean up
-        unsetenv(DOCSCAN_ORIGINAL_PWD_ENV)
+        unsetenv(docScanOriginalPwdKey)
         FileManager.default.changeCurrentDirectoryPath(originalDir)
 
         // Should resolve relative to the env var path, not /tmp

@@ -7,10 +7,10 @@ import MLXLMCommon
 public class TextLLMManager {
     private let config: Configuration
 
-    // Default text-only model for analyzing OCR results (Qwen2.5-7B optimized for Apple Silicon)
+    /// Default text-only model for analyzing OCR results (Qwen2.5-7B optimized for Apple Silicon)
     private let defaultTextModel = "mlx-community/Qwen2.5-7B-Instruct-4bit"
 
-    // Model container (lazy loaded)
+    /// Model container (lazy loaded)
     private var modelContainer: ModelContainer?
 
     public init(config: Configuration) {
@@ -110,7 +110,7 @@ public class TextLLMManager {
                     .replacingOccurrences(of: "DATE:", with: "")
                     .trimmingCharacters(in: .whitespaces)
 
-                if dateString != "UNKNOWN" && dateString != "NOT_FOUND" {
+                if dateString != "UNKNOWN", dateString != "NOT_FOUND" {
                     date = parseDate(dateString)
                 }
             } else if trimmed.hasPrefix(secondaryPrefix) {
@@ -118,15 +118,15 @@ public class TextLLMManager {
                     .replacingOccurrences(of: secondaryPrefix, with: "")
                     .trimmingCharacters(in: .whitespaces)
 
-                if fieldValue != "UNKNOWN" && fieldValue != "NOT_FOUND" {
+                if fieldValue != "UNKNOWN", fieldValue != "NOT_FOUND" {
                     secondaryField = sanitizeFieldValue(fieldValue, for: documentType)
                 }
-            } else if trimmed.hasPrefix("PATIENT:") && documentType == .prescription {
+            } else if trimmed.hasPrefix("PATIENT:"), documentType == .prescription {
                 let patientValue = trimmed
                     .replacingOccurrences(of: "PATIENT:", with: "")
                     .trimmingCharacters(in: .whitespaces)
 
-                if patientValue != "UNKNOWN" && patientValue != "NOT_FOUND" {
+                if patientValue != "UNKNOWN", patientValue != "NOT_FOUND" {
                     patientName = StringUtils.sanitizePatientName(patientValue)
                 }
             }
@@ -138,7 +138,7 @@ public class TextLLMManager {
                 print("Text-LLM: Date not found by LLM, trying regex fallback...")
             }
             date = extractDateWithRegex(from: text)
-            if config.verbose && date != nil {
+            if config.verbose, date != nil {
                 print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(date!))")
             }
         }
@@ -217,7 +217,7 @@ public class TextLLMManager {
                 print("Text-LLM: Date not found by LLM, trying regex fallback...")
             }
             date = extractDateWithRegex(from: text)
-            if config.verbose && date != nil {
+            if config.verbose, date != nil {
                 print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(date!))")
             }
         }

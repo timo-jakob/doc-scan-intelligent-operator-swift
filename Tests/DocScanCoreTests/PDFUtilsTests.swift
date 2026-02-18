@@ -1,9 +1,8 @@
-import XCTest
-import PDFKit
 @testable import DocScanCore
+import PDFKit
+import XCTest
 
 final class PDFUtilsTests: XCTestCase {
-
     // MARK: - Test Fixtures
 
     /// A minimal PDF with embedded searchable text "Hello World Rechnung Invoice Test Document 12345"
@@ -45,7 +44,7 @@ final class PDFUtilsTests: XCTestCase {
         let pdfPath = tempDir.appendingPathComponent("test_\(UUID().uuidString).pdf").path
         let pdfURL = URL(fileURLWithPath: pdfPath)
 
-        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)  // Letter size
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792) // Letter size
 
         guard let context = CGContext(pdfURL as CFURL, mediaBox: &mediaBox, nil) else {
             throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create PDF context"])
@@ -287,7 +286,7 @@ final class PDFUtilsTests: XCTestCase {
                 XCTFail("Expected DocScanError")
                 return
             }
-            if case .fileNotFound(let path) = docScanError {
+            if case let .fileNotFound(path) = docScanError {
                 XCTAssertEqual(path, nonExistentPath)
             } else {
                 XCTFail("Expected fileNotFound error")
@@ -308,7 +307,7 @@ final class PDFUtilsTests: XCTestCase {
                 XCTFail("Expected DocScanError")
                 return
             }
-            if case .invalidPDF(let message) = docScanError {
+            if case let .invalidPDF(message) = docScanError {
                 XCTAssertTrue(message.contains("Unable to open"))
             } else {
                 XCTFail("Expected invalidPDF error")
@@ -453,7 +452,7 @@ final class PDFUtilsTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    func testExtractTextReturnsNilForEmptyPDF() throws {
+    func testExtractTextReturnsNilForEmptyPDF() {
         // Create a PDF with minimal content
         let tempDir = FileManager.default.temporaryDirectory
         let pdfPath = tempDir.appendingPathComponent("empty_\(UUID().uuidString).pdf").path
@@ -481,7 +480,7 @@ final class PDFUtilsTests: XCTestCase {
 
     func testHasExtractableTextVerboseModeInsufficientText() throws {
         // Create a PDF with very short text
-        let testText = "Hi"  // Only 2 characters, below minimum of 50
+        let testText = "Hi" // Only 2 characters, below minimum of 50
         let pdfPath = try createTestPDF(withText: testText)
         defer { removeTestPDF(at: pdfPath) }
 
