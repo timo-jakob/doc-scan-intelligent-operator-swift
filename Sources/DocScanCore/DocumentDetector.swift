@@ -204,9 +204,9 @@ extension DocumentDetector {
         // If we have direct text, use it; otherwise fall back to Vision OCR
         let ocrTask = Task {
             if let text = directText {
-                return self.categorizeWithDirectText(text)
+                self.categorizeWithDirectText(text)
             } else {
-                return try await self.categorizeWithOCR(image: image)
+                try await self.categorizeWithOCR(image: image)
             }
         }
 
@@ -336,7 +336,7 @@ extension DocumentDetector {
 
         if config.verbose {
             print("PDF: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
-            if let reason = reason {
+            if let reason {
                 print("PDF: Reason: \(reason)")
             }
         }
@@ -364,7 +364,7 @@ extension DocumentDetector {
 
         if config.verbose {
             print("OCR: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
-            if let reason = reason {
+            if let reason {
                 print("OCR: Reason: \(reason)")
             }
         }

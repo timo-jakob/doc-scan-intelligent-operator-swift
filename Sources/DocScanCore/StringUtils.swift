@@ -19,7 +19,7 @@ public enum StringUtils {
         "dr. med.", "dr.med.", "dr med", "drmed",
         "dr.", "dr",
         "prof. dr.", "prof.dr.", "prof dr",
-        "med.", "med"
+        "med.", "med",
     ]
 
     /// Sanitize a company name for use in filenames

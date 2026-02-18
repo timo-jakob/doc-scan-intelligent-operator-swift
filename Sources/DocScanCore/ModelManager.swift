@@ -117,7 +117,7 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
             let model = try await loadModel(
                 id: modelName
             ) { [self] progress in
-                if self.config.verbose {
+                if config.verbose {
                     let percent = Int(progress.fractionCompleted * 100)
                     print("Downloading VLM: \(percent)%")
                 }

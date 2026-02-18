@@ -57,7 +57,7 @@ public class TextLLMManager {
 
         if config.verbose {
             print("Text-LLM: Keyword detection result: \(isInvoice) (confidence: \(confidence))")
-            if let reason = reason {
+            if let reason {
                 print("  - \(reason)")
             }
         }
@@ -94,12 +94,11 @@ public class TextLLMManager {
         var patientName: String?
 
         // Determine secondary field prefix based on document type
-        let secondaryPrefix: String
-        switch documentType {
+        let secondaryPrefix = switch documentType {
         case .invoice:
-            secondaryPrefix = "COMPANY:"
+            "COMPANY:"
         case .prescription:
-            secondaryPrefix = "DOCTOR:"
+            "DOCTOR:"
         }
 
         for line in lines {
@@ -150,9 +149,9 @@ public class TextLLMManager {
     private func sanitizeFieldValue(_ value: String, for documentType: DocumentType) -> String {
         switch documentType {
         case .invoice:
-            return StringUtils.sanitizeCompanyName(value)
+            StringUtils.sanitizeCompanyName(value)
         case .prescription:
-            return StringUtils.sanitizeDoctorName(value)
+            StringUtils.sanitizeDoctorName(value)
         }
     }
 
@@ -228,7 +227,7 @@ public class TextLLMManager {
     /// Extract date using regex patterns (fallback for LLM failures)
     /// Uses shared DateUtils for consistent date extraction across the codebase
     private func extractDateWithRegex(from text: String) -> Date? {
-        return DateUtils.extractDateFromText(text)
+        DateUtils.extractDateFromText(text)
     }
 
     /// Generate text using MLX LLM
@@ -250,7 +249,7 @@ public class TextLLMManager {
             let input = try await context.processor.prepare(
                 input: .init(messages: [
                     ["role": "system", "content": systemPrompt],
-                    ["role": "user", "content": userPrompt]
+                    ["role": "user", "content": userPrompt],
                 ])
             )
 
@@ -297,7 +296,7 @@ public class TextLLMManager {
         modelContainer = try await LLMModelFactory.shared.loadContainer(
             configuration: .init(id: defaultTextModel)
         ) { [self] progress in
-            if self.config.verbose {
+            if config.verbose {
                 let percent = Int(progress.fractionCompleted * 100)
                 print("Downloading model: \(percent)%")
             }
@@ -310,11 +309,11 @@ public class TextLLMManager {
 
     /// Parse date string using shared utility
     private func parseDate(_ dateString: String) -> Date? {
-        return DateUtils.parseDate(dateString)
+        DateUtils.parseDate(dateString)
     }
 
     /// Sanitize company name using shared utility
     private func sanitizeCompanyName(_ name: String) -> String {
-        return StringUtils.sanitizeCompanyName(name)
+        StringUtils.sanitizeCompanyName(name)
     }
 }

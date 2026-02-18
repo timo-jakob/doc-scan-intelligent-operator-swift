@@ -9,7 +9,7 @@ final class DateUtilsTests: XCTestCase {
         let validDates = [
             createDate(year: 2020, month: 6, day: 15),
             createDate(year: 2015, month: 1, day: 1),
-            createDate(year: 2023, month: 12, day: 31)
+            createDate(year: 2023, month: 12, day: 31),
         ]
 
         for date in validDates {
@@ -32,7 +32,7 @@ final class DateUtilsTests: XCTestCase {
             createDate(year: 1999, month: 12, day: 31), // Just before boundary
             createDate(year: 1999, month: 1, day: 1),
             createDate(year: 1990, month: 6, day: 15),
-            createDate(year: 1980, month: 1, day: 1)
+            createDate(year: 1980, month: 1, day: 1),
         ]
 
         for date in invalidDates {
@@ -57,7 +57,7 @@ final class DateUtilsTests: XCTestCase {
         let invalidDates = [
             createDate(year: currentYear + 3, month: 1, day: 1), // Just above boundary
             createDate(year: currentYear + 5, month: 6, day: 15),
-            createDate(year: currentYear + 10, month: 12, day: 31)
+            createDate(year: currentYear + 10, month: 12, day: 31),
         ]
 
         for date in invalidDates {
@@ -87,7 +87,7 @@ final class DateUtilsTests: XCTestCase {
         let invalidDateStrings = [
             "1999-12-31", // Before 2000
             "1990-06-15",
-            "01.01.1999"
+            "01.01.1999",
         ]
 
         for dateString in invalidDateStrings {
@@ -100,7 +100,7 @@ final class DateUtilsTests: XCTestCase {
         let validDateStrings = [
             "2000-01-01", // Lower boundary
             "2020-06-15",
-            "2024-12-31"
+            "2024-12-31",
         ]
 
         for dateString in validDateStrings {
@@ -134,7 +134,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.parseDate("2024-12-22")
         XCTAssertNotNil(date)
 
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -146,7 +146,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.parseDate("22.12.2024")
         XCTAssertNotNil(date)
 
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -158,7 +158,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.parseDate("22:12:2024")
         XCTAssertNotNil(date)
 
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -173,14 +173,14 @@ final class DateUtilsTests: XCTestCase {
             ("Dezember 2024", 2024, 12),
             ("März 2021", 2021, 3),
             ("sep 2022", 2022, 9),
-            ("okt 2023", 2023, 10)
+            ("okt 2023", 2023, 10),
         ]
 
         for (dateString, expectedYear, expectedMonth) in testCases {
             let date = DateUtils.parseDate(dateString)
             XCTAssertNotNil(date, "Should parse '\(dateString)'")
 
-            if let date = date {
+            if let date {
                 let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
                 XCTAssertEqual(components.year, expectedYear, "Year mismatch for '\(dateString)'")
                 XCTAssertEqual(components.month, expectedMonth, "Month mismatch for '\(dateString)'")
@@ -194,7 +194,7 @@ final class DateUtilsTests: XCTestCase {
             "not a date",
             "2024/13/45", // Invalid month/day
             "hello world",
-            ""
+            "",
         ]
 
         for dateString in invalidDates {
@@ -225,7 +225,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -238,7 +238,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -251,7 +251,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2023)
             XCTAssertEqual(components.month, 6)
@@ -265,7 +265,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2022)
             XCTAssertEqual(components.month, 9)
@@ -278,7 +278,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -303,7 +303,7 @@ final class DateUtilsTests: XCTestCase {
         let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 1)
@@ -331,7 +331,7 @@ final class DateUtilsPatternTests: XCTestCase {
         let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -345,7 +345,7 @@ final class DateUtilsPatternTests: XCTestCase {
         let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 12)
@@ -374,7 +374,7 @@ final class DateUtilsPatternTests: XCTestCase {
 
         XCTAssertNotNil(date)
         // Should return the first match
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
             XCTAssertEqual(components.year, 2024)
             XCTAssertEqual(components.month, 1)
@@ -397,13 +397,13 @@ final class DateUtilsPatternTests: XCTestCase {
             ("September 2023", 9),
             ("Oktober 2023", 10),
             ("November 2023", 11),
-            ("Dezember 2023", 12)
+            ("Dezember 2023", 12),
         ]
 
         for (text, expectedMonth) in testCases {
             let date = DateUtils.extractGermanMonthFromText(text)
             XCTAssertNotNil(date, "Failed to parse: \(text)")
-            if let date = date {
+            if let date {
                 let components = Calendar.current.dateComponents([.month], from: date)
                 XCTAssertEqual(components.month, expectedMonth, "Month mismatch for: \(text)")
             }
@@ -423,13 +423,13 @@ final class DateUtilsPatternTests: XCTestCase {
             ("Sept 2023", 9),
             ("Okt 2023", 10),
             ("Nov 2023", 11),
-            ("Dez 2023", 12)
+            ("Dez 2023", 12),
         ]
 
         for (text, expectedMonth) in testCases {
             let date = DateUtils.extractGermanMonthFromText(text)
             XCTAssertNotNil(date, "Failed to parse: \(text)")
-            if let date = date {
+            if let date {
                 let components = Calendar.current.dateComponents([.month], from: date)
                 XCTAssertEqual(components.month, expectedMonth, "Month mismatch for: \(text)")
             }
@@ -441,7 +441,7 @@ final class DateUtilsPatternTests: XCTestCase {
         for text in variations {
             let date = DateUtils.extractGermanMonthFromText(text)
             XCTAssertNotNil(date, "Failed to parse: \(text)")
-            if let date = date {
+            if let date {
                 let components = Calendar.current.dateComponents([.month], from: date)
                 XCTAssertEqual(components.month, 9)
             }
@@ -453,7 +453,7 @@ final class DateUtilsPatternTests: XCTestCase {
         let date = DateUtils.extractGermanMonthFromText(text)
 
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.year, .month], from: date)
             XCTAssertEqual(components.year, 2022)
             XCTAssertEqual(components.month, 9)
@@ -470,7 +470,7 @@ final class DateUtilsPatternTests: XCTestCase {
         // "maerz" is alternative spelling for "März"
         let date = DateUtils.extractGermanMonthFromText("Maerz 2023")
         XCTAssertNotNil(date)
-        if let date = date {
+        if let date {
             let components = Calendar.current.dateComponents([.month], from: date)
             XCTAssertEqual(components.month, 3)
         }

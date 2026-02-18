@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "DocScan",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     products: [
         .executable(
@@ -16,14 +16,14 @@ let package = Package(
         .library(
             name: "DocScanCore",
             targets: ["DocScanCore"]
-        )
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
         .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.29.1"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", branch: "main")
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", branch: "main"),
     ],
     targets: [
         // Core library with all invoice processing logic
@@ -39,7 +39,7 @@ let package = Package(
                 .product(name: "Transformers", package: "swift-transformers"),
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
-                .product(name: "MLXVLM", package: "mlx-swift-lm")
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
             ],
             path: "Sources/DocScanCore"
         ),
@@ -49,7 +49,7 @@ let package = Package(
             name: "DocScanCLI",
             dependencies: [
                 "DocScanCore",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources/DocScanCLI"
         ),
@@ -59,6 +59,6 @@ let package = Package(
             name: "DocScanCoreTests",
             dependencies: ["DocScanCore"],
             path: "Tests/DocScanCoreTests"
-        )
+        ),
     ]
 )

@@ -12,7 +12,7 @@ public enum DateUtils {
         "dd.MM.yyyy", // European: 22.12.2024
         "dd:MM:yyyy", // Colon-separated (OCR artifact): 22:12:2024
         "dd/MM/yyyy", // European with slashes: 22/12/2024
-        "MM/dd/yyyy" // US format: 12/22/2024
+        "MM/dd/yyyy", // US format: 12/22/2024
     ]
 
     /// Regex patterns for extracting dates from text
@@ -20,13 +20,13 @@ public enum DateUtils {
         "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b", // ISO: 2024-12-22
         "\\b(\\d{2})[./](\\d{2})[./](\\d{4})\\b", // European: 22.12.2024
         "\\b(\\d{2}):(\\d{2}):(\\d{4})\\b", // Colon-separated: 22:12:2024
-        "\\b(\\d{2})/(\\d{2})/(\\d{4})\\b" // US: 12/22/2024
+        "\\b(\\d{2})/(\\d{2})/(\\d{4})\\b", // US: 12/22/2024
     ]
 
     /// Keywords that typically precede invoice dates
     private static let dateKeywords = [
         "rechnungsdatum:", "invoice date:", "datum:", "date:",
-        "rechnungsdatum", "invoice date", "facture du:", "fecha:"
+        "rechnungsdatum", "invoice date", "facture du:", "fecha:",
     ]
 
     /// German month names for parsing "September 2022" style dates
@@ -42,14 +42,14 @@ public enum DateUtils {
         "september": 9, "sep": 9, "sept": 9,
         "oktober": 10, "okt": 10, "oct": 10,
         "november": 11, "nov": 11,
-        "dezember": 12, "dez": 12, "dec": 12
+        "dezember": 12, "dez": 12, "dec": 12,
     ]
 
     /// German month names as array for text searching (ordered by length for proper matching)
     private static let germanMonthNames = [
         "januar", "februar", "märz", "maerz", "april", "mai", "juni",
         "juli", "august", "september", "oktober", "november", "dezember",
-        "jan", "feb", "mrz", "apr", "jun", "jul", "aug", "sep", "sept", "okt", "nov", "dez"
+        "jan", "feb", "mrz", "apr", "jun", "jul", "aug", "sep", "sept", "okt", "nov", "dez",
     ]
 
     /// Parse a date string using multiple format attempts

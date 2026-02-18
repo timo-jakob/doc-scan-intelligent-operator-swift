@@ -72,3 +72,9 @@ fastlane/test_output
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
+
+# SonarQube local analysis artifacts
+.scannerwork/
+TestResults.xcresult/
+coverage.xml
+swiftlint-report.json

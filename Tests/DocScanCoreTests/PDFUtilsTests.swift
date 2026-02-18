@@ -60,7 +60,7 @@ final class PDFUtilsTests: XCTestCase {
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12),
             .foregroundColor: NSColor.black,
-            .paragraphStyle: paragraphStyle
+            .paragraphStyle: paragraphStyle,
         ]
 
         // Use NSString for drawing

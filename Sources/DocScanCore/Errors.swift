@@ -3,7 +3,7 @@ import Foundation
 /// Timeout error for async operations
 public struct TimeoutError: Error, LocalizedError {
     public var errorDescription: String? {
-        return "Operation timed out"
+        "Operation timed out"
     }
 }
 

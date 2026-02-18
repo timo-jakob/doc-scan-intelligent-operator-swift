@@ -243,7 +243,7 @@ final class OCREngineTests: XCTestCase {
             "Numéro de facture: 98765",
             "Número de factura: FAC-2024",
             "Rechnungsdatum: 15.12.2024",
-            "Invoice Date: December 15, 2024"
+            "Invoice Date: December 15, 2024",
         ]
 
         for text in strongTexts {
@@ -260,7 +260,7 @@ final class OCREngineTests: XCTestCase {
             "La facture",
             "La factura",
             "Quittung",
-            "Receipt for your purchase"
+            "Receipt for your purchase",
         ]
 
         for text in mediumTexts {
@@ -275,7 +275,7 @@ final class OCREngineTests: XCTestCase {
             "Hello world",
             "This is a regular document",
             "Meeting notes for December",
-            "Project plan and timeline"
+            "Project plan and timeline",
         ]
 
         for text in nonInvoiceTexts {
@@ -293,7 +293,7 @@ final class OCREngineTests: XCTestCase {
             "Rechnung",
             "INVOICE",
             "Invoice",
-            "invoice"
+            "invoice",
         ]
 
         for text in testCases {
@@ -373,13 +373,13 @@ final class OCREngineTests: XCTestCase {
             ("French SARL\nParis", "SARL"),
             ("Spanish S.A.\nMadrid", "S.A."),
             ("German KG\nBerlin", "KG"),
-            ("Another OHG\nMunich", "OHG")
+            ("Another OHG\nMunich", "OHG"),
         ]
 
         for (text, expectedContains) in testCases {
             let company = engine.extractCompany(from: text)
             XCTAssertNotNil(company, "Should extract company from: \(text)")
-            if let company = company {
+            if let company {
                 XCTAssertTrue(company.contains(expectedContains), "Company '\(company)' should contain '\(expectedContains)'")
             }
         }
@@ -402,7 +402,6 @@ final class OCREngineTests: XCTestCase {
         // Should contain multiple keywords in reason
         XCTAssertTrue(try XCTUnwrap(reason?.contains("rechnungsnummer")) || reason!.contains("invoice date"))
     }
-
 }
 
 // MARK: - Generic detectKeywords Tests (Multi-Document Type Support)
@@ -452,7 +451,7 @@ final class OCREngineKeywordsTests: XCTestCase {
             "Verordnung für Patient",
             "Prescription #123",
             "PZN: 1234567",
-            "Kassenärztliche Verordnung"
+            "Kassenärztliche Verordnung",
         ]
 
         for text in strongTexts {
@@ -467,7 +466,7 @@ final class OCREngineKeywordsTests: XCTestCase {
             "Dr. med. Hans Müller - Arzt",
             "Praxis für Allgemeinmedizin",
             "Medikament: Ibuprofen 400mg",
-            "Apotheke zur Rose"
+            "Apotheke zur Rose",
         ]
 
         for text in mediumTexts {
@@ -494,7 +493,7 @@ final class OCREngineKeywordsTests: XCTestCase {
             "Rezept",
             "VERORDNUNG",
             "Verordnung",
-            "verordnung"
+            "verordnung",
         ]
 
         for text in testCases {
@@ -520,7 +519,7 @@ final class OCREngineKeywordsTests: XCTestCase {
             ("Kassenrezept\nPZN 04356752\nIbuprofen 400mg", true),
             ("Privatrezept\nVerordnung für Max Mustermann", true),
             ("Rechnung für Arztbesuch\nBetrag: 50 EUR", true), // Contains "arzt"
-            ("Einkaufsliste:\n- Milch\n- Brot", false)
+            ("Einkaufsliste:\n- Milch\n- Brot", false),
         ]
 
         for (text, shouldMatch) in examples {

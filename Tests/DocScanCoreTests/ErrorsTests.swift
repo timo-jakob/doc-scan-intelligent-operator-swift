@@ -96,7 +96,7 @@ final class ErrorsTests: XCTestCase {
             .notAnInvoice,
             .extractionFailed("test"),
             .insufficientDiskSpace(required: 1, available: 0),
-            .invalidInput("test")
+            .invalidInput("test"),
         ]
 
         for error in errors {

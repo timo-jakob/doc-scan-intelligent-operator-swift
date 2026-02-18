@@ -9,9 +9,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var displayName: String {
         switch self {
         case .invoice:
-            return "Invoice"
+            "Invoice"
         case .prescription:
-            return "Prescription"
+            "Prescription"
         }
     }
 
@@ -19,9 +19,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var germanName: String {
         switch self {
         case .invoice:
-            return "Rechnung"
+            "Rechnung"
         case .prescription:
-            return "Rezept"
+            "Rezept"
         }
     }
 
@@ -29,9 +29,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var vlmPrompt: String {
         switch self {
         case .invoice:
-            return "Is this document an INVOICE (Rechnung)? Look for billing information, amounts, invoice numbers. Answer only YES or NO."
+            "Is this document an INVOICE (Rechnung)? Look for billing information, amounts, invoice numbers. Answer only YES or NO."
         case .prescription:
-            return "Is this document a DOCTOR'S PRESCRIPTION (Arzt-Rezept)? Look for medication names, doctor information, patient details. Answer only YES or NO."
+            "Is this document a DOCTOR'S PRESCRIPTION (Arzt-Rezept)? Look for medication names, doctor information, patient details. Answer only YES or NO."
         }
     }
 
@@ -39,14 +39,14 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var strongKeywords: [String] {
         switch self {
         case .invoice:
-            return [
+            [
                 "rechnungsnummer", "invoice number", "numéro de facture",
-                "número de factura", "rechnungsdatum", "invoice date"
+                "número de factura", "rechnungsdatum", "invoice date",
             ]
         case .prescription:
-            return [
+            [
                 "rezept", "verordnung", "prescription", "ordonnance",
-                "pharmazentralnummer", "pzn", "privatrezept", "kassenrezept"
+                "pharmazentralnummer", "pzn", "privatrezept", "kassenrezept",
             ]
         }
     }
@@ -55,16 +55,16 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var mediumKeywords: [String] {
         switch self {
         case .invoice:
-            return [
+            [
                 "rechnung", "invoice", "facture", "factura",
-                "quittung", "receipt", "beleg"
+                "quittung", "receipt", "beleg",
             ]
         case .prescription:
-            return [
+            [
                 "arzt", "ärztin", "doctor", "dr.med", "dr. med",
                 "praxis", "gemeinschaftspraxis", "medikament", "medication",
                 "apotheke", "apo", "pharmacy", "dosierung", "dosage",
-                "patient", "privat"
+                "patient", "privat",
             ]
         }
     }
@@ -73,9 +73,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var extractionFields: [ExtractionField] {
         switch self {
         case .invoice:
-            return [.date, .company]
+            [.date, .company]
         case .prescription:
-            return [.date, .doctor, .patient]
+            [.date, .doctor, .patient]
         }
     }
 
@@ -83,9 +83,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var defaultFilenamePattern: String {
         switch self {
         case .invoice:
-            return "{date}_Rechnung_{company}.pdf"
+            "{date}_Rechnung_{company}.pdf"
         case .prescription:
-            return "{date}_Rezept_für_{patient}_von_{doctor}.pdf"
+            "{date}_Rezept_für_{patient}_von_{doctor}.pdf"
         }
     }
 
@@ -93,9 +93,9 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var extractionSystemPrompt: String {
         switch self {
         case .invoice:
-            return "You are an invoice data extraction assistant. Extract information accurately and respond in the exact format requested."
+            "You are an invoice data extraction assistant. Extract information accurately and respond in the exact format requested."
         case .prescription:
-            return "You are a medical prescription data extraction assistant. Extract information accurately and respond in the exact format requested."
+            "You are a medical prescription data extraction assistant. Extract information accurately and respond in the exact format requested."
         }
     }
 
@@ -103,7 +103,7 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public func extractionUserPrompt(for text: String) -> String {
         switch self {
         case .invoice:
-            return """
+            """
             Extract the following information from this invoice text:
             1. Invoice date (Rechnungsdatum): Provide in format YYYY-MM-DD
             2. Invoicing party (company name that issued the invoice)
@@ -123,7 +123,7 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
             COMPANY: Company Name
             """
         case .prescription:
-            return """
+            """
             Extract the following information from this German prescription text:
 
             1. Patient's FIRST NAME:
@@ -169,6 +169,6 @@ public enum ExtractionField: String, CaseIterable, Codable, Sendable {
 
     /// Placeholder used in filename patterns
     public var placeholder: String {
-        return "{\(rawValue)}"
+        "{\(rawValue)}"
     }
 }

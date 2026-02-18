@@ -36,9 +36,9 @@ public class OCREngine {
 
     /// Extract text from a single image (standard OCR)
     private func extractTextSingle(from cgImage: CGImage) async throws -> String {
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
-                if let error = error {
+                if let error {
                     continuation.resume(throwing: DocScanError.extractionFailed("OCR failed: \(error.localizedDescription)"))
                     return
                 }
@@ -119,7 +119,7 @@ public class OCREngine {
 
     /// Detect invoice keywords with confidence and reason (instance method)
     public func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
-        return Self.detectInvoiceKeywords(from: text)
+        Self.detectInvoiceKeywords(from: text)
     }
 
     /// Detect invoice keywords with confidence and reason (static, shared implementation)
@@ -163,13 +163,13 @@ public class OCREngine {
 
     /// Instance method for generic keyword detection
     public func detectKeywords(for documentType: DocumentType, from text: String) -> (isMatch: Bool, confidence: String, reason: String?) {
-        return Self.detectKeywords(for: documentType, from: text)
+        Self.detectKeywords(for: documentType, from: text)
     }
 
     /// Extract invoice date from OCR text
     /// Uses shared DateUtils for consistent date extraction across the codebase
     public func extractDate(from text: String) -> Date? {
-        return DateUtils.extractDateFromText(text)
+        DateUtils.extractDateFromText(text)
     }
 
     /// Extract company name from OCR text
@@ -183,7 +183,7 @@ public class OCREngine {
         // Strategy 1: Look for company indicators
         let companyKeywords = [
             "gmbh", "ag", "inc", "ltd", "llc", "corp", "corporation",
-            "sarl", "s.a.", "kg", "ohg"
+            "sarl", "s.a.", "kg", "ohg",
         ]
 
         for line in lines.prefix(10) { // Check first 10 lines
@@ -202,7 +202,7 @@ public class OCREngine {
     }
 
     private func sanitizeCompanyName(_ name: String) -> String {
-        return StringUtils.sanitizeCompanyName(name)
+        StringUtils.sanitizeCompanyName(name)
     }
 
     /// Extract all invoice data from OCR text using Text-LLM (legacy method)

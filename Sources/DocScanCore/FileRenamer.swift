@@ -74,11 +74,10 @@ public class FileRenamer {
         let ext = targetURL.pathExtension
 
         while fileManager.fileExists(atPath: finalURL.path) {
-            let newFilename: String
-            if ext.isEmpty {
-                newFilename = "\(filename)_\(counter)"
+            let newFilename = if ext.isEmpty {
+                "\(filename)_\(counter)"
             } else {
-                newFilename = "\(filename)_\(counter).\(ext)"
+                "\(filename)_\(counter).\(ext)"
             }
 
             finalURL = directory.appendingPathComponent(newFilename)
