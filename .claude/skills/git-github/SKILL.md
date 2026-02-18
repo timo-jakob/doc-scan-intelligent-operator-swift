@@ -1,6 +1,6 @@
 ---
 name: git-github
-description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "create a PR", "commit this", "let's push", "open a pull request", "create a branch", or "we can push this". Also use proactively whenever about to run `git push` as part of any autonomous workflow — even mid-task. Enforces branch-based workflow — never commits directly to main. Runs SwiftFormat, SwiftLint, and SonarQube locally before pushing. After opening a PR, waits for all CI checks and fixes any reported issues.
+description: Handles all git and GitHub workflow actions for this project. Use when the user says "push this to GitHub", "commit this", "let's push", "create a branch", or "we can push this". Also use proactively whenever about to run `git push` as part of any autonomous workflow — even mid-task. Use when the user explicitly says "create a PR" or "open a pull request" to open a PR. Enforces branch-based workflow — never commits directly to main. Runs SwiftFormat, SwiftLint, and SonarQube locally before pushing. Does NOT automatically open a Pull Request — only does so when explicitly asked by the user.
 metadata:
   author: doc-scan-intelligent-operator-swift
   version: 2.0.0
@@ -151,7 +151,11 @@ Subsequent pushes on the same branch:
 git push
 ```
 
-### Step 6: Open a Pull Request
+### Step 6: Open a Pull Request (only when explicitly requested)
+
+> **Do NOT open a PR automatically.** Only run this step when the user explicitly says "create a PR", "open a pull request", or similar.
+
+When asked, create the PR with:
 
 ```bash
 gh pr create --title "<type>: <summary>" --body "$(cat <<'EOF'
@@ -171,7 +175,7 @@ EOF
 
 PR title follows the same Conventional Commits format as the commit message.
 
-### Step 7: Wait for CI and fix all issues
+### Step 7: Wait for CI and fix all issues (only after a PR is open)
 
 After the PR is open, wait for all GitHub Actions to complete:
 
@@ -228,25 +232,23 @@ Actions:
 2. Determine the change type from context — ask if unclear
 3. `git switch -c fix/resolve-date-extraction` (or appropriate branch)
 4. Run `make format` to format all code
-5. Run `make lint` and fix any warnings
+5. Run `make lint` and fix any errors
 6. Stage specific changed files
 7. Commit with a meaningful message including the co-authorship footer
 8. Run `make sonar` — wait for SonarCloud result, fix any issues
 9. `git push -u origin <branch-name>`
-10. `gh pr create ...`
-11. `gh pr checks <PR-NUMBER> --watch` — wait for all CI checks
-12. Fix any remaining CI failures; repeat until all checks are green or 10-commit limit reached
+10. Inform the user the branch is pushed and ready — do NOT open a PR
 
 **Example 2: User says "commit this refactoring"**
 
 Actions:
 1. Confirm current branch — create one if on `main`
 2. Run `make format` to format all code
-3. Run `make lint` and fix any warnings
+3. Run `make lint` and fix any errors
 4. Stage only the refactored files
 5. Commit: `refactor(detector): simplify two-phase categorization logic`
 6. Run `make sonar` and fix any issues
-7. Push and offer to open a PR
+7. Push the branch and inform the user it is ready — do NOT open a PR
 
 ---
 
