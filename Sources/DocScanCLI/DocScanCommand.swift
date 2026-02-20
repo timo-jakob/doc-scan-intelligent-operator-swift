@@ -1,4 +1,5 @@
 import ArgumentParser
+import Darwin
 import DocScanCore
 import Foundation
 
@@ -203,45 +204,57 @@ extension DocScanCommand {
 
 extension DocScanCommand {
     /// Print model info lines and preload both models, showing a progress bar when downloading.
+    /// On a non-TTY stdout (piped/redirected), skips in-place \r rewrites to avoid garbled output.
     private func printStartupAndPreload(
         vlmManager: ModelManager,
         textManager: TextLLMManager,
         vlmModelName: String,
         textModelName: String
     ) async throws {
-        // VLM line — rewritten in-place while downloading
-        writeStdout("🤖 VLM    \(vlmModelName)")
+        let tty = isInteractiveTerminal
+
+        // VLM line
+        if tty { writeStdout("🤖 VLM    \(vlmModelName)") }
         var vlmDownloaded = false
         try await vlmManager.preload(modelName: vlmModelName) { fraction in
             vlmDownloaded = true
+            guard tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
             self.writeStdout("\r🤖 VLM    \(vlmModelName)  ⬇️  \(bar) \(pct)%")
         }
-        if vlmDownloaded {
-            writeStdout("\r🤖 VLM    \(vlmModelName)  ✅ ready\n")
+        if tty {
+            writeStdout(vlmDownloaded ? "\r🤖 VLM    \(vlmModelName)  ✅ ready\n" : "\n")
         } else {
-            writeStdout("\n")
+            let suffix = vlmDownloaded ? "  ✅ ready" : ""
+            writeStdout("🤖 VLM    \(vlmModelName)\(suffix)\n")
         }
 
-        // Text LLM line — rewritten in-place while downloading
-        writeStdout("📝 Text   \(textModelName)")
+        // Text LLM line
+        if tty { writeStdout("📝 Text   \(textModelName)") }
         var textDownloaded = false
         try await textManager.preload { fraction in
             textDownloaded = true
+            guard tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
             self.writeStdout("\r📝 Text   \(textModelName)  ⬇️  \(bar) \(pct)%")
         }
-        if textDownloaded {
-            writeStdout("\r📝 Text   \(textModelName)  ✅ ready\n")
+        if tty {
+            writeStdout(textDownloaded ? "\r📝 Text   \(textModelName)  ✅ ready\n" : "\n")
         } else {
-            writeStdout("\n")
+            let suffix = textDownloaded ? "  ✅ ready" : ""
+            writeStdout("📝 Text   \(textModelName)\(suffix)\n")
         }
     }
 
+    /// True when stdout is connected to an interactive terminal (not piped or redirected).
+    private var isInteractiveTerminal: Bool {
+        isatty(STDOUT_FILENO) != 0
+    }
+
     /// Write directly to stdout without buffering (needed for in-place \r updates).
-    func writeStdout(_ string: String) {
+    private func writeStdout(_ string: String) {
         FileHandle.standardOutput.write(Data(string.utf8))
     }
 
@@ -298,8 +311,8 @@ extension DocScanCommand {
         _ categorization: CategorizationVerification,
         documentType: DocumentType
     ) throws -> Bool {
-        let vlmTimedOut = categorization.vlmResult.method.contains("timeout")
-        let ocrTimedOut = categorization.ocrResult.method.contains("timeout")
+        let vlmTimedOut = categorization.vlmResult.isTimedOut
+        let ocrTimedOut = categorization.ocrResult.isTimedOut
         let typeName = documentType.displayName.lowercased()
 
         if vlmTimedOut, ocrTimedOut {
@@ -376,10 +389,11 @@ extension DocScanCommand {
 
         while true {
             print("Enter your choice (1 or 2): ", terminator: "")
-            if let input = readLine()?.trimmingCharacters(in: .whitespaces) {
-                if input == "1" { return categorization.vlmResult.isMatch }
-                if input == "2" { return categorization.ocrResult.isMatch }
+            guard let input = readLine()?.trimmingCharacters(in: .whitespaces) else {
+                throw ExitCode.failure // stdin closed
             }
+            if input == "1" { return categorization.vlmResult.isMatch }
+            if input == "2" { return categorization.ocrResult.isMatch }
             print("Invalid choice. Please enter 1 or 2.")
         }
     }
@@ -392,10 +406,10 @@ extension DocScanCommand {
         _ categorization: CategorizationVerification,
         documentType: DocumentType
     ) throws -> Bool {
-        let vlmTimedOut = categorization.vlmResult.method.contains("timeout")
-        let ocrTimedOut = categorization.ocrResult.method.contains("timeout")
-        let vlmScore = categorization.vlmResult.confidenceScore
-        let ocrScore = categorization.ocrResult.confidenceScore
+        let vlmTimedOut = categorization.vlmResult.isTimedOut
+        let ocrTimedOut = categorization.ocrResult.isTimedOut
+        let vlmConf = categorization.vlmResult.confidence
+        let ocrConf = categorization.ocrResult.confidence
         let typeName = documentType.displayName.lowercased()
 
         if vlmTimedOut, ocrTimedOut {
@@ -406,38 +420,39 @@ extension DocScanCommand {
         if vlmTimedOut {
             let isMatch = categorization.ocrResult.isMatch
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR \(ocrScore)%\n")
+            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR: \(ocrConf)\n")
             return isMatch
         }
 
         if ocrTimedOut {
             let isMatch = categorization.vlmResult.isMatch
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM \(vlmScore)% · ⏱️ OCR\n")
+            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf) · ⏱️ OCR\n")
             return isMatch
         }
 
         if categorization.bothAgree {
             let isMatch = categorization.agreedIsMatch ?? false
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM \(vlmScore)% · OCR \(ocrScore)%\n")
+            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf) · OCR: \(ocrConf)\n")
             return isMatch
         }
 
         return try resolveConflictCompact(
-            categorization, documentType: documentType, vlmScore: vlmScore, ocrScore: ocrScore
+            categorization, documentType: documentType, vlmConf: vlmConf, ocrConf: ocrConf
         )
     }
 
     private func resolveConflictCompact(
         _ categorization: CategorizationVerification,
         documentType: DocumentType,
-        vlmScore: Int,
-        ocrScore: Int
+        vlmConf: String,
+        ocrConf: String
     ) throws -> Bool {
         let vlmYN = categorization.vlmResult.isMatch ? "YES" : "NO"
         let ocrYN = categorization.ocrResult.isMatch ? "YES" : "NO"
-        let conflictInfo = "VLM=\(vlmYN) \(vlmScore)% · OCR=\(ocrYN) \(ocrScore)%"
+        let conflictInfo = "VLM=\(vlmYN)(\(vlmConf)) · OCR=\(ocrYN)(\(ocrConf))"
+        let prompt = "📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? "
 
         if let mode = autoResolve {
             guard ["vlm", "ocr"].contains(mode.lowercased()) else {
@@ -452,13 +467,17 @@ extension DocScanCommand {
             return result
         }
 
-        writeStdout("📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? ")
+        writeStdout(prompt)
         while true {
-            if let input = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() {
-                if input == "v" || input == "vlm" { return categorization.vlmResult.isMatch }
-                if input == "o" || input == "ocr" { return categorization.ocrResult.isMatch }
+            guard let input = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() else {
+                writeStdout("\n")
+                throw ExitCode.failure // stdin closed
             }
-            writeStdout("\r📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? ")
+            if input == "v" || input == "vlm" { return categorization.vlmResult.isMatch }
+            if input == "o" || input == "ocr" { return categorization.ocrResult.isMatch }
+            // Invalid input — re-prompt on the same line when in a TTY, new line otherwise
+            let prefix = isInteractiveTerminal ? "\r" : ""
+            writeStdout("\(prefix)\(prompt)")
         }
     }
 }

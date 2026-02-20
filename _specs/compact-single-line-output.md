@@ -40,38 +40,42 @@ Two lines printed once at the start of every run:
 
 ### Startup — Models Need Downloading
 
-When one or both models are not yet in the local cache, a progress bar is shown on the same line, updating in place until the download completes. One line per model:
+Models are loaded sequentially (VLM first, then Text). When a model is not yet in the local cache,
+its line is rewritten in-place with a progress bar until the download completes:
 
 ```
-🤖 VLM    mlx-community/Qwen2-VL-2B-Instruct-4bit  ⬇️  [████████░░░░░░░░]  52%  1.2 GB / 2.3 GB
-📝 Text   mlx-community/Qwen2.5-7B-Instruct-4bit   ⬇️  [░░░░░░░░░░░░░░░░]   0%  waiting…
+🤖 VLM    mlx-community/Qwen2-VL-2B-Instruct-4bit  ⬇️  [████████░░░░░░░░]  52%
 ```
 
-Once a download finishes, the line resolves to the standard ready format:
+Once the download finishes, the line resolves to the ready format, then the Text model line begins:
 
 ```
 🤖 VLM    mlx-community/Qwen2-VL-2B-Instruct-4bit  ✅ ready
-📝 Text   mlx-community/Qwen2.5-7B-Instruct-4bit   ✅ ready
+📝 Text   mlx-community/Qwen2.5-7B-Instruct-4bit   ⬇️  [░░░░░░░░░░░░░░░░]   0%
 ```
 
-Downloads run sequentially (VLM first, then Text model). Processing begins only after both models are ready.
+On non-TTY stdout (piped/redirected), in-place rewrites are skipped; each model emits one clean
+line showing the final state (`✅ ready` if downloaded, just the model name if already cached).
+Processing begins only after both models are ready.
 
 ### Happy Path (no conflict)
 
-One line per phase, one summary line. Confidence is shown as a percentage for VLM and OCR separately:
+One line per phase, one summary line. Confidence is shown as a qualitative tier (`high`, `medium`,
+or `low`) for VLM and OCR separately — these reflect keyword-match strength and VLM response
+certainty, not raw model probabilities:
 
 ```
-📋 Phase 1  ✅ invoice  VLM 94% · OCR 87%
+📋 Phase 1  ✅ invoice  VLM: high · OCR: high
 📄 Phase 2  ✅ extracted  2025-06-27 · DB_Fernverkehr_AG
 ✏️  Renamed  invoice.pdf → 2025-06-27_Rechnung_DB_Fernverkehr_AG.pdf
 ```
 
 ### Conflict Path (user prompt on one line)
 
-Confidence is shown per source to help the user decide:
+Decision and confidence are shown per source to help the user decide:
 
 ```
-📋 Phase 1  ⚠️  conflict  VLM=YES 91% · OCR=NO 43%  →  Use [v]lm or [o]cr?
+📋 Phase 1  ⚠️  conflict  VLM=YES(high) · OCR=NO(high)  →  [v]lm or [o]cr?
 ```
 
 ### Not a Match (document type unknown)
@@ -79,7 +83,7 @@ Confidence is shown per source to help the user decide:
 When neither VLM nor OCR recognise the document as any known type, report it as unknown — never as a negation of the requested type:
 
 ```
-📋 Phase 1  ❌ unknown document  VLM 12% · OCR 8%
+📋 Phase 1  ❌ unknown document  VLM: high · OCR: high
 ```
 
 ### Dry Run
@@ -97,8 +101,8 @@ When neither VLM nor OCR recognise the document as any known type, report it as 
 - [ ] Processing a single recognised document produces exactly 3 lines of output (Phase 1, Phase 2, rename/dry-run)
 - [ ] A conflict prompt fits on one line and accepts a single keypress response
 - [ ] A document not matching any known type produces exactly 1 line reading "unknown document" — no mention of any specific document type
-- [ ] Phase 1 line always shows VLM confidence % and OCR confidence %
-- [ ] Conflict line shows per-source confidence to help user decide
+- [ ] Phase 1 line always shows VLM and OCR confidence as qualitative tiers (high/medium/low)
+- [ ] Conflict line shows per-source decision and confidence tier to help user decide
 - [ ] All lines stay within 100 characters for typical inputs
 - [ ] Icons are preserved on each line
 - [ ] Output is unchanged when `-v` / `--verbose` flag is used (verbose mode keeps its existing detail)

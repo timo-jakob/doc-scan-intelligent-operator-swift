@@ -147,7 +147,7 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
         modelName: String,
         progressHandler: @escaping (Double) -> Void
     ) async throws {
-        guard currentModelName != modelName || loadedModel == nil else { return }
+        guard loadedModel == nil || currentModelName != modelName else { return }
 
         let model = try await loadModel(id: modelName) { progress in
             progressHandler(progress.fractionCompleted)

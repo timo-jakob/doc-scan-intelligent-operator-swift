@@ -37,17 +37,9 @@ public struct CategorizationResult: Sendable {
         return method
     }
 
-    /// Numeric confidence score (0–100) representing probability the document IS the target type.
-    /// Used for compact single-line output.
-    public var confidenceScore: Int {
-        if confidence == "low" { return 0 }
-        switch (isMatch, confidence) {
-        case (true, "high"): return 92
-        case (true, "medium"): return 68
-        case (false, "high"): return 8
-        case (false, "medium"): return 32
-        default: return 50
-        }
+    /// True when this result represents a timeout rather than an actual categorisation decision.
+    public var isTimedOut: Bool {
+        method.contains("timeout")
     }
 
     /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
