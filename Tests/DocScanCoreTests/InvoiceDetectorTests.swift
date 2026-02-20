@@ -42,6 +42,27 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
     }
 }
 
+// MARK: - Mock TextLLM Manager
+
+/// Mock TextLLM manager for testing without actual model loading
+final class MockTextLLMManager: TextLLMManager {
+    var mockDate: Date?
+    var mockSecondaryField: String?
+    var mockPatientName: String?
+    var shouldThrowError: Bool = false
+    var errorToThrow: Error = DocScanError.inferenceError("Mock TextLLM error")
+
+    override func extractData(
+        for _: DocumentType,
+        from _: String
+    ) async throws -> (date: Date?, secondaryField: String?, patientName: String?) {
+        if shouldThrowError {
+            throw errorToThrow
+        }
+        return (date: mockDate, secondaryField: mockSecondaryField, patientName: mockPatientName)
+    }
+}
+
 // MARK: - Document Detector Tests
 
 final class InvoiceDetectorTests: XCTestCase {

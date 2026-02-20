@@ -4,7 +4,7 @@ import MLXLLM
 import MLXLMCommon
 
 /// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm
-public class TextLLMManager {
+open class TextLLMManager {
     private let config: Configuration
 
     /// Default text-only model for analyzing OCR results (Qwen2.5-7B optimized for Apple Silicon)
@@ -92,7 +92,7 @@ public class TextLLMManager {
 
     /// Generic data extraction for any document type
     /// Returns extracted date, secondary field (company/doctor), and optional patient name
-    public func extractData(
+    open func extractData(
         for documentType: DocumentType,
         from text: String
     ) async throws -> (date: Date?, secondaryField: String?, patientName: String?) {
