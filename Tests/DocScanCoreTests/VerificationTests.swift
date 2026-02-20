@@ -212,6 +212,38 @@ final class VerificationTests: XCTestCase {
         XCTAssertNotEqual(pdf.shortDisplayLabel, ocr.shortDisplayLabel)
     }
 
+    // MARK: - isTimedOut Tests
+
+    func testIsTimedOutFalseForNormalVLM() {
+        let result = CategorizationResult(isMatch: true, method: "VLM")
+        XCTAssertFalse(result.isTimedOut)
+    }
+
+    func testIsTimedOutFalseForNormalOCR() {
+        let result = CategorizationResult(isMatch: true, method: "OCR")
+        XCTAssertFalse(result.isTimedOut)
+    }
+
+    func testIsTimedOutFalseForPDF() {
+        let result = CategorizationResult(isMatch: true, method: "PDF")
+        XCTAssertFalse(result.isTimedOut)
+    }
+
+    func testIsTimedOutFalseForVLMError() {
+        let result = CategorizationResult(isMatch: false, method: "VLM (error)")
+        XCTAssertFalse(result.isTimedOut)
+    }
+
+    func testIsTimedOutTrueForVLMTimeout() {
+        let result = CategorizationResult(isMatch: false, confidence: "low", method: "VLM (timeout)")
+        XCTAssertTrue(result.isTimedOut)
+    }
+
+    func testIsTimedOutTrueForOCRTimeout() {
+        let result = CategorizationResult(isMatch: false, confidence: "low", method: "OCR (timeout)")
+        XCTAssertTrue(result.isTimedOut)
+    }
+
     // MARK: - CategorizationVerification Tests
 
     func testCategorizationVerificationBothAgreeMatch() {

@@ -4,7 +4,7 @@ import MLXLLM
 import MLXLMCommon
 
 /// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm
-public class TextLLMManager {
+open class TextLLMManager {
     private let config: Configuration
 
     /// Default text-only model for analyzing OCR results (Qwen2.5-7B optimized for Apple Silicon)
@@ -13,8 +13,26 @@ public class TextLLMManager {
     /// Model container (lazy loaded)
     private var modelContainer: ModelContainer?
 
+    /// The model identifier used for text LLM inference
+    public var modelName: String {
+        defaultTextModel
+    }
+
     public init(config: Configuration) {
         self.config = config
+    }
+
+    /// Preload the text LLM model so it is ready before processing begins.
+    /// Calls progressHandler with fractions 0.0–1.0 only when a download is required.
+    /// If the model is already cached locally the handler is never called.
+    public func preload(progressHandler: @escaping (Double) -> Void) async throws {
+        guard modelContainer == nil else { return }
+
+        modelContainer = try await LLMModelFactory.shared.loadContainer(
+            configuration: .init(id: defaultTextModel)
+        ) { progress in
+            progressHandler(progress.fractionCompleted)
+        }
     }
 
     /// Analyze OCR text using Text-LLM to extract invoice data
@@ -74,7 +92,7 @@ public class TextLLMManager {
 
     /// Generic data extraction for any document type
     /// Returns extracted date, secondary field (company/doctor), and optional patient name
-    public func extractData(
+    open func extractData(
         for documentType: DocumentType,
         from text: String
     ) async throws -> (date: Date?, secondaryField: String?, patientName: String?) {

@@ -37,6 +37,11 @@ public struct CategorizationResult: Sendable {
         return method
     }
 
+    /// True when this result represents a timeout rather than an actual categorisation decision.
+    public var isTimedOut: Bool {
+        method.contains("timeout")
+    }
+
     /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
     public var shortDisplayLabel: String {
         if method.hasPrefix("VLM") {
@@ -149,6 +154,20 @@ public class DocumentDetector {
         self.vlmProvider = vlmProvider
         ocrEngine = OCREngine(config: config)
         textLLM = TextLLMManager(config: config)
+    }
+
+    /// Initialize with pre-loaded VLM provider and TextLLM manager (for startup preloading)
+    public init(
+        config: Configuration,
+        documentType: DocumentType = .invoice,
+        vlmProvider: VLMProvider,
+        textLLM: TextLLMManager
+    ) {
+        self.config = config
+        self.documentType = documentType
+        self.vlmProvider = vlmProvider
+        ocrEngine = OCREngine(config: config)
+        self.textLLM = textLLM
     }
 }
 
