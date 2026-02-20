@@ -59,30 +59,62 @@ struct DocScanCommand: AsyncParsableCommand {
         if verbose { printVerboseHeader(configuration, documentType: documentType) }
 
         let finalPdfPath = try validateAndResolvePath()
-        let detector = DocumentDetector(config: configuration, documentType: documentType)
 
-        print("Analyzing: \(finalPdfPath)")
-        print("Document type: \(documentType.displayName)")
-        print()
+        // Create model managers, print startup info, and preload
+        let vlmManager = ModelManager(config: configuration)
+        let textManager = TextLLMManager(config: configuration)
+        try await printStartupAndPreload(
+            vlmManager: vlmManager,
+            textManager: textManager,
+            vlmModelName: configuration.modelName,
+            textModelName: textManager.modelName
+        )
 
-        // PHASE 1
-        printPhaseHeader(number: 1, title: "Categorization (VLM + OCR in parallel)")
+        // Create detector reusing the preloaded managers
+        let detector = DocumentDetector(
+            config: configuration,
+            documentType: documentType,
+            vlmProvider: vlmManager,
+            textLLM: textManager
+        )
+
+        // PHASE 1: Categorization
+        if verbose {
+            print("Analyzing: \(finalPdfPath)")
+            print("Document type: \(documentType.displayName)")
+            print()
+            printPhaseHeader(number: 1, title: "Categorization (VLM + OCR in parallel)")
+        }
+
         let categorization = try await detector.categorize(pdfPath: finalPdfPath)
-        displayCategorizationResults(categorization, documentType: documentType)
 
-        let isMatch = try determineIsMatch(categorization, documentType: documentType)
-        print()
+        let isMatch: Bool
+        if verbose {
+            displayCategorizationResults(categorization, documentType: documentType)
+            isMatch = try determineIsMatchVerbose(categorization, documentType: documentType)
+            print()
+        } else {
+            isMatch = try determineIsMatchCompact(categorization, documentType: documentType)
+        }
 
         guard isMatch else {
-            print("❌ Document is not a \(documentType.displayName.lowercased()) - exiting")
+            if verbose { print("❌ Document is not a \(documentType.displayName.lowercased()) - exiting") }
             throw ExitCode.failure
         }
 
-        // PHASE 2
-        printPhaseHeader(number: 2, title: "Data Extraction (OCR + TextLLM)")
+        // PHASE 2: Data Extraction
+        if verbose {
+            printPhaseHeader(number: 2, title: "Data Extraction (OCR + TextLLM)")
+        }
+
         let extraction = try await detector.extractData()
         let date = try validateExtraction(extraction, documentType: documentType)
-        displayExtractionResults(extraction, date: date, documentType: documentType)
+
+        if verbose {
+            displayExtractionResults(extraction, date: date, documentType: documentType)
+        } else {
+            printCompactPhase2(extraction, date: date, documentType: documentType)
+        }
 
         let finalData = DocumentData(
             documentType: documentType,
@@ -98,13 +130,20 @@ struct DocScanCommand: AsyncParsableCommand {
             throw ExitCode.failure
         }
 
-        print("New filename: \(newFilename)")
+        let originalFilename = URL(fileURLWithPath: finalPdfPath).lastPathComponent
         let renamer = FileRenamer(verbose: verbose)
         let newPath = try renamer.rename(from: finalPdfPath, to: newFilename, dryRun: dryRun)
-        print()
-        print(dryRun
-            ? "✨ Dry run completed - no files were modified"
-            : "✨ Successfully renamed to: \(newPath)")
+
+        if verbose {
+            print("New filename: \(newFilename)")
+            print()
+            print(dryRun
+                ? "✨ Dry run completed - no files were modified"
+                : "✨ Successfully renamed to: \(newPath)")
+        } else {
+            let action = dryRun ? "Dry run" : "Renamed"
+            writeStdout("✏️   \(action)  \(originalFilename) → \(newFilename)\n")
+        }
     }
 }
 
@@ -160,7 +199,61 @@ extension DocScanCommand {
     }
 }
 
-// MARK: - Phase 1: Categorization
+// MARK: - Startup
+
+extension DocScanCommand {
+    /// Print model info lines and preload both models, showing a progress bar when downloading.
+    private func printStartupAndPreload(
+        vlmManager: ModelManager,
+        textManager: TextLLMManager,
+        vlmModelName: String,
+        textModelName: String
+    ) async throws {
+        // VLM line — rewritten in-place while downloading
+        writeStdout("🤖 VLM    \(vlmModelName)")
+        var vlmDownloaded = false
+        try await vlmManager.preload(modelName: vlmModelName) { fraction in
+            vlmDownloaded = true
+            let bar = Self.progressBar(fraction: fraction)
+            let pct = String(format: "%3d", Int(fraction * 100))
+            self.writeStdout("\r🤖 VLM    \(vlmModelName)  ⬇️  \(bar) \(pct)%")
+        }
+        if vlmDownloaded {
+            writeStdout("\r🤖 VLM    \(vlmModelName)  ✅ ready\n")
+        } else {
+            writeStdout("\n")
+        }
+
+        // Text LLM line — rewritten in-place while downloading
+        writeStdout("📝 Text   \(textModelName)")
+        var textDownloaded = false
+        try await textManager.preload { fraction in
+            textDownloaded = true
+            let bar = Self.progressBar(fraction: fraction)
+            let pct = String(format: "%3d", Int(fraction * 100))
+            self.writeStdout("\r📝 Text   \(textModelName)  ⬇️  \(bar) \(pct)%")
+        }
+        if textDownloaded {
+            writeStdout("\r📝 Text   \(textModelName)  ✅ ready\n")
+        } else {
+            writeStdout("\n")
+        }
+    }
+
+    /// Write directly to stdout without buffering (needed for in-place \r updates).
+    func writeStdout(_ string: String) {
+        FileHandle.standardOutput.write(Data(string.utf8))
+    }
+
+    /// Build a fixed-width ASCII progress bar for download display.
+    private static func progressBar(fraction: Double, width: Int = 16) -> String {
+        let filled = min(width, Int(fraction * Double(width)))
+        let empty = width - filled
+        return "[" + String(repeating: "█", count: filled) + String(repeating: "░", count: empty) + "]"
+    }
+}
+
+// MARK: - Phase 1: Verbose Output
 
 extension DocScanCommand {
     private func printPhaseHeader(number: Int, title: String) {
@@ -201,7 +294,7 @@ extension DocScanCommand {
         }
     }
 
-    private func determineIsMatch(
+    private func determineIsMatchVerbose(
         _ categorization: CategorizationVerification,
         documentType: DocumentType
     ) throws -> Bool {
@@ -228,12 +321,11 @@ extension DocScanCommand {
             print("✅ \(vlmLabel) and \(textLabel) agree: This \(isMatch ? "IS" : "is NOT") a \(typeName)")
             return isMatch
         }
-        return try resolveCategorization(categorization, autoResolve: autoResolve, documentType: documentType)
+        return try resolveCategorizationVerbose(categorization, documentType: documentType)
     }
 
-    private func resolveCategorization(
+    private func resolveCategorizationVerbose(
         _ categorization: CategorizationVerification,
-        autoResolve: String?,
         documentType: DocumentType
     ) throws -> Bool {
         let vlmLabel = categorization.vlmResult.shortDisplayLabel
@@ -247,12 +339,12 @@ extension DocScanCommand {
         print()
 
         if let autoResolveMode = autoResolve {
-            return try applyAutoResolve(autoResolveMode, categorization: categorization, documentType: documentType)
+            return try applyAutoResolveVerbose(autoResolveMode, categorization: categorization, documentType: documentType)
         }
-        return try interactiveResolve(categorization, documentType: documentType)
+        return try interactiveResolveVerbose(categorization, documentType: documentType)
     }
 
-    private func applyAutoResolve(
+    private func applyAutoResolveVerbose(
         _ mode: String,
         categorization: CategorizationVerification,
         documentType: DocumentType
@@ -270,7 +362,7 @@ extension DocScanCommand {
         return result
     }
 
-    private func interactiveResolve(
+    private func interactiveResolveVerbose(
         _ categorization: CategorizationVerification,
         documentType: DocumentType
     ) throws -> Bool {
@@ -293,7 +385,85 @@ extension DocScanCommand {
     }
 }
 
-// MARK: - Phase 2: Extraction
+// MARK: - Phase 1: Compact Output
+
+extension DocScanCommand {
+    private func determineIsMatchCompact(
+        _ categorization: CategorizationVerification,
+        documentType: DocumentType
+    ) throws -> Bool {
+        let vlmTimedOut = categorization.vlmResult.method.contains("timeout")
+        let ocrTimedOut = categorization.ocrResult.method.contains("timeout")
+        let vlmScore = categorization.vlmResult.confidenceScore
+        let ocrScore = categorization.ocrResult.confidenceScore
+        let typeName = documentType.displayName.lowercased()
+
+        if vlmTimedOut, ocrTimedOut {
+            writeStdout("📋 Phase 1  ❌ both methods timed out\n")
+            throw ExitCode.failure
+        }
+
+        if vlmTimedOut {
+            let isMatch = categorization.ocrResult.isMatch
+            let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
+            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR \(ocrScore)%\n")
+            return isMatch
+        }
+
+        if ocrTimedOut {
+            let isMatch = categorization.vlmResult.isMatch
+            let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
+            writeStdout("📋 Phase 1  \(label)  VLM \(vlmScore)% · ⏱️ OCR\n")
+            return isMatch
+        }
+
+        if categorization.bothAgree {
+            let isMatch = categorization.agreedIsMatch ?? false
+            let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
+            writeStdout("📋 Phase 1  \(label)  VLM \(vlmScore)% · OCR \(ocrScore)%\n")
+            return isMatch
+        }
+
+        return try resolveConflictCompact(
+            categorization, documentType: documentType, vlmScore: vlmScore, ocrScore: ocrScore
+        )
+    }
+
+    private func resolveConflictCompact(
+        _ categorization: CategorizationVerification,
+        documentType: DocumentType,
+        vlmScore: Int,
+        ocrScore: Int
+    ) throws -> Bool {
+        let vlmYN = categorization.vlmResult.isMatch ? "YES" : "NO"
+        let ocrYN = categorization.ocrResult.isMatch ? "YES" : "NO"
+        let conflictInfo = "VLM=\(vlmYN) \(vlmScore)% · OCR=\(ocrYN) \(ocrScore)%"
+
+        if let mode = autoResolve {
+            guard ["vlm", "ocr"].contains(mode.lowercased()) else {
+                print("❌ Invalid --auto-resolve option: '\(mode)'")
+                throw ExitCode.failure
+            }
+            let useVLM = mode.lowercased() == "vlm"
+            let result = useVLM ? categorization.vlmResult.isMatch : categorization.ocrResult.isMatch
+            let typeName = documentType.displayName.lowercased()
+            let matchStr = result ? "✅ \(typeName)" : "❌ unknown document"
+            writeStdout("📋 Phase 1  ⚠️  \(matchStr)  \(conflictInfo)  [auto:\(mode.lowercased())]\n")
+            return result
+        }
+
+        writeStdout("📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? ")
+        while true {
+            if let input = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() {
+                if input == "v" || input == "vlm" { return categorization.vlmResult.isMatch }
+                if input == "o" || input == "ocr" { return categorization.ocrResult.isMatch }
+            }
+            writeStdout("\r📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? ")
+        }
+    }
+}
+
+// MARK: - Phase 2
 
 extension DocScanCommand {
     private func validateExtraction(
@@ -337,6 +507,19 @@ extension DocScanCommand {
             }
         }
         print()
+    }
+
+    private func printCompactPhase2(
+        _ extraction: ExtractionResult,
+        date: Date,
+        documentType _: DocumentType
+    ) {
+        let dateStr = formatDate(date)
+        if let field = extraction.secondaryField {
+            writeStdout("📄 Phase 2  ✅ extracted  \(dateStr) · \(field)\n")
+        } else {
+            writeStdout("📄 Phase 2  ✅ extracted  \(dateStr)\n")
+        }
     }
 
     private func formatDate(_ date: Date) -> String {

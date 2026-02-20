@@ -140,6 +140,24 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
         }
     }
 
+    /// Preload the VLM model so it is ready before processing begins.
+    /// Calls progressHandler with fractions 0.0–1.0 only when a download is required.
+    /// If the model is already cached locally the handler is never called.
+    public func preload(
+        modelName: String,
+        progressHandler: @escaping (Double) -> Void
+    ) async throws {
+        guard currentModelName != modelName || loadedModel == nil else { return }
+
+        let model = try await loadModel(id: modelName) { progress in
+            progressHandler(progress.fractionCompleted)
+        }
+
+        loadedModel = model
+        chatSession = ChatSession(model)
+        currentModelName = modelName
+    }
+
     /// Clear model cache
     public func clearCache() throws {
         if fileManager.fileExists(atPath: config.modelCacheDir) {

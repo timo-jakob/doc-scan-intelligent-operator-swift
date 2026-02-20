@@ -13,8 +13,26 @@ public class TextLLMManager {
     /// Model container (lazy loaded)
     private var modelContainer: ModelContainer?
 
+    /// The model identifier used for text LLM inference
+    public var modelName: String {
+        defaultTextModel
+    }
+
     public init(config: Configuration) {
         self.config = config
+    }
+
+    /// Preload the text LLM model so it is ready before processing begins.
+    /// Calls progressHandler with fractions 0.0–1.0 only when a download is required.
+    /// If the model is already cached locally the handler is never called.
+    public func preload(progressHandler: @escaping (Double) -> Void) async throws {
+        guard modelContainer == nil else { return }
+
+        modelContainer = try await LLMModelFactory.shared.loadContainer(
+            configuration: .init(id: defaultTextModel)
+        ) { progress in
+            progressHandler(progress.fractionCompleted)
+        }
     }
 
     /// Analyze OCR text using Text-LLM to extract invoice data
