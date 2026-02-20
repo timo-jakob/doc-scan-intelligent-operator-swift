@@ -271,4 +271,50 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    // MARK: - Verbose Mode Coverage Tests
+
+    func testCategorizeVerboseModeWithVLMTimeout() async throws {
+        // Exercises the verbose print inside the VLM-timeout catch branch (lines 240-241)
+        let verboseConfig = Configuration(verbose: true)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
+        let pdfPath = try createSearchablePDF()
+        mockVLM.shouldThrowError = true
+        mockVLM.errorToThrow = TimeoutError()
+
+        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+
+        XCTAssertFalse(result.vlmResult.isMatch)
+        XCTAssertTrue(result.vlmResult.isTimedOut)
+        XCTAssertTrue(result.ocrResult.isMatch)
+    }
+
+    func testCategorizeVerboseModeWithVLMError() async throws {
+        // Exercises the verbose print inside the VLM-error catch branch (lines 246-247)
+        let verboseConfig = Configuration(verbose: true)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
+        let pdfPath = try createSearchablePDF()
+        mockVLM.shouldThrowError = true
+        mockVLM.errorToThrow = DocScanError.inferenceError("Mock VLM error")
+
+        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+
+        XCTAssertFalse(result.vlmResult.isMatch)
+        XCTAssertTrue(result.vlmResult.method.contains("error"))
+        XCTAssertTrue(result.ocrResult.isMatch)
+    }
+
+    func testCategorizeVerboseModeConflict() async throws {
+        // Exercises the verbose conflict print (lines 279-280): VLM=NO, OCR detects invoice keywords
+        let verboseConfig = Configuration(verbose: true)
+        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice, vlmProvider: mockVLM)
+        let pdfPath = try createSearchablePDF()
+        mockVLM.mockResponse = "NO"
+
+        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+
+        XCTAssertFalse(result.vlmResult.isMatch)
+        XCTAssertTrue(result.ocrResult.isMatch)
+        XCTAssertFalse(result.bothAgree)
+    }
 }

@@ -421,4 +421,52 @@ final class InvoiceDetectorTests: XCTestCase {
             XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
         }
     }
+
+    // MARK: - Pre-loaded TextLLM Initializer Tests
+
+    func testDocumentDetectorInitWithPreloadedTextLLM() {
+        let textLLM = TextLLMManager(config: config)
+        let detectorWithTextLLM = DocumentDetector(
+            config: config,
+            documentType: .invoice,
+            vlmProvider: mockVLM,
+            textLLM: textLLM
+        )
+
+        XCTAssertEqual(detectorWithTextLLM.documentType, .invoice)
+    }
+
+    func testDocumentDetectorInitWithPreloadedTextLLMPrescription() {
+        let textLLM = TextLLMManager(config: config)
+        let detectorWithTextLLM = DocumentDetector(
+            config: config,
+            documentType: .prescription,
+            vlmProvider: mockVLM,
+            textLLM: textLLM
+        )
+
+        XCTAssertEqual(detectorWithTextLLM.documentType, .prescription)
+    }
+
+    func testDocumentDetectorInitWithPreloadedTextLLMGeneratesFilename() throws {
+        let textLLM = TextLLMManager(config: config)
+        let detectorWithTextLLM = DocumentDetector(
+            config: config,
+            documentType: .invoice,
+            vlmProvider: mockVLM,
+            textLLM: textLLM
+        )
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = try XCTUnwrap(dateFormatter.date(from: "2025-01-15"))
+        let data = DocumentData(
+            documentType: .invoice,
+            isMatch: true,
+            date: date,
+            secondaryField: "Test_Corp"
+        )
+        let filename = detectorWithTextLLM.generateFilename(from: data)
+        XCTAssertEqual(filename, "2025-01-15_Rechnung_Test_Corp.pdf")
+    }
 }
