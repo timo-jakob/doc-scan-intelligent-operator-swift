@@ -78,50 +78,6 @@ public struct CategorizationVerification {
     }
 }
 
-// MARK: - Extraction Results (Phase 2: OCR+TextLLM only)
-
-/// Result of data extraction (OCR+TextLLM only)
-/// Contains date and a secondary field (company for invoices, doctor for prescriptions)
-public struct ExtractionResult: Sendable {
-    public let date: Date?
-    public let secondaryField: String? // company, doctor, etc. depending on document type
-    public let patientName: String? // patient first name (for prescriptions)
-
-    public init(date: Date?, secondaryField: String?, patientName: String? = nil) {
-        self.date = date
-        self.secondaryField = secondaryField
-        self.patientName = patientName
-    }
-}
-
-// MARK: - Final Document Data
-
-/// Final result combining categorization and extraction
-public struct DocumentData {
-    public let documentType: DocumentType
-    public let isMatch: Bool // Whether document matches the target type
-    public let date: Date?
-    public let secondaryField: String? // company, doctor, etc.
-    public let patientName: String? // patient first name (for prescriptions)
-    public let categorization: CategorizationVerification?
-
-    public init(
-        documentType: DocumentType,
-        isMatch: Bool,
-        date: Date?,
-        secondaryField: String?,
-        patientName: String? = nil,
-        categorization: CategorizationVerification? = nil
-    ) {
-        self.documentType = documentType
-        self.isMatch = isMatch
-        self.date = date
-        self.secondaryField = secondaryField
-        self.patientName = patientName
-        self.categorization = categorization
-    }
-}
-
 /// Detects documents of a specific type and extracts key information using two-phase approach:
 /// Phase 1: Categorization (VLM + OCR in parallel) - Does this match the document type?
 /// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and secondary field
@@ -129,7 +85,7 @@ public class DocumentDetector {
     private let vlmProvider: VLMProvider
     private let ocrEngine: OCREngine
     private let textLLM: TextLLMManager
-    private let config: Configuration
+    let config: Configuration
     public let documentType: DocumentType
 
     // Cache the image and OCR text between phases
@@ -176,51 +132,83 @@ extension DocumentDetector {
 
     /// Categorize a PDF - determine if it's an invoice using VLM + OCR in parallel
     public func categorize(pdfPath: String) async throws -> CategorizationVerification {
-        // Validate PDF
+        // Validate PDF and prepare image
         try PDFUtils.validatePDF(at: pdfPath)
-
-        // Cache the PDF path for OCR
         cachedPDFPath = pdfPath
         usedDirectExtraction = false
 
-        // Try direct PDF text extraction first (faster and more accurate for searchable PDFs)
-        if config.verbose {
-            print("Checking for extractable text in PDF...")
-        }
+        let directText = tryDirectTextExtraction(from: pdfPath)
 
-        var directText: String?
-        if let text = PDFUtils.extractText(from: pdfPath, verbose: config.verbose),
-           text.count >= PDFUtils.minimumTextLength {
-            directText = text
-            cachedOCRText = text
-            usedDirectExtraction = true
-            if config.verbose {
-                print("✅ Using direct PDF text extraction (\(text.count) chars) - faster and more accurate")
-            }
-        }
-
-        // Convert first page to image (needed for VLM, and for OCR fallback)
-        if config.verbose {
-            print("Converting PDF to image...")
-        }
-        let image = try PDFUtils.pdfToImage(at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose)
+        if config.verbose { print("Converting PDF to image...") }
+        let image = try PDFUtils.pdfToImage(
+            at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose
+        )
         cachedImage = image
 
-        // Run both VLM and OCR categorization in parallel
         if config.verbose {
             print("Running categorization (VLM + OCR in parallel)...")
         }
 
-        // Timeout duration: 30 seconds
-        let timeoutDuration: TimeInterval = 30.0
+        // Run VLM and OCR in parallel, await with timeouts
+        let vlm = await runVLMCategorization(image: image)
+        let ocr = try await runOCRCategorization(
+            image: image, directText: directText
+        )
 
-        // VLM categorization task
-        let vlmTask = Task {
-            try await self.categorizeWithVLM(image: image)
+        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
+        logVerificationResult(verification)
+        return verification
+    }
+
+    /// Try direct PDF text extraction (faster for searchable PDFs)
+    private func tryDirectTextExtraction(from pdfPath: String) -> String? {
+        if config.verbose { print("Checking for extractable text in PDF...") }
+
+        guard let text = PDFUtils.extractText(from: pdfPath, verbose: config.verbose),
+              text.count >= PDFUtils.minimumTextLength
+        else { return nil }
+
+        cachedOCRText = text
+        usedDirectExtraction = true
+        if config.verbose {
+            print("✅ Using direct PDF text extraction (\(text.count) chars)")
         }
+        return text
+    }
 
-        // OCR categorization task
-        // If we have direct text, use it; otherwise fall back to Vision OCR
+    /// Run VLM categorization with timeout and error handling
+    private func runVLMCategorization(image: NSImage) async -> CategorizationResult {
+        let timeoutSeconds: TimeInterval = 30.0
+        let vlmTask = Task { try await self.categorizeWithVLM(image: image) }
+
+        do {
+            return try await withTimeout(seconds: timeoutSeconds) {
+                try await vlmTask.value
+            }
+        } catch is TimeoutError {
+            if config.verbose {
+                print("⏱️  VLM timed out after \(Int(timeoutSeconds)) seconds")
+            }
+            vlmTask.cancel()
+            return CategorizationResult(
+                isMatch: false, confidence: "low",
+                method: "VLM (timeout)", reason: "Timed out"
+            )
+        } catch {
+            if config.verbose { print("VLM categorization failed: \(error)") }
+            return CategorizationResult(
+                isMatch: false, confidence: "low",
+                method: "VLM (error)", reason: error.localizedDescription
+            )
+        }
+    }
+
+    /// Run OCR categorization with timeout
+    private func runOCRCategorization(
+        image: NSImage,
+        directText: String?
+    ) async throws -> CategorizationResult {
+        let timeoutSeconds: TimeInterval = 30.0
         let ocrTask = Task {
             if let text = directText {
                 self.categorizeWithDirectText(text)
@@ -229,58 +217,35 @@ extension DocumentDetector {
             }
         }
 
-        // Handle VLM with timeout
-        let vlm: CategorizationResult
         do {
-            vlm = try await withTimeout(seconds: timeoutDuration) {
-                try await vlmTask.value
-            }
-        } catch is TimeoutError {
-            if config.verbose {
-                print("⏱️  VLM timed out after \(Int(timeoutDuration)) seconds")
-            }
-            vlmTask.cancel()
-            vlm = CategorizationResult(isMatch: false, confidence: "low", method: "VLM (timeout)", reason: "Timed out")
-        } catch {
-            if config.verbose {
-                print("VLM categorization failed: \(error)")
-            }
-            vlm = CategorizationResult(isMatch: false, confidence: "low", method: "VLM (error)", reason: error.localizedDescription)
-        }
-
-        // Handle OCR with timeout
-        let ocr: CategorizationResult
-        do {
-            ocr = try await withTimeout(seconds: timeoutDuration) {
+            return try await withTimeout(seconds: timeoutSeconds) {
                 try await ocrTask.value
             }
         } catch is TimeoutError {
             if config.verbose {
-                print("⏱️  OCR timed out after \(Int(timeoutDuration)) seconds")
+                print("⏱️  OCR timed out after \(Int(timeoutSeconds)) seconds")
             }
             ocrTask.cancel()
-            ocr = CategorizationResult(isMatch: false, confidence: "low", method: "OCR (timeout)", reason: "Timed out")
-        } catch {
-            if config.verbose {
-                print("OCR categorization failed: \(error)")
-            }
-            throw error
+            return CategorizationResult(
+                isMatch: false, confidence: "low",
+                method: "OCR (timeout)", reason: "Timed out"
+            )
         }
+    }
 
-        // Compare results
-        let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
-
-        if config.verbose {
-            let typeName = documentType.displayName.lowercased()
-            if verification.bothAgree {
-                let result = verification.agreedIsMatch == true ? "IS a \(typeName)" : "is NOT a \(typeName)"
-                print("✅ VLM and OCR agree: Document \(result)")
-            } else {
-                print("⚠️  Categorization conflict: VLM says \(vlm.isMatch ? typeName : "not \(typeName)"), OCR says \(ocr.isMatch ? typeName : "not \(typeName)")")
-            }
+    /// Log the verification result in verbose mode
+    private func logVerificationResult(_ verification: CategorizationVerification) {
+        guard config.verbose else { return }
+        let typeName = documentType.displayName.lowercased()
+        if verification.bothAgree {
+            let match = verification.agreedIsMatch == true
+            let desc = match ? "IS a \(typeName)" : "is NOT a \(typeName)"
+            print("✅ VLM and OCR agree: Document \(desc)")
+        } else {
+            let vlmSays = verification.vlmResult.isMatch ? typeName : "not \(typeName)"
+            let ocrSays = verification.ocrResult.isMatch ? typeName : "not \(typeName)"
+            print("⚠️  Categorization conflict: VLM says \(vlmSays), OCR says \(ocrSays)")
         }
-
-        return verification
     }
 
     // MARK: - Phase 2: Data Extraction (OCR+TextLLM only)
@@ -308,40 +273,45 @@ extension DocumentDetector {
             }
         }
 
-        return ExtractionResult(date: result.date, secondaryField: result.secondaryField, patientName: result.patientName)
+        return ExtractionResult(
+            date: result.date,
+            secondaryField: result.secondaryField,
+            patientName: result.patientName
+        )
     }
 
     // MARK: - VLM Categorization
 
     /// Categorize using VLM - simple yes/no document type detection
-    private func categorizeWithVLM(image: NSImage) async throws -> CategorizationResult {
+    func categorizeWithVLM(image: NSImage) async throws -> CategorizationResult {
         if config.verbose {
-            print("VLM: Starting categorization for \(documentType.displayName.lowercased())...")
+            let typeName = documentType.displayName.lowercased()
+            print("VLM: Starting categorization for \(typeName)...")
         }
 
-        let prompt = documentType.vlmPrompt
+        let response = try await vlmProvider.generateFromImage(
+            image, prompt: documentType.vlmPrompt
+        )
+        if config.verbose { print("VLM response: \(response)") }
 
-        let response = try await vlmProvider.generateFromImage(image, prompt: prompt)
-
-        if config.verbose {
-            print("VLM response: \(response)")
-        }
-
-        // Parse response - look for yes/no
         let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let isMatch = lowercased.contains("yes") || lowercased.hasPrefix("ja")
         let confidence = (lowercased == "yes" || lowercased == "no") ? "high" : "medium"
 
         if config.verbose {
-            print("VLM: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
+            let typeName = documentType.displayName.lowercased()
+            print("VLM: Is \(typeName) = \(isMatch) (confidence: \(confidence))")
         }
 
-        return CategorizationResult(isMatch: isMatch, confidence: confidence, method: "VLM", reason: response)
+        return CategorizationResult(
+            isMatch: isMatch, confidence: confidence,
+            method: "VLM", reason: response
+        )
     }
 
     // MARK: - Text Categorization
 
-    /// Categorize using direct PDF text (no OCR needed - faster and more accurate)
+    /// Categorize using direct PDF text (no OCR needed)
     /// Internal access for testability
     func categorizeWithDirectText(_ text: String) -> CategorizationResult {
         if config.verbose {
@@ -350,67 +320,60 @@ extension DocumentDetector {
             print("PDF: Text preview: \(String(text.prefix(500)))")
         }
 
-        // Use keyword-based detection on the direct text
-        let (isMatch, confidence, reason) = ocrEngine.detectKeywords(for: documentType, from: text)
+        let result = ocrEngine.detectKeywords(for: documentType, from: text)
 
         if config.verbose {
-            print("PDF: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
-            if let reason {
-                print("PDF: Reason: \(reason)")
-            }
+            let typeName = documentType.displayName.lowercased()
+            print("PDF: Is \(typeName) = \(result.isMatch) (confidence: \(result.confidence))")
+            if let reason = result.reason { print("PDF: Reason: \(reason)") }
         }
 
-        return CategorizationResult(isMatch: isMatch, confidence: confidence, method: "PDF", reason: reason)
+        return CategorizationResult(
+            isMatch: result.isMatch, confidence: result.confidence,
+            method: "PDF", reason: result.reason
+        )
     }
 
     /// Categorize using Vision OCR (fallback for scanned documents)
-    private func categorizeWithOCR(image: NSImage) async throws -> CategorizationResult {
-        if config.verbose {
-            print("OCR: Starting Vision OCR (scanned document)...")
-        }
+    func categorizeWithOCR(image: NSImage) async throws -> CategorizationResult {
+        if config.verbose { print("OCR: Starting Vision OCR (scanned document)...") }
 
-        // Extract text using Vision OCR
         let text = try await ocrEngine.extractText(from: image)
-        cachedOCRText = text // Cache for phase 2
+        cachedOCRText = text
 
         if config.verbose {
             print("OCR: Extracted \(text.count) characters")
             print("OCR: Text preview: \(String(text.prefix(500)))")
         }
 
-        // Use keyword-based detection
-        let (isMatch, confidence, reason) = ocrEngine.detectKeywords(for: documentType, from: text)
+        let result = ocrEngine.detectKeywords(for: documentType, from: text)
 
         if config.verbose {
-            print("OCR: Is \(documentType.displayName.lowercased()) = \(isMatch) (confidence: \(confidence))")
-            if let reason {
-                print("OCR: Reason: \(reason)")
-            }
+            let typeName = documentType.displayName.lowercased()
+            print("OCR: Is \(typeName) = \(result.isMatch) (confidence: \(result.confidence))")
+            if let reason = result.reason { print("OCR: Reason: \(reason)") }
         }
 
-        return CategorizationResult(isMatch: isMatch, confidence: confidence, method: "OCR", reason: reason)
+        return CategorizationResult(
+            isMatch: result.isMatch, confidence: result.confidence,
+            method: "OCR", reason: result.reason
+        )
     }
 
     // MARK: - Helper Methods
 
     /// Execute an async operation with a timeout
-    private func withTimeout<T>(
+    func withTimeout<T>(
         seconds: TimeInterval,
         operation: @escaping () async throws -> T
     ) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
-            // Add the actual operation
+            group.addTask { try await operation() }
             group.addTask {
-                try await operation()
-            }
-
-            // Add the timeout task
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                let nanoseconds = UInt64(seconds * 1_000_000_000)
+                try await Task.sleep(nanoseconds: nanoseconds)
                 throw TimeoutError()
             }
-
-            // Wait for the first to complete
             guard let result = try await group.next() else {
                 group.cancelAll()
                 throw TimeoutError()
@@ -418,48 +381,5 @@ extension DocumentDetector {
             group.cancelAll()
             return result
         }
-    }
-
-    /// Generate filename from document data
-    public func generateFilename(from data: DocumentData) -> String? {
-        guard data.isMatch else { return nil }
-        guard let date = data.date else { return nil }
-
-        // For invoices, company is required
-        if documentType == .invoice, data.secondaryField == nil {
-            return nil
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = config.dateFormat
-        let dateString = dateFormatter.string(from: date)
-
-        // Use document type's default pattern
-        var pattern = documentType.defaultFilenamePattern
-        pattern = pattern.replacingOccurrences(of: "{date}", with: dateString)
-
-        // Replace the secondary field placeholder based on document type
-        switch documentType {
-        case .invoice:
-            pattern = pattern.replacingOccurrences(of: "{company}", with: data.secondaryField!)
-        case .prescription:
-            // Handle patient name placeholder first (optional)
-            // Must be processed before doctor to handle the case where both are nil
-            if let patientName = data.patientName {
-                pattern = pattern.replacingOccurrences(of: "{patient}", with: patientName)
-            } else {
-                // Remove the "für_{patient}_" part if no patient name available
-                pattern = pattern.replacingOccurrences(of: "für_{patient}_", with: "")
-            }
-            // Handle doctor name placeholder (optional)
-            if let doctor = data.secondaryField {
-                pattern = pattern.replacingOccurrences(of: "{doctor}", with: doctor)
-            } else {
-                // Remove the "_von_{doctor}" part if no doctor name available
-                pattern = pattern.replacingOccurrences(of: "_von_{doctor}", with: "")
-            }
-        }
-
-        return pattern
     }
 }

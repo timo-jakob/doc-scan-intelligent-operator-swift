@@ -77,8 +77,9 @@ final class ErrorsTests: XCTestCase {
     }
 
     func testInvalidInputErrorDescription() {
-        let error = DocScanError.invalidInput("PDF path cannot be empty. Use '.' to refer to the current directory.")
-        XCTAssertEqual(error.errorDescription, "Invalid input: PDF path cannot be empty. Use '.' to refer to the current directory.")
+        let msg = "PDF path cannot be empty. Use '.' to refer to the current directory."
+        let error = DocScanError.invalidInput(msg)
+        XCTAssertEqual(error.errorDescription, "Invalid input: \(msg)")
     }
 
     // MARK: - LocalizedError Conformance Tests

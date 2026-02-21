@@ -60,8 +60,34 @@ struct DocScanCommand: AsyncParsableCommand {
         if verbose { printVerboseHeader(configuration, documentType: documentType) }
 
         let finalPdfPath = try validateAndResolvePath()
+        let detector = try await createDetector(
+            configuration: configuration, documentType: documentType
+        )
 
-        // Create model managers, print startup info, and preload
+        let (categorization, isMatch) = try await executePhase1(
+            detector: detector, pdfPath: finalPdfPath, documentType: documentType
+        )
+
+        guard isMatch else {
+            if verbose {
+                let typeName = documentType.displayName.lowercased()
+                print("❌ Document is not a \(typeName) - exiting")
+            }
+            throw ExitCode.failure
+        }
+
+        try await executePhase2(
+            detector: detector,
+            pdfPath: finalPdfPath,
+            documentType: documentType,
+            categorization: categorization
+        )
+    }
+
+    private func createDetector(
+        configuration: Configuration,
+        documentType: DocumentType
+    ) async throws -> DocumentDetector {
         let vlmManager = ModelManager(config: configuration)
         let textManager = TextLLMManager(config: configuration)
         try await printStartupAndPreload(
@@ -70,24 +96,30 @@ struct DocScanCommand: AsyncParsableCommand {
             vlmModelName: configuration.modelName,
             textModelName: textManager.modelName
         )
-
-        // Create detector reusing the preloaded managers
-        let detector = DocumentDetector(
+        return DocumentDetector(
             config: configuration,
             documentType: documentType,
             vlmProvider: vlmManager,
             textLLM: textManager
         )
+    }
 
-        // PHASE 1: Categorization
+    private func executePhase1(
+        detector: DocumentDetector,
+        pdfPath: String,
+        documentType: DocumentType
+    ) async throws -> (CategorizationVerification, Bool) {
         if verbose {
-            print("Analyzing: \(finalPdfPath)")
+            print("Analyzing: \(pdfPath)")
             print("Document type: \(documentType.displayName)")
             print()
-            printPhaseHeader(number: 1, title: "Categorization (VLM + OCR in parallel)")
+            printPhaseHeader(
+                number: 1,
+                title: "Categorization (VLM + OCR in parallel)"
+            )
         }
 
-        let categorization = try await detector.categorize(pdfPath: finalPdfPath)
+        let categorization = try await detector.categorize(pdfPath: pdfPath)
 
         let isMatch: Bool
         if verbose {
@@ -97,13 +129,15 @@ struct DocScanCommand: AsyncParsableCommand {
         } else {
             isMatch = try determineIsMatchCompact(categorization, documentType: documentType)
         }
+        return (categorization, isMatch)
+    }
 
-        guard isMatch else {
-            if verbose { print("❌ Document is not a \(documentType.displayName.lowercased()) - exiting") }
-            throw ExitCode.failure
-        }
-
-        // PHASE 2: Data Extraction
+    private func executePhase2(
+        detector: DocumentDetector,
+        pdfPath: String,
+        documentType: DocumentType,
+        categorization: CategorizationVerification
+    ) async throws {
         if verbose {
             printPhaseHeader(number: 2, title: "Data Extraction (OCR + TextLLM)")
         }
@@ -131,9 +165,11 @@ struct DocScanCommand: AsyncParsableCommand {
             throw ExitCode.failure
         }
 
-        let originalFilename = URL(fileURLWithPath: finalPdfPath).lastPathComponent
+        let originalFilename = URL(fileURLWithPath: pdfPath).lastPathComponent
         let renamer = FileRenamer(verbose: verbose)
-        let newPath = try renamer.rename(from: finalPdfPath, to: newFilename, dryRun: dryRun)
+        let newPath = try renamer.rename(
+            from: pdfPath, to: newFilename, dryRun: dryRun
+        )
 
         if verbose {
             print("New filename: \(newFilename)")
@@ -253,12 +289,12 @@ extension DocScanCommand {
     }
 
     /// True when stdout is connected to an interactive terminal (not piped or redirected).
-    private var isInteractiveTerminal: Bool {
+    var isInteractiveTerminal: Bool {
         isatty(STDOUT_FILENO) != 0
     }
 
     /// Write directly to stdout without buffering (needed for in-place \r updates).
-    private func writeStdout(_ string: String) {
+    func writeStdout(_ string: String) {
         FileHandle.standardOutput.write(Data(string.utf8))
     }
 
@@ -267,287 +303,5 @@ extension DocScanCommand {
         let filled = min(width, Int(fraction * Double(width)))
         let empty = width - filled
         return "[" + String(repeating: "█", count: filled) + String(repeating: "░", count: empty) + "]"
-    }
-}
-
-// MARK: - Phase 1: Verbose Output
-
-extension DocScanCommand {
-    private func printPhaseHeader(number: Int, title: String) {
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("Phase \(number): \(title)")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print()
-    }
-
-    private func displayCategorizationResults(
-        _ categorization: CategorizationVerification,
-        documentType: DocumentType
-    ) {
-        print("╔══════════════════════════════════════════════════╗")
-        print("║         Categorization Results                   ║")
-        print("╠══════════════════════════════════════════════════╣")
-        let vlmLine = "║ \(categorization.vlmResult.displayLabel):"
-        print(vlmLine.padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
-        displayCategorizationResult(categorization.vlmResult, prefix: "║   ", documentType: documentType)
-        print("║                                                  ║")
-        let ocrLine = "║ \(categorization.ocrResult.displayLabel):"
-        print(ocrLine.padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
-        displayCategorizationResult(categorization.ocrResult, prefix: "║   ", documentType: documentType)
-        print("╚══════════════════════════════════════════════════╝")
-        print()
-    }
-
-    private func displayCategorizationResult(
-        _ result: CategorizationResult,
-        prefix: String,
-        documentType: DocumentType
-    ) {
-        let typeName = documentType.displayName
-        let matchStatus = result.isMatch ? "✅ \(typeName)" : "❌ Not \(typeName)"
-        print("\(prefix)\(matchStatus) (confidence: \(result.confidence))")
-        if let reason = result.reason, verbose {
-            print("\(prefix)Reason: \(String(reason.prefix(40)))")
-        }
-    }
-
-    private func determineIsMatchVerbose(
-        _ categorization: CategorizationVerification,
-        documentType: DocumentType
-    ) throws -> Bool {
-        let vlmTimedOut = categorization.vlmResult.isTimedOut
-        let ocrTimedOut = categorization.ocrResult.isTimedOut
-        let typeName = documentType.displayName.lowercased()
-
-        if vlmTimedOut, ocrTimedOut {
-            print("❌ Both methods timed out")
-            throw ExitCode.failure
-        }
-        if vlmTimedOut {
-            print("⏱️  VLM timed out - using OCR result")
-            return categorization.ocrResult.isMatch
-        }
-        if ocrTimedOut {
-            print("⏱️  OCR timed out - using VLM result")
-            return categorization.vlmResult.isMatch
-        }
-        if categorization.bothAgree {
-            let isMatch = categorization.agreedIsMatch ?? false
-            let vlmLabel = categorization.vlmResult.shortDisplayLabel
-            let textLabel = categorization.ocrResult.shortDisplayLabel
-            print("✅ \(vlmLabel) and \(textLabel) agree: This \(isMatch ? "IS" : "is NOT") a \(typeName)")
-            return isMatch
-        }
-        return try resolveCategorizationVerbose(categorization, documentType: documentType)
-    }
-
-    private func resolveCategorizationVerbose(
-        _ categorization: CategorizationVerification,
-        documentType: DocumentType
-    ) throws -> Bool {
-        let vlmLabel = categorization.vlmResult.shortDisplayLabel
-        let textLabel = categorization.ocrResult.shortDisplayLabel
-        let typeName = documentType.displayName
-
-        print("⚠️  CATEGORIZATION CONFLICT")
-        print()
-        print("  \(vlmLabel) says: \(categorization.vlmResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
-        print("  \(textLabel) says: \(categorization.ocrResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
-        print()
-
-        if let autoResolveMode = autoResolve {
-            return try applyAutoResolveVerbose(autoResolveMode, categorization: categorization, documentType: documentType)
-        }
-        return try interactiveResolveVerbose(categorization, documentType: documentType)
-    }
-
-    private func applyAutoResolveVerbose(
-        _ mode: String,
-        categorization: CategorizationVerification,
-        documentType: DocumentType
-    ) throws -> Bool {
-        guard ["vlm", "ocr"].contains(mode.lowercased()) else {
-            print("❌ Invalid --auto-resolve option: '\(mode)'")
-            print("   Valid options: vlm, ocr")
-            throw ExitCode.failure
-        }
-        let useVLM = mode.lowercased() == "vlm"
-        let result = useVLM ? categorization.vlmResult.isMatch : categorization.ocrResult.isMatch
-        let chosenLabel = useVLM ? categorization.vlmResult.shortDisplayLabel : categorization.ocrResult.shortDisplayLabel
-        let typeName = documentType.displayName.lowercased()
-        print("🤖 Auto-resolve: Using \(chosenLabel) → \(result ? typeName : "Not a \(typeName)")")
-        return result
-    }
-
-    private func interactiveResolveVerbose(
-        _ categorization: CategorizationVerification,
-        documentType: DocumentType
-    ) throws -> Bool {
-        let vlmLabel = categorization.vlmResult.shortDisplayLabel
-        let textLabel = categorization.ocrResult.shortDisplayLabel
-        let typeName = documentType.displayName
-
-        print("Which result do you trust?")
-        print("  [1] \(vlmLabel): \(categorization.vlmResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
-        print("  [2] \(textLabel): \(categorization.ocrResult.isMatch ? typeName : "Not a \(typeName.lowercased())")")
-
-        while true {
-            print("Enter your choice (1 or 2): ", terminator: "")
-            guard let input = readLine()?.trimmingCharacters(in: .whitespaces) else {
-                throw ExitCode.failure // stdin closed
-            }
-            if input == "1" { return categorization.vlmResult.isMatch }
-            if input == "2" { return categorization.ocrResult.isMatch }
-            print("Invalid choice. Please enter 1 or 2.")
-        }
-    }
-}
-
-// MARK: - Phase 1: Compact Output
-
-extension DocScanCommand {
-    private func determineIsMatchCompact(
-        _ categorization: CategorizationVerification,
-        documentType: DocumentType
-    ) throws -> Bool {
-        let vlmTimedOut = categorization.vlmResult.isTimedOut
-        let ocrTimedOut = categorization.ocrResult.isTimedOut
-        let vlmConf = categorization.vlmResult.confidence
-        let ocrConf = categorization.ocrResult.confidence
-        let typeName = documentType.displayName.lowercased()
-
-        if vlmTimedOut, ocrTimedOut {
-            writeStdout("📋 Phase 1  ❌ both methods timed out\n")
-            throw ExitCode.failure
-        }
-
-        if vlmTimedOut {
-            let isMatch = categorization.ocrResult.isMatch
-            let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR: \(ocrConf)\n")
-            return isMatch
-        }
-
-        if ocrTimedOut {
-            let isMatch = categorization.vlmResult.isMatch
-            let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf) · ⏱️ OCR\n")
-            return isMatch
-        }
-
-        if categorization.bothAgree {
-            let isMatch = categorization.agreedIsMatch ?? false
-            let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf) · OCR: \(ocrConf)\n")
-            return isMatch
-        }
-
-        return try resolveConflictCompact(
-            categorization, documentType: documentType, vlmConf: vlmConf, ocrConf: ocrConf
-        )
-    }
-
-    private func resolveConflictCompact(
-        _ categorization: CategorizationVerification,
-        documentType: DocumentType,
-        vlmConf: String,
-        ocrConf: String
-    ) throws -> Bool {
-        let vlmYN = categorization.vlmResult.isMatch ? "YES" : "NO"
-        let ocrYN = categorization.ocrResult.isMatch ? "YES" : "NO"
-        let conflictInfo = "VLM=\(vlmYN)(\(vlmConf)) · OCR=\(ocrYN)(\(ocrConf))"
-        let prompt = "📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? "
-
-        if let mode = autoResolve {
-            guard ["vlm", "ocr"].contains(mode.lowercased()) else {
-                print("❌ Invalid --auto-resolve option: '\(mode)'")
-                throw ExitCode.failure
-            }
-            let useVLM = mode.lowercased() == "vlm"
-            let result = useVLM ? categorization.vlmResult.isMatch : categorization.ocrResult.isMatch
-            let typeName = documentType.displayName.lowercased()
-            let matchStr = result ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  ⚠️  \(matchStr)  \(conflictInfo)  [auto:\(mode.lowercased())]\n")
-            return result
-        }
-
-        writeStdout(prompt)
-        while true {
-            guard let input = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() else {
-                writeStdout("\n")
-                throw ExitCode.failure // stdin closed
-            }
-            if input == "v" || input == "vlm" { return categorization.vlmResult.isMatch }
-            if input == "o" || input == "ocr" { return categorization.ocrResult.isMatch }
-            // Invalid input — re-prompt on the same line when in a TTY, new line otherwise
-            let prefix = isInteractiveTerminal ? "\r" : ""
-            writeStdout("\(prefix)\(prompt)")
-        }
-    }
-}
-
-// MARK: - Phase 2
-
-extension DocScanCommand {
-    private func validateExtraction(
-        _ extraction: ExtractionResult,
-        documentType: DocumentType
-    ) throws -> Date {
-        let typeName = documentType.displayName.lowercased()
-        guard let date = extraction.date else {
-            print("⚠️  Could not extract date from \(typeName)")
-            print("   Date: ❌ Not found")
-            throw ExitCode.failure
-        }
-        if documentType == .invoice, extraction.secondaryField == nil {
-            print("⚠️  Could not extract company from invoice")
-            print("   Date: \(formatDate(date))")
-            print("   Company: ❌ Not found")
-            throw ExitCode.failure
-        }
-        return date
-    }
-
-    private func displayExtractionResults(
-        _ extraction: ExtractionResult,
-        date: Date,
-        documentType: DocumentType
-    ) {
-        let fieldName = documentType == .invoice ? "Company" : "Doctor"
-        let fieldEmoji = documentType == .invoice ? "🏢" : "👨‍⚕️"
-        print("Extracted data:")
-        print("   📅 Date: \(formatDate(date))")
-        if let field = extraction.secondaryField {
-            print("   \(fieldEmoji) \(fieldName): \(field)")
-        } else if documentType == .prescription {
-            print("   \(fieldEmoji) \(fieldName): Not found (will be excluded from filename)")
-        }
-        if documentType == .prescription {
-            if let patient = extraction.patientName {
-                print("   👤 Patient: \(patient)")
-            } else {
-                print("   👤 Patient: Not found (will be excluded from filename)")
-            }
-        }
-        print()
-    }
-
-    private func printCompactPhase2(
-        _ extraction: ExtractionResult,
-        date: Date,
-        documentType _: DocumentType
-    ) {
-        let dateStr = formatDate(date)
-        if let field = extraction.secondaryField {
-            writeStdout("📄 Phase 2  ✅ extracted  \(dateStr) · \(field)\n")
-        } else {
-            writeStdout("📄 Phase 2  ✅ extracted  \(dateStr)\n")
-        }
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
     }
 }

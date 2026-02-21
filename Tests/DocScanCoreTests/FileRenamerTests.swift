@@ -310,9 +310,11 @@ final class FileRenamerTests: XCTestCase {
         let expectedPath = tempDirectory.appendingPathComponent("target_1.txt").path
         XCTAssertEqual(newPath, expectedPath)
     }
+}
 
-    // MARK: - File Without Extension Tests
+// MARK: - File Without Extension Tests
 
+extension FileRenamerTests {
     func testRenameFileWithoutExtension() throws {
         // Create test file without extension
         let sourceFile = tempDirectory.appendingPathComponent("source")

@@ -2,6 +2,19 @@ import AppKit
 import Foundation
 import Vision
 
+/// Result of keyword-based document type detection
+public struct KeywordResult: Sendable {
+    public let isMatch: Bool
+    public let confidence: String
+    public let reason: String?
+
+    public init(isMatch: Bool, confidence: String, reason: String?) {
+        self.isMatch = isMatch
+        self.confidence = confidence
+        self.reason = reason
+    }
+}
+
 /// OCR engine using Apple's Vision framework for text recognition + Text-LLM for analysis
 public class OCREngine {
     private let config: Configuration
@@ -26,7 +39,8 @@ public class OCREngine {
         // For very tall images, tile to work around Vision's limitations
         if aspectRatio > 4.0 {
             if config.verbose {
-                print("OCR: Tall image detected (aspect ratio \(String(format: "%.1f", aspectRatio)):1), using tiled OCR")
+                let ratio = String(format: "%.1f", aspectRatio)
+                print("OCR: Tall image detected (aspect ratio \(ratio):1), using tiled OCR")
             }
             return try await extractTextTiled(from: cgImage)
         }
@@ -39,7 +53,8 @@ public class OCREngine {
         try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
                 if let error {
-                    continuation.resume(throwing: DocScanError.extractionFailed("OCR failed: \(error.localizedDescription)"))
+                    let msg = "OCR failed: \(error.localizedDescription)"
+                    continuation.resume(throwing: DocScanError.extractionFailed(msg))
                     return
                 }
 
@@ -66,7 +81,8 @@ public class OCREngine {
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(throwing: DocScanError.extractionFailed("OCR request failed: \(error.localizedDescription)"))
+                let msg = "OCR request failed: \(error.localizedDescription)"
+                continuation.resume(throwing: DocScanError.extractionFailed(msg))
             }
         }
     }
@@ -113,20 +129,18 @@ public class OCREngine {
 
     /// Detect if text contains invoice indicators (simple boolean)
     public func detectInvoice(from text: String) -> Bool {
-        let (isInvoice, _, _) = Self.detectInvoiceKeywords(from: text)
-        return isInvoice
+        Self.detectInvoiceKeywords(from: text).isMatch
     }
 
     /// Detect invoice keywords with confidence and reason (instance method)
-    public func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
+    public func detectInvoiceKeywords(from text: String) -> KeywordResult {
         Self.detectInvoiceKeywords(from: text)
     }
 
     /// Detect invoice keywords with confidence and reason (static, shared implementation)
     /// Legacy method - delegates to generic detectKeywords
-    public static func detectInvoiceKeywords(from text: String) -> (isInvoice: Bool, confidence: String, reason: String?) {
-        let result = detectKeywords(for: .invoice, from: text)
-        return (result.isMatch, result.confidence, result.reason)
+    public static func detectInvoiceKeywords(from text: String) -> KeywordResult {
+        detectKeywords(for: .invoice, from: text)
     }
 
     /// Generic keyword detection for any document type
@@ -134,7 +148,7 @@ public class OCREngine {
     public static func detectKeywords(
         for documentType: DocumentType,
         from text: String
-    ) -> (isMatch: Bool, confidence: String, reason: String?) {
+    ) -> KeywordResult {
         let lowercased = text.lowercased()
 
         let strongIndicators = documentType.strongKeywords
@@ -153,16 +167,26 @@ public class OCREngine {
 
         // Determine result
         if !foundStrong.isEmpty {
-            return (true, "high", "Found: \(foundStrong.joined(separator: ", "))")
+            let reason = "Found: \(foundStrong.joined(separator: ", "))"
+            return KeywordResult(isMatch: true, confidence: "high", reason: reason)
         } else if !foundMedium.isEmpty {
-            return (true, "medium", "Found: \(foundMedium.joined(separator: ", "))")
+            let reason = "Found: \(foundMedium.joined(separator: ", "))"
+            return KeywordResult(isMatch: true, confidence: "medium", reason: reason)
         } else {
-            return (false, "high", "No \(documentType.displayName.lowercased()) keywords found")
+            let typeName = documentType.displayName.lowercased()
+            return KeywordResult(
+                isMatch: false,
+                confidence: "high",
+                reason: "No \(typeName) keywords found"
+            )
         }
     }
 
     /// Instance method for generic keyword detection
-    public func detectKeywords(for documentType: DocumentType, from text: String) -> (isMatch: Bool, confidence: String, reason: String?) {
+    public func detectKeywords(
+        for documentType: DocumentType,
+        from text: String
+    ) -> KeywordResult {
         Self.detectKeywords(for: documentType, from: text)
     }
 
@@ -205,24 +229,33 @@ public class OCREngine {
         StringUtils.sanitizeCompanyName(name)
     }
 
+    /// Result of legacy invoice data extraction
+    public struct LegacyInvoiceData {
+        public let isInvoice: Bool
+        public let date: Date?
+        public let company: String?
+    }
+
     /// Extract all invoice data from OCR text using Text-LLM (legacy method)
-    public func extractInvoiceData(from text: String) async throws -> (isInvoice: Bool, date: Date?, company: String?) {
+    public func extractInvoiceData(
+        from text: String
+    ) async throws -> LegacyInvoiceData {
         if config.verbose {
             print("OCR extracted text (\(text.count) characters)")
             print("Sending to Text-LLM for analysis...")
         }
 
         // Use Text-LLM to analyze the OCR text
-        let (isInvoice, date, company) = try await textLLM.analyzeInvoiceText(text)
+        let result = try await textLLM.analyzeInvoiceText(text)
 
         if config.verbose {
             print("OCR + Text-LLM Results:")
-            print("  Is Invoice: \(isInvoice)")
-            print("  Date: \(date?.description ?? "nil")")
-            print("  Company: \(company ?? "nil")")
+            print("  Is Invoice: \(result.isInvoice)")
+            print("  Date: \(result.date?.description ?? "nil")")
+            print("  Company: \(result.company ?? "nil")")
         }
 
-        return (isInvoice, date, company)
+        return result
     }
 
     /// Extract only date and company from OCR text (no invoice detection)
