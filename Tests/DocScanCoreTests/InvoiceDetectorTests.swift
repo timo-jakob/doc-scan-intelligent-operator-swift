@@ -3,66 +3,6 @@ import AppKit
 import PDFKit
 import XCTest
 
-// MARK: - Mock VLM Provider
-
-/// Mock VLM provider for testing without actual model loading
-final class MockVLMProvider: VLMProvider, @unchecked Sendable {
-    /// Configure the mock response
-    var mockResponse: String = "YES"
-    var shouldThrowError: Bool = false
-    var errorToThrow: Error = DocScanError.modelLoadFailed("Mock error")
-
-    /// Track calls for verification
-    private(set) var generateFromImageCallCount = 0
-    private(set) var lastPrompt: String?
-    private(set) var lastImage: NSImage?
-
-    func generateFromImage(
-        _ image: NSImage,
-        prompt: String,
-        modelName _: String?
-    ) async throws -> String {
-        generateFromImageCallCount += 1
-        lastPrompt = prompt
-        lastImage = image
-
-        if shouldThrowError {
-            throw errorToThrow
-        }
-
-        return mockResponse
-    }
-
-    func reset() {
-        generateFromImageCallCount = 0
-        lastPrompt = nil
-        lastImage = nil
-        mockResponse = "YES"
-        shouldThrowError = false
-    }
-}
-
-// MARK: - Mock TextLLM Manager
-
-/// Mock TextLLM manager for testing without actual model loading
-final class MockTextLLMManager: TextLLMManager {
-    var mockDate: Date?
-    var mockSecondaryField: String?
-    var mockPatientName: String?
-    var shouldThrowError: Bool = false
-    var errorToThrow: Error = DocScanError.inferenceError("Mock TextLLM error")
-
-    override func extractData(
-        for _: DocumentType,
-        from _: String
-    ) async throws -> (date: Date?, secondaryField: String?, patientName: String?) {
-        if shouldThrowError {
-            throw errorToThrow
-        }
-        return (date: mockDate, secondaryField: mockSecondaryField, patientName: mockPatientName)
-    }
-}
-
 // MARK: - Document Detector Tests
 
 final class InvoiceDetectorTests: XCTestCase {
@@ -108,7 +48,7 @@ final class InvoiceDetectorTests: XCTestCase {
         DocumentDetector(config: config)
     }
 
-    private func createSearchablePDF() throws -> String {
+    func createSearchablePDF() throws -> String {
         let pdfPath = tempDirectory.appendingPathComponent("test_invoice.pdf").path
         guard let pdfData = Data(
             base64Encoded: Self.sharedSearchablePDFBase64,
@@ -120,7 +60,7 @@ final class InvoiceDetectorTests: XCTestCase {
         return pdfPath
     }
 
-    private func createEmptyPDF() throws -> String {
+    func createEmptyPDF() throws -> String {
         let pdfPath = tempDirectory.appendingPathComponent("empty.pdf").path
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
         guard let context = CGContext(URL(fileURLWithPath: pdfPath) as CFURL, mediaBox: &mediaBox, nil) else {
@@ -247,204 +187,11 @@ final class InvoiceDetectorTests: XCTestCase {
 
         XCTAssertEqual(filename, "15.12.2024_Rechnung_TestCo.pdf")
     }
+}
 
-    // MARK: - Direct Text Categorization Tests
+// MARK: - Pre-loaded TextLLM Initializer Tests
 
-    func testCategorizeWithDirectTextInvoice() {
-        let invoiceText = """
-        DB Fernverkehr AG
-        Rechnung
-        Rechnungsnummer: 2025018156792
-        Datum: 27.06.2025
-        Betrag: 81,90 €
-        """
-
-        let result = detector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
-        XCTAssertNotNil(result.reason)
-    }
-
-    func testCategorizeWithDirectTextInvoiceGerman() {
-        let invoiceText = """
-        Rechnungsnummer: 12345
-        Rechnungsdatum: 15.12.2024
-        Gesamtbetrag: 150,00 EUR
-        """
-
-        let result = detector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
-    }
-
-    func testCategorizeWithDirectTextInvoiceEnglish() {
-        let invoiceText = """
-        Invoice Number: INV-2024-001
-        Invoice Date: December 15, 2024
-        Total Amount: $150.00
-        """
-
-        let result = detector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testCategorizeWithDirectTextNotInvoice() {
-        let regularText = """
-        This is a regular document.
-        It contains some text but nothing special.
-        Just a normal letter or report.
-        """
-
-        let result = detector.categorizeWithDirectText(regularText)
-
-        XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
-    }
-
-    func testCategorizeWithDirectTextMediumConfidence() {
-        // Only contains "Rechnung" but no strong indicators like "Rechnungsnummer"
-        let invoiceText = """
-        Vielen Dank für Ihre Rechnung.
-        Wir werden diese bearbeiten.
-        """
-
-        let result = detector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "medium")
-    }
-
-    func testCategorizeWithDirectTextEmptyString() {
-        let result = detector.categorizeWithDirectText("")
-
-        XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testCategorizeWithDirectTextFrench() {
-        let invoiceText = """
-        Facture
-        Numéro de facture: 12345
-        Date: 15/12/2024
-        """
-
-        let result = detector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testCategorizeWithDirectTextReceipt() {
-        let receiptText = """
-        Receipt
-        Thank you for your purchase
-        Total: $25.00
-        """
-
-        let result = detector.categorizeWithDirectText(receiptText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testCategorizeWithDirectTextVerboseMode() {
-        let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice)
-
-        let invoiceText = "Rechnung Nr. 12345"
-        let result = verboseDetector.categorizeWithDirectText(invoiceText)
-
-        // Should still work correctly in verbose mode
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testCategorizeWithDirectTextVerboseModeNotInvoice() {
-        let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice)
-
-        // Regular text without any invoice keywords
-        let regularText = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
-        let result = verboseDetector.categorizeWithDirectText(regularText)
-
-        XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
-    }
-
-    func testCategorizeWithDirectTextVerboseModeWithReason() {
-        let verboseConfig = Configuration(verbose: true)
-        let verboseDetector = DocumentDetector(config: verboseConfig, documentType: .invoice)
-
-        // Invoice text with strong indicators
-        let invoiceText = """
-        Rechnungsnummer: 12345
-        Rechnungsdatum: 15.12.2024
-        """
-        let result = verboseDetector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertNotNil(result.reason)
-    }
-
-    func testCategorizeWithDirectTextLongText() {
-        let longText = String(repeating: "This is a test document. ", count: 100)
-            + "Rechnung Nr. 12345"
-
-        let result = detector.categorizeWithDirectText(longText)
-
-        XCTAssertTrue(result.isMatch)
-    }
-
-    func testCategorizeWithDirectTextSpanish() {
-        let invoiceText = """
-        Factura
-        Número de factura: FAC-2024-001
-        Fecha: 15/12/2024
-        """
-
-        let result = detector.categorizeWithDirectText(invoiceText)
-
-        XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
-    }
-
-    func testCategorizeWithDirectTextQuittung() {
-        let receiptText = """
-        Quittung
-        Betrag: 50,00 EUR
-        """
-
-        let result = detector.categorizeWithDirectText(receiptText)
-
-        XCTAssertTrue(result.isMatch)
-    }
-
-    func testCategorizeWithDirectTextCaseInsensitive() {
-        let testCases = [
-            "RECHNUNG NR 12345",
-            "rechnung nr 12345",
-            "Rechnung Nr 12345",
-            "INVOICE NUMBER 12345",
-            "invoice number 12345",
-        ]
-
-        for text in testCases {
-            let result = detector.categorizeWithDirectText(text)
-            XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
-        }
-    }
-
-    // MARK: - Pre-loaded TextLLM Initializer Tests
-
+extension InvoiceDetectorTests {
     func testDocumentDetectorInitWithPreloadedTextLLM() {
         let textLLM = TextLLMManager(config: config)
         let detectorWithTextLLM = DocumentDetector(

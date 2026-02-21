@@ -36,7 +36,9 @@ open class TextLLMManager {
     }
 
     /// Analyze OCR text using Text-LLM to extract invoice data
-    public func analyzeInvoiceText(_ text: String) async throws -> (isInvoice: Bool, date: Date?, company: String?) {
+    public func analyzeInvoiceText(
+        _ text: String
+    ) async throws -> OCREngine.LegacyInvoiceData {
         if config.verbose {
             print("Text-LLM: Analyzing OCR text...")
         }
@@ -48,20 +50,24 @@ open class TextLLMManager {
             if config.verbose {
                 print("Text-LLM: Not an invoice")
             }
-            return (false, nil, nil)
+            return OCREngine.LegacyInvoiceData(isInvoice: false, date: nil, company: nil)
         }
 
         // Extract date and company using LLM
-        let (date, company) = try await extractInvoiceData(from: text)
+        let extraction = try await extractInvoiceData(from: text)
 
         if config.verbose {
             print("Text-LLM Results:")
             print("  Is Invoice: \(isInvoice)")
-            print("  Date: \(date?.description ?? "nil")")
-            print("  Company: \(company ?? "nil")")
+            print("  Date: \(extraction.date?.description ?? "nil")")
+            print("  Company: \(extraction.company ?? "nil")")
         }
 
-        return (isInvoice, date, company)
+        return OCREngine.LegacyInvoiceData(
+            isInvoice: isInvoice,
+            date: extraction.date,
+            company: extraction.company
+        )
     }
 
     /// Detect if text represents an invoice using keyword detection
@@ -71,16 +77,16 @@ open class TextLLMManager {
         }
 
         // Use shared keyword detection from OCREngine
-        let (isInvoice, confidence, reason) = OCREngine.detectInvoiceKeywords(from: text)
+        let result = OCREngine.detectInvoiceKeywords(from: text)
 
         if config.verbose {
-            print("Text-LLM: Keyword detection result: \(isInvoice) (confidence: \(confidence))")
-            if let reason {
+            print("Text-LLM: Keyword detection result: \(result.isMatch) (confidence: \(result.confidence))")
+            if let reason = result.reason {
                 print("  - \(reason)")
             }
         }
 
-        return isInvoice
+        return result.isMatch
     }
 
     /// Extract date and company from text using LLM (public API for Phase 2)
@@ -95,7 +101,7 @@ open class TextLLMManager {
     open func extractData(
         for documentType: DocumentType,
         from text: String
-    ) async throws -> (date: Date?, secondaryField: String?, patientName: String?) {
+    ) async throws -> ExtractionResult {
         let systemPrompt = documentType.extractionSystemPrompt
         let userPrompt = documentType.extractionUserPrompt(for: text)
 
@@ -105,62 +111,74 @@ open class TextLLMManager {
             maxTokens: config.maxTokens
         )
 
-        // Parse response based on document type
+        var parsed = parseExtractionResponse(response, documentType: documentType)
+
+        // Fallback: If LLM didn't find a date, try regex-based extraction
+        if parsed.date == nil {
+            if config.verbose {
+                print("Text-LLM: Date not found by LLM, trying regex fallback...")
+            }
+            let fallbackDate = extractDateWithRegex(from: text)
+            if config.verbose, let fallbackDate {
+                print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(fallbackDate))")
+            }
+            parsed = ExtractionResult(
+                date: fallbackDate,
+                secondaryField: parsed.secondaryField,
+                patientName: parsed.patientName
+            )
+        }
+
+        return parsed
+    }
+
+    /// Parse an LLM response into an ExtractionResult
+    private func parseExtractionResponse(
+        _ response: String,
+        documentType: DocumentType
+    ) -> ExtractionResult {
         let lines = response.components(separatedBy: .newlines)
         var date: Date?
         var secondaryField: String?
         var patientName: String?
 
-        // Determine secondary field prefix based on document type
         let secondaryPrefix = switch documentType {
-        case .invoice:
-            "COMPANY:"
-        case .prescription:
-            "DOCTOR:"
+        case .invoice: "COMPANY:"
+        case .prescription: "DOCTOR:"
         }
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-
             if trimmed.hasPrefix("DATE:") {
-                let dateString = trimmed
+                let value = trimmed
                     .replacingOccurrences(of: "DATE:", with: "")
                     .trimmingCharacters(in: .whitespaces)
-
-                if dateString != "UNKNOWN", dateString != "NOT_FOUND" {
-                    date = parseDate(dateString)
+                if value != "UNKNOWN", value != "NOT_FOUND" {
+                    date = parseDate(value)
                 }
             } else if trimmed.hasPrefix(secondaryPrefix) {
-                let fieldValue = trimmed
+                let value = trimmed
                     .replacingOccurrences(of: secondaryPrefix, with: "")
                     .trimmingCharacters(in: .whitespaces)
-
-                if fieldValue != "UNKNOWN", fieldValue != "NOT_FOUND" {
-                    secondaryField = sanitizeFieldValue(fieldValue, for: documentType)
+                if value != "UNKNOWN", value != "NOT_FOUND" {
+                    secondaryField = sanitizeFieldValue(value, for: documentType)
                 }
-            } else if trimmed.hasPrefix("PATIENT:"), documentType == .prescription {
-                let patientValue = trimmed
+            } else if trimmed.hasPrefix("PATIENT:"),
+                      documentType == .prescription {
+                let value = trimmed
                     .replacingOccurrences(of: "PATIENT:", with: "")
                     .trimmingCharacters(in: .whitespaces)
-
-                if patientValue != "UNKNOWN", patientValue != "NOT_FOUND" {
-                    patientName = StringUtils.sanitizePatientName(patientValue)
+                if value != "UNKNOWN", value != "NOT_FOUND" {
+                    patientName = StringUtils.sanitizePatientName(value)
                 }
             }
         }
 
-        // Fallback: If LLM didn't find a date, try regex-based extraction
-        if date == nil {
-            if config.verbose {
-                print("Text-LLM: Date not found by LLM, trying regex fallback...")
-            }
-            date = extractDateWithRegex(from: text)
-            if config.verbose, date != nil {
-                print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(date!))")
-            }
-        }
-
-        return (date, secondaryField, patientName)
+        return ExtractionResult(
+            date: date,
+            secondaryField: secondaryField,
+            patientName: patientName
+        )
     }
 
     /// Sanitize field value based on document type
@@ -173,10 +191,17 @@ open class TextLLMManager {
         }
     }
 
+    /// Result of legacy invoice extraction (date + company)
+    struct InvoiceExtraction {
+        let date: Date?
+        let company: String?
+    }
+
     /// Extract invoice date and company from text using LLM with regex fallback
-    private func extractInvoiceData(from text: String) async throws -> (Date?, String?) {
+    private func extractInvoiceData(from text: String) async throws -> InvoiceExtraction {
         let systemPrompt = """
-        You are an invoice data extraction assistant. Extract information accurately and respond in the exact format requested.
+        You are an invoice data extraction assistant. \
+        Extract information accurately and respond in the exact format requested.
         """
 
         let userPrompt = """
@@ -200,46 +225,22 @@ open class TextLLMManager {
             maxTokens: config.maxTokens
         )
 
-        // Parse response
-        let lines = response.components(separatedBy: .newlines)
-        var date: Date?
-        var company: String?
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed.hasPrefix("DATE:") {
-                let dateString = trimmed
-                    .replacingOccurrences(of: "DATE:", with: "")
-                    .trimmingCharacters(in: .whitespaces)
-
-                if dateString != "UNKNOWN" {
-                    date = parseDate(dateString)
-                }
-            } else if trimmed.hasPrefix("COMPANY:") {
-                let companyName = trimmed
-                    .replacingOccurrences(of: "COMPANY:", with: "")
-                    .trimmingCharacters(in: .whitespaces)
-
-                if companyName != "UNKNOWN" {
-                    company = sanitizeCompanyName(companyName)
-                }
-            }
-        }
+        let parsed = parseExtractionResponse(response, documentType: .invoice)
+        var date = parsed.date
+        let company = parsed.secondaryField
 
         // Fallback: If LLM didn't find a date, try regex-based extraction
-        // This catches German month formats like "September 2022" and other edge cases
         if date == nil {
             if config.verbose {
                 print("Text-LLM: Date not found by LLM, trying regex fallback...")
             }
             date = extractDateWithRegex(from: text)
-            if config.verbose, date != nil {
-                print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(date!))")
+            if config.verbose, let date {
+                print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(date))")
             }
         }
 
-        return (date, company)
+        return InvoiceExtraction(date: date, company: company)
     }
 
     /// Extract date using regex patterns (fallback for LLM failures)
@@ -247,9 +248,13 @@ open class TextLLMManager {
     private func extractDateWithRegex(from text: String) -> Date? {
         DateUtils.extractDateFromText(text)
     }
+}
 
+// MARK: - LLM Generation
+
+extension TextLLMManager {
     /// Generate text using MLX LLM
-    private func generate(
+    func generate(
         systemPrompt: String,
         userPrompt: String,
         maxTokens: Int
@@ -331,12 +336,12 @@ open class TextLLMManager {
     }
 
     /// Parse date string using shared utility
-    private func parseDate(_ dateString: String) -> Date? {
+    func parseDate(_ dateString: String) -> Date? {
         DateUtils.parseDate(dateString)
     }
 
     /// Sanitize company name using shared utility
-    private func sanitizeCompanyName(_ name: String) -> String {
+    func sanitizeCompanyName(_ name: String) -> String {
         StringUtils.sanitizeCompanyName(name)
     }
 }

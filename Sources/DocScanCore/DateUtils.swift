@@ -205,9 +205,15 @@ public enum DateUtils {
         for month in germanMonthNames {
             // Use word boundary regex to avoid false positives
             let monthPattern = "\\b\(NSRegularExpression.escapedPattern(for: month))\\b"
-            guard let monthRegex = try? NSRegularExpression(pattern: monthPattern, options: .caseInsensitive),
-                  let monthMatch = monthRegex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)),
-                  let monthRange = Range(monthMatch.range, in: lowercased)
+            let options: NSRegularExpression.Options = .caseInsensitive
+            let searchRange = NSRange(lowercased.startIndex..., in: lowercased)
+            guard let monthRegex = try? NSRegularExpression(
+                pattern: monthPattern, options: options
+            ),
+                let monthMatch = monthRegex.firstMatch(
+                    in: lowercased, range: searchRange
+                ),
+                let monthRange = Range(monthMatch.range, in: lowercased)
             else {
                 continue
             }
@@ -216,8 +222,13 @@ public enum DateUtils {
             let afterMonthString = String(String(lowercased[monthRange.upperBound...]).prefix(20))
             let yearPattern = "\\b(20\\d{2})\\b"
 
+            let yearRange2 = NSRange(
+                afterMonthString.startIndex..., in: afterMonthString
+            )
             guard let yearRegex = try? NSRegularExpression(pattern: yearPattern),
-                  let yearMatch = yearRegex.firstMatch(in: afterMonthString, range: NSRange(afterMonthString.startIndex..., in: afterMonthString)),
+                  let yearMatch = yearRegex.firstMatch(
+                      in: afterMonthString, range: yearRange2
+                  ),
                   let yearRange = Range(yearMatch.range, in: afterMonthString)
             else {
                 continue

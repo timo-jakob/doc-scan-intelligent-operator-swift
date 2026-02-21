@@ -28,9 +28,11 @@ final class PathUtilsTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDirectory)
         super.tearDown()
     }
+}
 
-    // MARK: - Absolute Path Tests
+// MARK: - Absolute Path Tests
 
+extension PathUtilsTests {
     func testAbsolutePath() {
         let absolutePath = "/usr/local/bin/docscan"
         let resolved = PathUtils.resolvePath(absolutePath)
@@ -50,9 +52,11 @@ final class PathUtilsTests: XCTestCase {
         XCTAssertEqual(resolved, testFile.path)
         XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
     }
+}
 
-    // MARK: - Tilde Expansion Tests
+// MARK: - Tilde Expansion Tests
 
+extension PathUtilsTests {
     func testTildeExpansion() {
         let tildePath = "~/Documents/invoice.pdf"
         let resolved = PathUtils.resolvePath(tildePath)
@@ -72,9 +76,11 @@ final class PathUtilsTests: XCTestCase {
         let resolved = PathUtils.resolvePath(testFile.path)
         XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
     }
+}
 
-    // MARK: - Relative Path Tests
+// MARK: - Relative Path Tests
 
+extension PathUtilsTests {
     func testRelativePathBareFilename() throws {
         // Change to temp directory
         FileManager.default.changeCurrentDirectoryPath(tempDirectory.path)
@@ -138,9 +144,11 @@ final class PathUtilsTests: XCTestCase {
         XCTAssertEqual(resolved, testFile.path)
         XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
     }
+}
 
-    // MARK: - Path Normalization Tests (../ and ./)
+// MARK: - Path Normalization Tests (../ and ./)
 
+extension PathUtilsTests {
     func testPathNormalizationWithDotDot() throws {
         // Create directory structure: temp/subdir/file.pdf
         let subdir = tempDirectory.appendingPathComponent("subdir")
@@ -204,9 +212,11 @@ final class PathUtilsTests: XCTestCase {
         XCTAssertFalse(resolved.contains(".."))
         XCTAssertFalse(resolved.contains("/./"))
     }
+}
 
-    // MARK: - Symlink Resolution Tests
+// MARK: - Symlink Resolution Tests
 
+extension PathUtilsTests {
     func testSymlinkResolution() throws {
         // Create actual file
         let actualFile = tempDirectory.appendingPathComponent("actual.pdf")
@@ -275,9 +285,11 @@ final class PathUtilsTests: XCTestCase {
         // Should resolve to actual file
         XCTAssertEqual(resolved, actualFile.path)
     }
+}
 
-    // MARK: - Non-Existent File Tests
+// MARK: - Non-Existent File Tests
 
+extension PathUtilsTests {
     func testNonExistentFileAbsolutePath() {
         let nonExistentPath = tempDirectory.appendingPathComponent("nonexistent.pdf").path
         let resolved = PathUtils.resolvePath(nonExistentPath)
@@ -305,164 +317,5 @@ final class PathUtilsTests: XCTestCase {
         // Should normalize even if file doesn't exist
         XCTAssertFalse(resolved.contains(".."))
         XCTAssertTrue(resolved.hasSuffix("nonexistent.pdf"))
-    }
-
-    // MARK: - Edge Cases
-
-    func testPathWithSpaces() throws {
-        // Create file with spaces in name
-        let testFile = tempDirectory.appendingPathComponent("file with spaces.pdf")
-        try "test content".write(to: testFile, atomically: true, encoding: .utf8)
-
-        let resolved = PathUtils.resolvePath(testFile.path)
-
-        XCTAssertEqual(resolved, testFile.path)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
-    }
-
-    func testPathWithSpecialCharacters() throws {
-        // Create file with special characters
-        let testFile = tempDirectory.appendingPathComponent("file-with_special.chars.pdf")
-        try "test content".write(to: testFile, atomically: true, encoding: .utf8)
-
-        let resolved = PathUtils.resolvePath(testFile.path)
-
-        XCTAssertEqual(resolved, testFile.path)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
-    }
-
-    func testPathWithUnicode() throws {
-        // Create file with Unicode characters
-        let testFile = tempDirectory.appendingPathComponent("Rechnung_Müller_2024.pdf")
-        try "test content".write(to: testFile, atomically: true, encoding: .utf8)
-
-        let resolved = PathUtils.resolvePath(testFile.path)
-
-        XCTAssertEqual(resolved, testFile.path)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
-    }
-
-    // MARK: - Combined Tests (Multiple Features)
-
-    func testRelativePathWithSymlinkAndNormalization() throws {
-        // Create directory structure
-        let subdir = tempDirectory.appendingPathComponent("subdir")
-        try FileManager.default.createDirectory(at: subdir, withIntermediateDirectories: true)
-
-        // Create actual file
-        let actualFile = tempDirectory.appendingPathComponent("actual.pdf")
-        try "test content".write(to: actualFile, atomically: true, encoding: .utf8)
-
-        // Create symlink with ../ in path
-        let symlinkFile = subdir.appendingPathComponent("link.pdf")
-        try FileManager.default.createSymbolicLink(
-            atPath: symlinkFile.path,
-            withDestinationPath: "../actual.pdf"
-        )
-
-        // Change to temp directory
-        FileManager.default.changeCurrentDirectoryPath(tempDirectory.path)
-
-        // Resolve relative path to symlink
-        let resolved = PathUtils.resolvePath("./subdir/link.pdf")
-
-        // Should resolve symlink and normalize to actual file
-        XCTAssertEqual(resolved, actualFile.path)
-        XCTAssertFalse(resolved.contains(".."))
-        XCTAssertFalse(resolved.contains("subdir"))
-    }
-
-    func testTildeWithNormalizationAndSymlink() {
-        // This test verifies that tilde expansion works with our path resolution
-        let homePath = FileManager.default.homeDirectoryForCurrentUser.path
-        let resolved = PathUtils.resolvePath("~/Documents/../Documents/test.pdf")
-
-        // Should expand tilde and normalize
-        XCTAssertFalse(resolved.contains("~"))
-        XCTAssertTrue(resolved.hasPrefix(homePath))
-        XCTAssertTrue(resolved.hasSuffix("Documents/test.pdf"))
-    }
-
-    // MARK: - getCurrentWorkingDirectory Tests
-
-    func testGetCurrentWorkingDirectoryWithoutEnvVar() {
-        // Ensure env var is not set
-        unsetenv(docScanOriginalPwdKey)
-
-        let cwd = PathUtils.getCurrentWorkingDirectory()
-
-        // Should return FileManager's current directory
-        XCTAssertEqual(cwd, FileManager.default.currentDirectoryPath)
-    }
-
-    func testGetCurrentWorkingDirectoryWithEnvVar() {
-        let testPath = "/test/original/path"
-
-        // Set the environment variable
-        setenv(docScanOriginalPwdKey, testPath, 1)
-
-        let cwd = PathUtils.getCurrentWorkingDirectory()
-
-        // Clean up
-        unsetenv(docScanOriginalPwdKey)
-
-        // Should return the env var value
-        XCTAssertEqual(cwd, testPath)
-    }
-
-    func testGetCurrentWorkingDirectoryWithEmptyEnvVar() {
-        // Set empty environment variable
-        setenv(docScanOriginalPwdKey, "", 1)
-
-        let cwd = PathUtils.getCurrentWorkingDirectory()
-
-        // Clean up
-        unsetenv(docScanOriginalPwdKey)
-
-        // Should fall back to FileManager's current directory
-        XCTAssertEqual(cwd, FileManager.default.currentDirectoryPath)
-    }
-
-    func testRelativePathResolutionWithEnvVar() throws {
-        // Create a file in temp directory
-        let testFile = tempDirectory.appendingPathComponent("env_test.pdf")
-        try "test content".write(to: testFile, atomically: true, encoding: .utf8)
-
-        // Set the original PWD to temp directory (simulating wrapper script behavior)
-        setenv(docScanOriginalPwdKey, tempDirectory.path, 1)
-
-        // Resolve relative path - should use the env var, not current directory
-        let resolved = PathUtils.resolvePath("env_test.pdf")
-
-        // Clean up
-        unsetenv(docScanOriginalPwdKey)
-
-        // Should resolve relative to the env var path
-        XCTAssertEqual(resolved, testFile.path)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: resolved))
-    }
-
-    func testRelativePathResolutionWithEnvVarDifferentFromCurrentDir() throws {
-        // Create a file in temp directory
-        let testFile = tempDirectory.appendingPathComponent("different_dir_test.pdf")
-        try "test content".write(to: testFile, atomically: true, encoding: .utf8)
-
-        // Change current directory to something else
-        let originalDir = FileManager.default.currentDirectoryPath
-        FileManager.default.changeCurrentDirectoryPath("/tmp")
-
-        // Set the original PWD to temp directory
-        setenv(docScanOriginalPwdKey, tempDirectory.path, 1)
-
-        // Resolve relative path
-        let resolved = PathUtils.resolvePath("different_dir_test.pdf")
-
-        // Clean up
-        unsetenv(docScanOriginalPwdKey)
-        FileManager.default.changeCurrentDirectoryPath(originalDir)
-
-        // Should resolve relative to the env var path, not /tmp
-        XCTAssertEqual(resolved, testFile.path)
-        XCTAssertFalse(resolved.contains("/tmp"))
     }
 }

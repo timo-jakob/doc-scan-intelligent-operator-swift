@@ -285,9 +285,11 @@ final class VerificationTests: XCTestCase {
         XCTAssertFalse(verification.bothAgree)
         XCTAssertNil(verification.agreedIsMatch)
     }
+}
 
-    // MARK: - ExtractionResult Tests
+// MARK: - ExtractionResult Tests
 
+extension VerificationTests {
     func testExtractionResultInitialization() {
         let date = Date()
         let result = ExtractionResult(date: date, secondaryField: "Test Corp")

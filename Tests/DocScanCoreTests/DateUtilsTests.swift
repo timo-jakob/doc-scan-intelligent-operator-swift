@@ -36,7 +36,11 @@ final class DateUtilsTests: XCTestCase {
         ]
 
         for date in invalidDates {
-            XCTAssertFalse(DateUtils.isValidDate(date), "Date in \(Calendar.current.component(.year, from: date)) should be invalid (before 2000)")
+            let year = Calendar.current.component(.year, from: date)
+            XCTAssertFalse(
+                DateUtils.isValidDate(date),
+                "Date in \(year) should be invalid (before 2000)"
+            )
         }
     }
 
@@ -44,7 +48,10 @@ final class DateUtilsTests: XCTestCase {
         // Current year + 2 should be valid
         let currentYear = Calendar.current.component(.year, from: Date())
         let upperBoundaryDate = createDate(year: currentYear + 2, month: 6, day: 15)
-        XCTAssertTrue(DateUtils.isValidDate(upperBoundaryDate), "Year \(currentYear + 2) should be valid (upper boundary)")
+        XCTAssertTrue(
+            DateUtils.isValidDate(upperBoundaryDate),
+            "Year \(currentYear + 2) should be valid (upper boundary)"
+        )
 
         let endOfUpperBoundary = createDate(year: currentYear + 2, month: 12, day: 31)
         XCTAssertTrue(DateUtils.isValidDate(endOfUpperBoundary), "End of \(currentYear + 2) should be valid")
@@ -62,7 +69,10 @@ final class DateUtilsTests: XCTestCase {
 
         for date in invalidDates {
             let year = Calendar.current.component(.year, from: date)
-            XCTAssertFalse(DateUtils.isValidDate(date), "Date in \(year) should be invalid (more than 2 years in future)")
+            XCTAssertFalse(
+                DateUtils.isValidDate(date),
+                "Date in \(year) should be invalid (more than 2 years in future)"
+            )
         }
     }
 
@@ -91,7 +101,10 @@ final class DateUtilsTests: XCTestCase {
         ]
 
         for dateString in invalidDateStrings {
-            XCTAssertNil(DateUtils.parseDate(dateString), "Date string '\(dateString)' should be rejected by validation")
+            XCTAssertNil(
+                DateUtils.parseDate(dateString),
+                "Date string '\(dateString)' should be rejected by validation"
+            )
         }
     }
 
@@ -167,16 +180,25 @@ final class DateUtilsTests: XCTestCase {
     }
 
     func testParseDateGermanMonthFormat() {
-        let testCases: [(String, Int, Int)] = [
-            ("September 2022", 2022, 9),
-            ("Januar 2023", 2023, 1),
-            ("Dezember 2024", 2024, 12),
-            ("März 2021", 2021, 3),
-            ("sep 2022", 2022, 9),
-            ("okt 2023", 2023, 10),
+        struct TestCase {
+            let input: String
+            let year: Int
+            let month: Int
+        }
+
+        let testCases: [TestCase] = [
+            TestCase(input: "September 2022", year: 2022, month: 9),
+            TestCase(input: "Januar 2023", year: 2023, month: 1),
+            TestCase(input: "Dezember 2024", year: 2024, month: 12),
+            TestCase(input: "März 2021", year: 2021, month: 3),
+            TestCase(input: "sep 2022", year: 2022, month: 9),
+            TestCase(input: "okt 2023", year: 2023, month: 10),
         ]
 
-        for (dateString, expectedYear, expectedMonth) in testCases {
+        for testCase in testCases {
+            let dateString = testCase.input
+            let expectedYear = testCase.year
+            let expectedMonth = testCase.month
             let date = DateUtils.parseDate(dateString)
             XCTAssertNotNil(date, "Should parse '\(dateString)'")
 
@@ -217,9 +239,11 @@ final class DateUtilsTests: XCTestCase {
         XCTAssertEqual(DateUtils.formatDate(date, format: "yyyy/MM/dd"), "2024/12/22")
         XCTAssertEqual(DateUtils.formatDate(date, format: "MMMM yyyy"), "December 2024")
     }
+}
 
-    // MARK: - extractDateFromText Tests
+// MARK: - extractDateFromText Tests
 
+extension DateUtilsTests {
     func testExtractDateFromTextWithKeyword() {
         let text = "Rechnungsdatum: 2024-12-15 some other text"
         let date = DateUtils.extractDateFromText(text)
@@ -319,173 +343,5 @@ final class DateUtilsTests: XCTestCase {
         components.month = month
         components.day = day
         return Calendar.current.date(from: components)!
-    }
-}
-
-// MARK: - extractDateWithPattern and extractGermanMonthFromText Tests
-
-final class DateUtilsPatternTests: XCTestCase {
-    func testExtractDateWithPatternISO() {
-        let text = "Date is 2024-12-22 here"
-        let pattern = "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b"
-        let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
-
-        XCTAssertNotNil(date)
-        if let date {
-            let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
-            XCTAssertEqual(components.year, 2024)
-            XCTAssertEqual(components.month, 12)
-            XCTAssertEqual(components.day, 22)
-        }
-    }
-
-    func testExtractDateWithPatternEuropean() {
-        let text = "Datum: 22.12.2024"
-        let pattern = "\\b(\\d{2})[./](\\d{2})[./](\\d{4})\\b"
-        let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
-
-        XCTAssertNotNil(date)
-        if let date {
-            let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
-            XCTAssertEqual(components.year, 2024)
-            XCTAssertEqual(components.month, 12)
-            XCTAssertEqual(components.day, 22)
-        }
-    }
-
-    func testExtractDateWithPatternNoMatch() {
-        let text = "No date here"
-        let pattern = "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b"
-        let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
-        XCTAssertNil(date)
-    }
-
-    func testExtractDateWithPatternInvalidRegex() {
-        let text = "2024-12-22"
-        let pattern = "[invalid(regex" // Invalid regex pattern
-        let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
-        XCTAssertNil(date)
-    }
-
-    func testExtractDateWithPatternMultipleMatches() {
-        let text = "First: 2024-01-15 Second: 2024-06-20"
-        let pattern = "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b"
-        let date = DateUtils.extractDateWithPattern(text, pattern: pattern)
-
-        XCTAssertNotNil(date)
-        // Should return the first match
-        if let date {
-            let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
-            XCTAssertEqual(components.year, 2024)
-            XCTAssertEqual(components.month, 1)
-            XCTAssertEqual(components.day, 15)
-        }
-    }
-
-    // MARK: - extractGermanMonthFromText Tests
-
-    func testExtractGermanMonthFromTextAllMonths() {
-        let testCases: [(String, Int)] = [
-            ("Januar 2023", 1),
-            ("Februar 2023", 2),
-            ("März 2023", 3),
-            ("April 2023", 4),
-            ("Mai 2023", 5),
-            ("Juni 2023", 6),
-            ("Juli 2023", 7),
-            ("August 2023", 8),
-            ("September 2023", 9),
-            ("Oktober 2023", 10),
-            ("November 2023", 11),
-            ("Dezember 2023", 12),
-        ]
-
-        for (text, expectedMonth) in testCases {
-            let date = DateUtils.extractGermanMonthFromText(text)
-            XCTAssertNotNil(date, "Failed to parse: \(text)")
-            if let date {
-                let components = Calendar.current.dateComponents([.month], from: date)
-                XCTAssertEqual(components.month, expectedMonth, "Month mismatch for: \(text)")
-            }
-        }
-    }
-
-    func testExtractGermanMonthFromTextAbbreviations() {
-        let testCases: [(String, Int)] = [
-            ("Jan 2023", 1),
-            ("Feb 2023", 2),
-            ("Mrz 2023", 3),
-            ("Apr 2023", 4),
-            ("Jun 2023", 6),
-            ("Jul 2023", 7),
-            ("Aug 2023", 8),
-            ("Sep 2023", 9),
-            ("Sept 2023", 9),
-            ("Okt 2023", 10),
-            ("Nov 2023", 11),
-            ("Dez 2023", 12),
-        ]
-
-        for (text, expectedMonth) in testCases {
-            let date = DateUtils.extractGermanMonthFromText(text)
-            XCTAssertNotNil(date, "Failed to parse: \(text)")
-            if let date {
-                let components = Calendar.current.dateComponents([.month], from: date)
-                XCTAssertEqual(components.month, expectedMonth, "Month mismatch for: \(text)")
-            }
-        }
-    }
-
-    func testExtractGermanMonthFromTextCaseInsensitive() {
-        let variations = ["september 2023", "SEPTEMBER 2023", "September 2023", "sEpTeMbEr 2023"]
-        for text in variations {
-            let date = DateUtils.extractGermanMonthFromText(text)
-            XCTAssertNotNil(date, "Failed to parse: \(text)")
-            if let date {
-                let components = Calendar.current.dateComponents([.month], from: date)
-                XCTAssertEqual(components.month, 9)
-            }
-        }
-    }
-
-    func testExtractGermanMonthFromTextInContext() {
-        let text = "Ihre Beitragsrechnung für September 2022"
-        let date = DateUtils.extractGermanMonthFromText(text)
-
-        XCTAssertNotNil(date)
-        if let date {
-            let components = Calendar.current.dateComponents([.year, .month], from: date)
-            XCTAssertEqual(components.year, 2022)
-            XCTAssertEqual(components.month, 9)
-        }
-    }
-
-    func testExtractGermanMonthFromTextNoYear() {
-        let text = "September ohne Jahr"
-        let date = DateUtils.extractGermanMonthFromText(text)
-        XCTAssertNil(date)
-    }
-
-    func testExtractGermanMonthFromTextMaerzAlternative() {
-        // "maerz" is alternative spelling for "März"
-        let date = DateUtils.extractGermanMonthFromText("Maerz 2023")
-        XCTAssertNotNil(date)
-        if let date {
-            let components = Calendar.current.dateComponents([.month], from: date)
-            XCTAssertEqual(components.month, 3)
-        }
-    }
-
-    func testExtractGermanMonthFromTextNoMatch() {
-        let text = "This text has no German month"
-        let date = DateUtils.extractGermanMonthFromText(text)
-        XCTAssertNil(date)
-    }
-
-    func testExtractGermanMonthFromTextFalsePositiveProtection() {
-        // "mai" should not match within "email"
-        let text = "email 2023"
-        let date = DateUtils.extractGermanMonthFromText(text)
-        XCTAssertNil(date, "Should not match 'mai' within 'email'")
     }
 }

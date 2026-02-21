@@ -274,9 +274,11 @@ final class StringUtilsTests: XCTestCase {
             XCTAssertEqual(result, expected, "Failed for input: \(input)")
         }
     }
+}
 
-    // MARK: - Patient Name Sanitization Tests
+// MARK: - Patient Name Sanitization Tests
 
+extension StringUtilsTests {
     func testSanitizePatientNameSimple() {
         let result = StringUtils.sanitizePatientName("Penelope")
         XCTAssertEqual(result, "Penelope")
