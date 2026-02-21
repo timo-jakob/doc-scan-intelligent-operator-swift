@@ -43,7 +43,7 @@ From `$ARGUMENTS`, extract:
    - Example: `card-component` or `card-component-dashboard`.
 
 3. `branch_name`  
-   use the git-github skill to create a branch_name
+   use the prepare-commit skill to create a branch_name
 
 If you cannot infer a sensible `feature_title` and `feature_slug`, ask the user to clarify instead of guessing.
 
