@@ -237,10 +237,11 @@ Do **not** push automatically.
 ## Step 6: Final report
 
 Print:
+- **Attempt N of 3 complete** — always state the current attempt number explicitly so the user knows when the limit is approaching
 - ✅ What was fixed and committed
 - ⚠️  What was flagged as ambiguous (with the original suggestion text, so the user can decide)
 - ℹ️  Any checks that were already passing or returned no data (with reason)
 - ℹ️  Reminder that Snyk and SonarQube only run on `main` — their results on PR branches are not available
 - That the branch is ready to push when the user is satisfied
 
-**If this was attempt 2 or 3 and checks still fail, explicitly list which checks are still failing and why, and tell the user the iteration limit has been reached.**
+**If this was attempt 3 and checks still fail, explicitly list which checks are still failing and why, and tell the user the iteration limit has been reached.**
