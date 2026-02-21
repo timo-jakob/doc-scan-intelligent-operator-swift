@@ -64,7 +64,7 @@ fi
 
 # Fetch full logs (not --log-failed) to capture lint violations hidden by continue-on-error
 # Tight pattern to avoid matching log noise (URLs, progress descriptions, etc.)
-gh run view "$RUN_ID" --log | grep -E "\.(swift|md):[0-9]+:[0-9]+: (warning|error):|BUILD FAILED|^error: " | head -100
+gh run view "$RUN_ID" --log | grep -E "\.(swift|md):[0-9]+:[0-9]+: (warning|error):|\*\* BUILD FAILED \*\*|^error: " | head -100
 ```
 
 Return: a structured list of build errors, test failures, and lint violations — each with file path and line number where available.
