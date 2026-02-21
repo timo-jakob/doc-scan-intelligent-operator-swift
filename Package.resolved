@@ -1,5 +1,5 @@
 {
-  "originHash" : "59a8a7392be6ceb383f22dc79b6defbe56c0dde2fec00f92a47c9af9416459bd",
+  "originHash" : "9fbdc22fea61518e77646c9ddae3485f8e70d45440c2a237f58fd026e9a5b686",
   "pins" : [
     {
       "identity" : "mlx-swift",
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpsim/Yams.git",
       "state" : {
-        "revision" : "51b5127c7fb6ffac106ad6d199aaa33c5024895f",
-        "version" : "6.2.0"
+        "revision" : "deaf82e867fa2cbd3cd865978b079bfcf384ac28",
+        "version" : "6.2.1"
       }
     }
   ],
