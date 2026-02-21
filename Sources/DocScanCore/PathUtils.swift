@@ -47,15 +47,6 @@ public enum PathUtils {
 
         // Normalize the path (handles ./ and ../ components) and resolve symlinks
         let normalizedURL = URL(fileURLWithPath: absolutePath).standardized
-        let resolvedPath: String
-        do {
-            // Resolve symlinks if the path exists
-            resolvedPath = try normalizedURL.resolvingSymlinksInPath().path
-        } catch {
-            // If symlink resolution fails (e.g., file doesn't exist yet), use standardized path
-            resolvedPath = normalizedURL.path
-        }
-
-        return resolvedPath
+        return normalizedURL.resolvingSymlinksInPath().path
     }
 }

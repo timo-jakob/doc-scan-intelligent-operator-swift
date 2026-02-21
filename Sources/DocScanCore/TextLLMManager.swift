@@ -261,7 +261,7 @@ open class TextLLMManager {
             throw DocScanError.modelLoadFailed("Model container not initialized")
         }
 
-        // Generate using mlx-swift-lm
+        // Generate using mlx-swift-lm (AsyncStream API)
         return try await container.perform { context in
             // Prepare input with chat template
             let input = try await context.processor.prepare(
@@ -271,25 +271,30 @@ open class TextLLMManager {
                 ])
             )
 
-            // Generate with streaming (collect full output)
-            var fullOutput = ""
-
-            try MLXLMCommon.generate(
+            let stream = try MLXLMCommon.generate(
                 input: input,
                 parameters: .init(
                     maxTokens: maxTokens,
                     temperature: Float(config.temperature)
                 ),
                 context: context
-            ) { tokens in
-                fullOutput = context.tokenizer.decode(tokens: tokens)
+            )
 
-                if config.verbose {
-                    // Show generation progress
-                    print(".", terminator: "")
+            var fullOutput = ""
+            for await generation in stream {
+                switch generation {
+                case let .chunk(text):
+                    fullOutput += text
+                    if config.verbose {
+                        print(".", terminator: "")
+                    }
+                case .info:
+                    break
+                case .toolCall:
+                    if config.verbose {
+                        print("[warn] unexpected toolCall event from TextLLM — ignored")
+                    }
                 }
-
-                return .more
             }
 
             if config.verbose {
