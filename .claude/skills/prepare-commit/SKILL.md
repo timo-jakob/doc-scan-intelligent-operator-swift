@@ -32,8 +32,10 @@ git branch --show-current
 If on `main`, determine the appropriate branch name from context (what was changed and why), then create it:
 
 ```bash
-git switch -c <type>/<short-description-in-kebab-case>
+git switch -c <prefix>/<short-description-in-kebab-case>
 ```
+
+Branch names follow the `<prefix>/<slug>` pattern:
 
 | Prefix | Use for |
 |---|---|
@@ -44,6 +46,8 @@ git switch -c <type>/<short-description-in-kebab-case>
 | `docs/` | Documentation only |
 | `chore/` | Build system, dependencies, tooling, CI |
 | `perf/` | Performance improvements |
+
+Use `claude/<prefix>/<slug>` when the branch is created by Claude autonomously (e.g. via the `/spec` command). Use `<prefix>/<slug>` (without the `claude/` namespace) when acting on an explicit user instruction.
 
 If already on a feature branch, proceed without switching.
 
@@ -61,13 +65,16 @@ make lint
 
 If `make lint` reports any **errors** (not warnings), fix them before continuing. Do not introduce new warnings.
 
+> SwiftFormat rewrites files in-place, which can occasionally shift line numbers and surface new SwiftLint violations on reformatted lines. After fixing any errors, run `make lint` a second time to confirm a clean state before staging.
+
 ### Step 4: Inspect the diff and propose a commit message
 
 ```bash
 git diff
-git diff --staged
 git status
 ```
+
+> Do not run `git diff --staged` here — nothing is staged yet, so it will always be empty. Inspect the unstaged diff (`git diff`) instead, which contains all pending changes.
 
 Analyze all changed files. Draft a commit message following the Conventional Commits format:
 
@@ -76,7 +83,7 @@ Analyze all changed files. Draft a commit message following the Conventional Com
 
 <optional body — explain WHY, not what the code does>
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude Code <noreply@anthropic.com>
 ```
 
 **Type** reflects the nature of the change:
@@ -122,7 +129,7 @@ git commit -m "$(cat <<'EOF'
 
 <optional body>
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude Code <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -153,7 +160,7 @@ git status
 
    Hide progress bar when models are loaded from cache to avoid flicker.
 
-   Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+   Co-Authored-By: Claude Code <noreply@anthropic.com>
    EOF
    )"
    ```
@@ -161,7 +168,7 @@ git status
 
 **Example 2: User says "commit these changes" while on `main`**
 
-1. Determine branch name from context: `fix/resolve-date-extraction`
+1. Determine branch name from context: `fix/resolve-date-extraction` (user-instructed → no `claude/` prefix)
 2. `git switch -c fix/resolve-date-extraction`
 3. `make format` → `make lint` → fix any errors
 4. `git diff` — inspect changes, draft commit message
