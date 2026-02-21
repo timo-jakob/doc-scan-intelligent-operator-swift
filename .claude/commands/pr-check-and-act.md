@@ -135,21 +135,27 @@ if [ -z "$SONAR_TOKEN" ]; then
   exit 0
 fi
 
-# 1. Quality gate status (informational only — does NOT determine whether to fix)
-curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR_NUMBER" | \
-  jq '{gate: .projectStatus.status, conditions: .projectStatus.conditions}'
+# 1. Fetch ALL open issues for the PR analysis
+PR_ISSUES=$(curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR_NUMBER&statuses=OPEN&ps=100")
+PR_ISSUE_COUNT=$(echo "$PR_ISSUES" | jq '.issues | length')
 
-# If the PR analysis is not available, fall back to the branch analysis:
-curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&branch=$BRANCH" | \
-  jq '{gate: .projectStatus.status}'
+if [ "$PR_ISSUE_COUNT" -gt 0 ] 2>/dev/null; then
+  # PR analysis is available — use it exclusively
+  echo "$PR_ISSUES" | jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
 
-# 2. Fetch ALL open issues — bugs, vulnerabilities, code smells, security hotspots
-curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR_NUMBER&statuses=OPEN&ps=100" | \
-  jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
+  # Quality gate status (informational only — does NOT determine whether to fix)
+  curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR_NUMBER" | \
+    jq '{gate: .projectStatus.status, conditions: .projectStatus.conditions}'
+else
+  # PR analysis returned no issues — fall back to branch analysis to avoid silently missing stale findings
+  echo "PR analysis returned no issues; falling back to branch analysis for $BRANCH"
 
-# Fallback to branch if PR analysis not found:
-curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&branch=$BRANCH&statuses=OPEN&ps=100" | \
-  jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
+  BRANCH_ISSUES=$(curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&branch=$BRANCH&statuses=OPEN&ps=100")
+  echo "$BRANCH_ISSUES" | jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
+
+  curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&branch=$BRANCH" | \
+    jq '{gate: .projectStatus.status}'
+fi
 ```
 
 Return: quality gate status (for information only) + full list of ALL open issues grouped by type — BUG, VULNERABILITY, CODE_SMELL, SECURITY_HOTSPOT — each with component path, line, severity, and message. Return "NO DATA — SonarQube only runs on main pushes" if both API calls return empty results.
