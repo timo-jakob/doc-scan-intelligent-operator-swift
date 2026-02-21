@@ -140,6 +140,8 @@ Confirm success:
 git status
 ```
 
+To push the branch: `git push -u origin <branch-name>` (first push) or `git push` (subsequent pushes).
+
 ---
 
 ## Examples
