@@ -215,35 +215,35 @@ extension DocScanCommand {
 
         // VLM line
         if tty { writeStdout("🤖 VLM    \(vlmModelName)") }
-        var vlmDownloaded = false
+        var vlmDownloading = false
         try await vlmManager.preload(modelName: vlmModelName) { fraction in
-            vlmDownloaded = true
-            guard tty else { return }
+            if fraction < 0.999 { vlmDownloading = true }
+            guard vlmDownloading, tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
             self.writeStdout("\r🤖 VLM    \(vlmModelName)  ⬇️  \(bar) \(pct)%")
         }
         if tty {
-            writeStdout(vlmDownloaded ? "\r🤖 VLM    \(vlmModelName)  ✅ ready\n" : "\n")
+            writeStdout(vlmDownloading ? "\r🤖 VLM    \(vlmModelName)  ✅ ready\n" : "\n")
         } else {
-            let suffix = vlmDownloaded ? "  ✅ ready" : ""
+            let suffix = vlmDownloading ? "  ✅ ready" : ""
             writeStdout("🤖 VLM    \(vlmModelName)\(suffix)\n")
         }
 
         // Text LLM line
         if tty { writeStdout("📝 Text   \(textModelName)") }
-        var textDownloaded = false
+        var textDownloading = false
         try await textManager.preload { fraction in
-            textDownloaded = true
-            guard tty else { return }
+            if fraction < 0.999 { textDownloading = true }
+            guard textDownloading, tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
             self.writeStdout("\r📝 Text   \(textModelName)  ⬇️  \(bar) \(pct)%")
         }
         if tty {
-            writeStdout(textDownloaded ? "\r📝 Text   \(textModelName)  ✅ ready\n" : "\n")
+            writeStdout(textDownloading ? "\r📝 Text   \(textModelName)  ✅ ready\n" : "\n")
         } else {
-            let suffix = textDownloaded ? "  ✅ ready" : ""
+            let suffix = textDownloading ? "  ✅ ready" : ""
             writeStdout("📝 Text   \(textModelName)\(suffix)\n")
         }
     }
