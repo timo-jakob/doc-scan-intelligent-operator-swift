@@ -1,7 +1,7 @@
 ---
 description: Fetch feedback from all GitHub Actions checks on a PR and automatically fix every actionable issue
 argument-hint: PR number (e.g. 33)
-allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Task
+allowed-tools: Bash(gh *), Bash(make *), Bash(swift *), Bash(git *), Bash(curl *), Read, Edit, Write, Glob, Grep, Task
 ---
 
 You are reviewing Pull Request #$ARGUMENTS on GitHub. Your job is to fetch all CI feedback, fix every actionable issue, and commit the fixes.
@@ -66,7 +66,7 @@ Return: list of vulnerabilities — package name, severity (critical/high/medium
 REPO="<repo from step 1>"
 # Inline code review comments (on specific lines):
 gh api repos/$REPO/pulls/$ARGUMENTS/comments \
-  --jq '[.[] | {path: .path, line: .line, body: .body}]'
+  --jq '[.[] | {path: .path, line: (.line // .original_line // .start_line), side: .side, body: .body}]'
 
 # PR-level reviews (approve / request changes with a body):
 gh api repos/$REPO/pulls/$ARGUMENTS/reviews \

@@ -146,7 +146,17 @@ git status
 5. Propose: `fix(cli): hide progress bar for cached models` — show to user, wait for approval
 6. `git add Sources/DocScanCLI/DocScanCommand.swift`
 7. `git status` — verify staged files
-8. `git commit -m "..."` with co-authorship footer
+8. Commit using the HEREDOC form from Step 6 to preserve body and co-authorship footer:
+   ```bash
+   git commit -m "$(cat <<'EOF'
+   fix(cli): hide progress bar for cached models
+
+   Hide progress bar when models are loaded from cache to avoid flicker.
+
+   Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+   EOF
+   )"
+   ```
 9. Report success
 
 **Example 2: User says "commit these changes" while on `main`**
