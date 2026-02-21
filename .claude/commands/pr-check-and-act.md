@@ -6,11 +6,11 @@ allowed-tools: Bash(gh *), Bash(make *), Bash(swift *), Bash(git *), Bash(curl *
 
 You are reviewing Pull Request #$ARGUMENTS on GitHub. Your job is to fetch all CI feedback, fix every actionable issue, and commit the fixes.
 
+> **How `$ARGUMENTS` works:** `$ARGUMENTS` is substituted into this prompt text before any shell runs — it is not a live shell variable. By the time any bash block executes, `$ARGUMENTS` has already been replaced with the literal PR number (e.g. `34`). The `argument-hint` frontmatter (`PR number (e.g. 33)`) is what prompts the user for input if they forget to supply one.
+
 **Iteration limit: stop after 3 commit cycles.** If failing checks remain after the third attempt, surface them to the user and stop.
 
 ## Step 1: Get the PR overview and switch to the PR branch
-
-> `$ARGUMENTS` is substituted into this prompt text before any shell runs — it is not a live shell variable. The `argument-hint` frontmatter (`PR number (e.g. 33)`) is what prompts the user for input if they forget to supply one.
 
 Fetch PR metadata:
 
