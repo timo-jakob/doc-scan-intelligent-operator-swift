@@ -8,19 +8,11 @@ You are reviewing Pull Request #$ARGUMENTS on GitHub. Your job is to fetch all C
 
 **Iteration limit: stop after 3 commit-and-push cycles.** If failing checks remain after the third attempt, surface them to the user and stop.
 
-## Step 1: Validate input and get the PR overview
+## Step 1: Get the PR overview and switch to the PR branch
 
-First, confirm a PR number was supplied:
+> `$ARGUMENTS` is substituted into this prompt text before any shell runs — it is not a live shell variable. The `argument-hint` frontmatter (`PR number (e.g. 33)`) is what prompts the user for input if they forget to supply one.
 
-```bash
-if [ -z "$ARGUMENTS" ]; then
-  echo "Usage: /pr-check-and-act <PR-number>"
-  echo "Example: /pr-check-and-act 33"
-  exit 1
-fi
-```
-
-Then fetch PR metadata:
+Fetch PR metadata:
 
 ```bash
 gh pr view $ARGUMENTS --json title,url,headRefName,baseRefName
@@ -28,6 +20,12 @@ gh pr checks $ARGUMENTS
 ```
 
 Print the PR title, branch, and a summary table of which checks passed and which failed/have comments.
+
+**Switch to the PR branch before doing anything else** — if the local branch differs from the PR head, all file edits would land on the wrong branch:
+
+```bash
+git switch <headRefName from gh pr view above>
+```
 
 Capture the values needed by the sub-agents (substitute the real values into every agent prompt before dispatching — agents do not inherit parent shell state):
 
@@ -65,7 +63,8 @@ if [ -z "$RUN_ID" ]; then
 fi
 
 # Fetch full logs (not --log-failed) to capture lint violations hidden by continue-on-error
-gh run view "$RUN_ID" --log | grep -E "warning:|error:|violation|SwiftFormat|SwiftLint|BUILD FAILED|FAILED|✗" | head -100
+# Tight pattern to avoid matching log noise (URLs, progress descriptions, etc.)
+gh run view "$RUN_ID" --log | grep -E "\.(swift|md):[0-9]+:[0-9]+: (warning|error):|BUILD FAILED|^error: " | head -100
 ```
 
 Return: a structured list of build errors, test failures, and lint violations — each with file path and line number where available.
@@ -105,8 +104,9 @@ gh api repos/$REPO/pulls/$PR_NUMBER/comments \
   --jq '[.[] | {path: .path, line: (.line // .original_line // .start_line), side: .side, body: .body}]'
 
 # PR-level reviews and issue thread comments (Claude posts here):
+# Fetch all bot comments across all review rounds — earlier rounds may contain unresolved CLEAR suggestions
 gh api repos/$REPO/issues/$PR_NUMBER/comments \
-  --jq '[.[] | select(.user.login | test("claude|bot")) | {user: .user.login, body: .body, created_at: .created_at}] | sort_by(.created_at) | reverse | .[0:1]'
+  --jq '[.[] | select(.user.login | test("claude|bot")) | {user: .user.login, body: .body, created_at: .created_at}] | sort_by(.created_at) | reverse'
 ```
 
 For each comment, classify it as:
@@ -128,20 +128,27 @@ REPO_KEY="<real repo key from step 1, e.g. owner_reponame>"
 PR_NUMBER="<real PR number>"
 BRANCH="<real branch name from step 1>"
 
+# Read SonarCloud token from macOS Keychain (same source as make sonar)
+SONAR_TOKEN=$(security find-generic-password -a sonar -s sonar-doc-scan-intelligent-operator-swift -w 2>/dev/null)
+if [ -z "$SONAR_TOKEN" ]; then
+  echo "NO DATA — SONAR_TOKEN not found in Keychain. Run: security add-generic-password -a sonar -s sonar-doc-scan-intelligent-operator-swift -w YOUR_TOKEN"
+  exit 0
+fi
+
 # 1. Quality gate status (informational only — does NOT determine whether to fix)
-curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR_NUMBER" | \
+curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR_NUMBER" | \
   jq '{gate: .projectStatus.status, conditions: .projectStatus.conditions}'
 
 # If the PR analysis is not available, fall back to the branch analysis:
-curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&branch=$BRANCH" | \
+curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&branch=$BRANCH" | \
   jq '{gate: .projectStatus.status}'
 
 # 2. Fetch ALL open issues — bugs, vulnerabilities, code smells, security hotspots
-curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR_NUMBER&statuses=OPEN&ps=100" | \
+curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR_NUMBER&statuses=OPEN&ps=100" | \
   jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
 
 # Fallback to branch if PR analysis not found:
-curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&branch=$BRANCH&statuses=OPEN&ps=100" | \
+curl -s -u "$SONAR_TOKEN:" "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&branch=$BRANCH&statuses=OPEN&ps=100" | \
   jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
 ```
 
@@ -202,12 +209,22 @@ Fix in this priority order:
 
 ## Step 5: Commit the fixes
 
-After all changes are made, use the **prepare-commit** skill to:
-- Ensure the branch is correct (not main)
-- Run `make format` then `make lint`
-- Generate a Conventional Commit message that describes all the fixes applied, e.g.:
-  `fix(ci): resolve failing tests, apply code review suggestions`
-- Stage only the changed files and commit
+After all changes are made, run `make format` then `make lint`, then commit inline (do **not** invoke the prepare-commit skill — it asks for user approval of the commit message, which interrupts the remediation loop):
+
+```bash
+make format
+make lint  # fix any errors; re-run to confirm clean state
+git add <only the changed files — never git add -A or git add .>
+git status  # verify what is staged
+git commit -m "$(cat <<'EOF'
+fix(ci): <describe all fixes applied, e.g. resolve failing tests, apply code review suggestions>
+
+Co-Authored-By: Claude Code <noreply@anthropic.com>
+EOF
+)"
+```
+
+> **User interaction expected here.** After each commit, show the user what was fixed (Step 6 report) and ask them to push and re-trigger CI before starting the next iteration. The user must approve continuing to the next iteration.
 
 Do **not** push automatically.
 
