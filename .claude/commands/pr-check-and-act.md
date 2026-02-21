@@ -204,6 +204,11 @@ Fix in this priority order:
 2. **Snyk vulnerabilities**
    - Update the affected dependency to the patched version in `Package.swift`
    - Run `swift package update` to resolve
+   - Build and run tests to confirm no API regressions before staging:
+     ```bash
+     swift test
+     ```
+   - If tests fail, diagnose the breaking change and fix call sites before continuing
 
 3. **CLEAR code review suggestions**
    - Apply each CLEAR suggestion directly to the relevant source file
