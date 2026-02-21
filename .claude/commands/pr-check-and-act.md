@@ -6,7 +6,21 @@ allowed-tools: Bash(gh *), Bash(make *), Bash(swift *), Bash(git *), Bash(curl *
 
 You are reviewing Pull Request #$ARGUMENTS on GitHub. Your job is to fetch all CI feedback, fix every actionable issue, and commit the fixes.
 
-## Step 1: Get the PR overview
+**Iteration limit: stop after 3 commit-and-push cycles.** If failing checks remain after the third attempt, surface them to the user and stop.
+
+## Step 1: Validate input and get the PR overview
+
+First, confirm a PR number was supplied:
+
+```bash
+if [ -z "$ARGUMENTS" ]; then
+  echo "Usage: /pr-check-and-act <PR-number>"
+  echo "Example: /pr-check-and-act 33"
+  exit 1
+fi
+```
+
+Then fetch PR metadata:
 
 ```bash
 gh pr view $ARGUMENTS --json title,url,headRefName,baseRefName
@@ -15,30 +29,43 @@ gh pr checks $ARGUMENTS
 
 Print the PR title, branch, and a summary table of which checks passed and which failed/have comments.
 
-Get the branch name for scoping workflow runs:
+Capture the values needed by the sub-agents (substitute the real values into every agent prompt before dispatching — agents do not inherit parent shell state):
 
 ```bash
 BRANCH=$(gh pr view $ARGUMENTS --json headRefName -q .headRefName)
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+# Derive SonarCloud project key from repo slug (owner/name → owner_name)
+REPO_KEY=$(gh repo view --json nameWithOwner -q '.nameWithOwner | gsub("/"; "_")')
 ```
 
 ## Step 2: Fetch detailed feedback — all 4 checks in parallel
 
 Use the Task tool to launch all four agents simultaneously in a **single message** (one tool call block with four Task invocations). Each agent uses `subagent_type=Bash`.
 
+**Before dispatching**, substitute the real values of `BRANCH`, `REPO`, `REPO_KEY`, and the PR number into each agent's prompt. Do not leave placeholders like `<branch from step 1>` in the prompts.
+
 ---
 
 **Agent 1 — CI / Code Quality**
 
-Fetch run IDs for CI and Code Quality workflows on this branch, then get logs for any that failed:
+`gh run list` returns workflow-level run names, not job names. The workflow is named `CI`; `Code Quality` is a job inside it and will never appear as a run name. Filter on `CI` only.
+
+Lint steps have `continue-on-error: true` in CI, so the job always exits 0 regardless of violations. Do **not** use `--log-failed` — fetch full logs and grep for violation markers instead.
 
 ```bash
-BRANCH="<branch from step 1>"
-gh run list --branch "$BRANCH" --json databaseId,name,conclusion,status \
-  --jq '.[] | select(.name == "CI" or .name == "Code Quality")'
+BRANCH="<real branch name from step 1>"
 
-# For each failed run ID:
-gh run view <RUN_ID> --log-failed
+# Find the most recent CI workflow run for this branch
+RUN_ID=$(gh run list --branch "$BRANCH" --json databaseId,name,conclusion,status \
+  --jq '.[] | select(.name == "CI") | .databaseId' | head -1)
+
+if [ -z "$RUN_ID" ]; then
+  echo "No CI run found for branch $BRANCH"
+  exit 0
+fi
+
+# Fetch full logs (not --log-failed) to capture lint violations hidden by continue-on-error
+gh run view "$RUN_ID" --log | grep -E "warning:|error:|violation|SwiftFormat|SwiftLint|BUILD FAILED|FAILED|✗" | head -100
 ```
 
 Return: a structured list of build errors, test failures, and lint violations — each with file path and line number where available.
@@ -47,30 +74,39 @@ Return: a structured list of build errors, test failures, and lint violations �
 
 **Agent 2 — Snyk Security Analysis**
 
-```bash
-BRANCH="<branch from step 1>"
-gh run list --branch "$BRANCH" --json databaseId,name,conclusion,status \
-  --jq '.[] | select(.name | ascii_downcase | contains("snyk"))'
+> ⚠️ Snyk only runs on pushes to `main` in this repo, not on PR branches. This agent will almost always return NO DATA for feature branches. Report this explicitly rather than silently returning "no vulnerabilities".
 
-# For each failed run ID:
-gh run view <RUN_ID> --log-failed
+```bash
+BRANCH="<real branch name from step 1>"
+
+RUN_ID=$(gh run list --branch "$BRANCH" --json databaseId,name,conclusion,status \
+  --jq '.[] | select(.name | ascii_downcase | contains("snyk")) | .databaseId' | head -1)
+
+if [ -z "$RUN_ID" ]; then
+  echo "NO DATA — Snyk only runs on pushes to main, not on PR branches."
+  exit 0
+fi
+
+gh run view "$RUN_ID" --log-failed
 ```
 
-Return: list of vulnerabilities — package name, severity (critical/high/medium/low), CVE if present, and the remediation (which version to upgrade to).
+Return: list of vulnerabilities — package name, severity (critical/high/medium/low), CVE if present, and the remediation (which version to upgrade to). Or "NO DATA — Snyk only runs on main" if no run exists.
 
 ---
 
 **Agent 3 — Claude Code Review**
 
 ```bash
-REPO="<repo from step 1>"
+REPO="<real repo nameWithOwner from step 1>"
+PR_NUMBER="<real PR number from $ARGUMENTS>"
+
 # Inline code review comments (on specific lines):
-gh api repos/$REPO/pulls/$ARGUMENTS/comments \
+gh api repos/$REPO/pulls/$PR_NUMBER/comments \
   --jq '[.[] | {path: .path, line: (.line // .original_line // .start_line), side: .side, body: .body}]'
 
-# PR-level reviews (approve / request changes with a body):
-gh api repos/$REPO/pulls/$ARGUMENTS/reviews \
-  --jq '[.[] | select(.state == "CHANGES_REQUESTED" or .body != "") | {state: .state, body: .body}]'
+# PR-level reviews and issue thread comments (Claude posts here):
+gh api repos/$REPO/issues/$PR_NUMBER/comments \
+  --jq '[.[] | select(.user.login | test("claude|bot")) | {user: .user.login, body: .body, created_at: .created_at}] | sort_by(.created_at) | reverse | .[0:1]'
 ```
 
 For each comment, classify it as:
@@ -83,15 +119,17 @@ Return: two labelled lists (CLEAR / AMBIGUOUS) with file, line, and suggestion t
 
 **Agent 4 — SonarQube Analysis**
 
-SonarQube runs on pushes to `main` in this repo, not on PRs. Always query SonarCloud directly for open issues — **do not rely solely on the GitHub Action status or quality gate result**. A passing quality gate does not mean there are no issues; Code Smells and other findings may exist below the gate threshold.
+> ⚠️ SonarQube only runs on pushes to `main` in this repo, not on PR branches. The GitHub Action will almost always return NO DATA for feature branches. Query SonarCloud directly for the branch analysis when available.
+
+Always query SonarCloud directly for open issues — **do not rely solely on the GitHub Action status or quality gate result**. A passing quality gate does not mean there are no issues; Code Smells and other findings may exist below the gate threshold.
 
 ```bash
-REPO_KEY="timo-jakob_doc-scan-intelligent-operator-swift"
-PR="$ARGUMENTS"
-BRANCH="<branch from step 1>"
+REPO_KEY="<real repo key from step 1, e.g. owner_reponame>"
+PR_NUMBER="<real PR number>"
+BRANCH="<real branch name from step 1>"
 
 # 1. Quality gate status (informational only — does NOT determine whether to fix)
-curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR" | \
+curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR_NUMBER" | \
   jq '{gate: .projectStatus.status, conditions: .projectStatus.conditions}'
 
 # If the PR analysis is not available, fall back to the branch analysis:
@@ -99,7 +137,7 @@ curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_
   jq '{gate: .projectStatus.status}'
 
 # 2. Fetch ALL open issues — bugs, vulnerabilities, code smells, security hotspots
-curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR&statuses=OPEN&ps=100" | \
+curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR_NUMBER&statuses=OPEN&ps=100" | \
   jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
 
 # Fallback to branch if PR analysis not found:
@@ -107,7 +145,7 @@ curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&branch=$B
   jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
 ```
 
-Return: quality gate status (for information only) + full list of ALL open issues grouped by type — BUG, VULNERABILITY, CODE_SMELL, SECURITY_HOTSPOT — each with component path, line, severity, and message. Return "SonarCloud returned no analysis for this PR or branch" only if both API calls return empty results.
+Return: quality gate status (for information only) + full list of ALL open issues grouped by type — BUG, VULNERABILITY, CODE_SMELL, SECURITY_HOTSPOT — each with component path, line, severity, and message. Return "NO DATA — SonarQube only runs on main pushes" if both API calls return empty results.
 
 ---
 
@@ -117,16 +155,16 @@ After all 4 agents return, print a clear summary:
 
 ```
 ── CI / Code Quality ─────────────────────── [PASS/FAIL]
-   <error or "all checks passed">
+   <error list or "all checks passed">
 
-── Snyk Security Analysis ────────────────── [PASS/FAIL]
-   <vulnerability list or "no issues">
+── Snyk Security Analysis ────────────────── [PASS/FAIL/NO DATA — main only]
+   <vulnerability list or explanation>
 
 ── Claude Code Review ────────────────────── [n comments]
    CLEAR  (n): <file>:<line> — <one-line summary>
    AMBIGUOUS (n): <file>:<line> — <one-line summary>
 
-── SonarQube Analysis ────────────────────── [gate: PASSED/FAILED/NO DATA]
+── SonarQube Analysis ────────────────────── [gate: PASSED/FAILED/NO DATA — main only]
    BUG (n), VULNERABILITY (n), CODE_SMELL (n), SECURITY_HOTSPOT (n)
    <list of issues — shown even when gate passed>
 ```
@@ -138,7 +176,12 @@ Fix in this priority order:
 1. **CI / Code Quality failures**
    - Build errors: diagnose and fix root cause in source files
    - Test failures: fix the failing code (not the tests, unless tests are wrong)
-   - Lint/format violations: run `make format && make lint`, then fix any remaining errors
+   - Lint/format violations:
+     ```bash
+     make format
+     make lint
+     ```
+     Then fix any remaining errors reported by lint.
 
 2. **Snyk vulnerabilities**
    - Update the affected dependency to the patched version in `Package.swift`
@@ -173,5 +216,8 @@ Do **not** push automatically.
 Print:
 - ✅ What was fixed and committed
 - ⚠️  What was flagged as ambiguous (with the original suggestion text, so the user can decide)
-- ℹ️  Any checks that were already passing
+- ℹ️  Any checks that were already passing or returned no data (with reason)
+- ℹ️  Reminder that Snyk and SonarQube only run on `main` — their results on PR branches are not available
 - That the branch is ready to push when the user is satisfied
+
+**If this was attempt 2 or 3 and checks still fail, explicitly list which checks are still failing and why, and tell the user the iteration limit has been reached.**
