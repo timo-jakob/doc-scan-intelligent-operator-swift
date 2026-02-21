@@ -6,7 +6,7 @@ allowed-tools: Bash(gh *), Bash(make *), Bash(swift *), Bash(git *), Bash(curl *
 
 You are reviewing Pull Request #$ARGUMENTS on GitHub. Your job is to fetch all CI feedback, fix every actionable issue, and commit the fixes.
 
-**Iteration limit: stop after 3 commit-and-push cycles.** If failing checks remain after the third attempt, surface them to the user and stop.
+**Iteration limit: stop after 3 commit cycles.** If failing checks remain after the third attempt, surface them to the user and stop.
 
 ## Step 1: Get the PR overview and switch to the PR branch
 
