@@ -213,38 +213,42 @@ extension DocScanCommand {
     ) async throws {
         let tty = isInteractiveTerminal
 
-        // VLM line
-        if tty { writeStdout("🤖 VLM    \(vlmModelName)") }
-        var vlmDownloading = false
-        try await vlmManager.preload(modelName: vlmModelName) { fraction in
-            if fraction < 0.999 { vlmDownloading = true }
-            guard vlmDownloading, tty else { return }
-            let bar = Self.progressBar(fraction: fraction)
-            let pct = String(format: "%3d", Int(fraction * 100))
-            self.writeStdout("\r🤖 VLM    \(vlmModelName)  ⬇️  \(bar) \(pct)%")
-        }
-        if tty {
-            writeStdout(vlmDownloading ? "\r🤖 VLM    \(vlmModelName)  ✅ ready\n" : "\n")
-        } else {
-            let suffix = vlmDownloading ? "  ✅ ready" : ""
-            writeStdout("🤖 VLM    \(vlmModelName)\(suffix)\n")
+        try await preloadModel(
+            emoji: "🤖", label: "VLM    ", modelName: vlmModelName, tty: tty
+        ) { handler in
+            try await vlmManager.preload(modelName: vlmModelName, progressHandler: handler)
         }
 
-        // Text LLM line
-        if tty { writeStdout("📝 Text   \(textModelName)") }
-        var textDownloading = false
-        try await textManager.preload { fraction in
-            if fraction < 0.999 { textDownloading = true }
-            guard textDownloading, tty else { return }
+        try await preloadModel(
+            emoji: "📝", label: "Text   ", modelName: textModelName, tty: tty
+        ) { handler in
+            try await textManager.preload(progressHandler: handler)
+        }
+    }
+
+    /// Preload a single model, showing a progress bar only when a download is actually happening.
+    /// `label` should be padded to 7 characters (e.g. "VLM    ", "Text   ") for column alignment.
+    private func preloadModel(
+        emoji: String,
+        label: String,
+        modelName: String,
+        tty: Bool,
+        load: (@escaping (Double) -> Void) async throws -> Void
+    ) async throws {
+        if tty { writeStdout("\(emoji) \(label)\(modelName)") }
+        var downloading = false
+        try await load { fraction in
+            if fraction < 0.999 { downloading = true }
+            guard downloading, tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
-            self.writeStdout("\r📝 Text   \(textModelName)  ⬇️  \(bar) \(pct)%")
+            self.writeStdout("\r\(emoji) \(label)\(modelName)  ⬇️  \(bar) \(pct)%")
         }
         if tty {
-            writeStdout(textDownloading ? "\r📝 Text   \(textModelName)  ✅ ready\n" : "\n")
+            writeStdout(downloading ? "\r\(emoji) \(label)\(modelName)  ✅ ready\n" : "\n")
         } else {
-            let suffix = textDownloading ? "  ✅ ready" : ""
-            writeStdout("📝 Text   \(textModelName)\(suffix)\n")
+            let suffix = downloading ? "  ✅ ready" : ""
+            writeStdout("\(emoji) \(label)\(modelName)\(suffix)\n")
         }
     }
 
