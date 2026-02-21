@@ -83,21 +83,31 @@ Return: two labelled lists (CLEAR / AMBIGUOUS) with file, line, and suggestion t
 
 **Agent 4 — SonarQube Analysis**
 
-SonarQube runs on pushes to `main` in this repo, not on PRs. Check whether it ran on this branch anyway:
+SonarQube runs on pushes to `main` in this repo, not on PRs. Always query SonarCloud directly for open issues — **do not rely solely on the GitHub Action status or quality gate result**. A passing quality gate does not mean there are no issues; Code Smells and other findings may exist below the gate threshold.
 
 ```bash
+REPO_KEY="timo-jakob_doc-scan-intelligent-operator-swift"
+PR="$ARGUMENTS"
 BRANCH="<branch from step 1>"
-gh run list --branch "$BRANCH" --json databaseId,name,conclusion,status \
-  --jq '.[] | select(.name | ascii_downcase | contains("sonar"))'
+
+# 1. Quality gate status (informational only — does NOT determine whether to fix)
+curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&pullRequest=$PR" | \
+  jq '{gate: .projectStatus.status, conditions: .projectStatus.conditions}'
+
+# If the PR analysis is not available, fall back to the branch analysis:
+curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$REPO_KEY&branch=$BRANCH" | \
+  jq '{gate: .projectStatus.status}'
+
+# 2. Fetch ALL open issues — bugs, vulnerabilities, code smells, security hotspots
+curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&pullRequest=$PR&statuses=OPEN&ps=100" | \
+  jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
+
+# Fallback to branch if PR analysis not found:
+curl -s "https://sonarcloud.io/api/issues/search?projectKeys=$REPO_KEY&branch=$BRANCH&statuses=OPEN&ps=100" | \
+  jq '[.issues[] | {type: .type, severity: .severity, message: .message, component: .component, line: .line, rule: .rule}]'
 ```
 
-If a run is found, fetch its logs:
-
-```bash
-gh run view <RUN_ID> --log-failed
-```
-
-Return: code smells, bugs, or security hotspots — or "SonarQube did not run on this PR" if no run exists.
+Return: quality gate status (for information only) + full list of ALL open issues grouped by type — BUG, VULNERABILITY, CODE_SMELL, SECURITY_HOTSPOT — each with component path, line, severity, and message. Return "SonarCloud returned no analysis for this PR or branch" only if both API calls return empty results.
 
 ---
 
@@ -116,8 +126,9 @@ After all 4 agents return, print a clear summary:
    CLEAR  (n): <file>:<line> — <one-line summary>
    AMBIGUOUS (n): <file>:<line> — <one-line summary>
 
-── SonarQube Analysis ────────────────────── [RAN/DID NOT RUN]
-   <findings or "not triggered on PRs">
+── SonarQube Analysis ────────────────────── [gate: PASSED/FAILED/NO DATA]
+   BUG (n), VULNERABILITY (n), CODE_SMELL (n), SECURITY_HOTSPOT (n)
+   <list of issues — shown even when gate passed>
 ```
 
 ## Step 4: Fix all actionable issues
@@ -140,9 +151,11 @@ Fix in this priority order:
 4. **AMBIGUOUS suggestions — do NOT auto-apply**
    - List them at the end of the session for the user to decide
 
-5. **SonarQube findings** (if present)
-   - Bugs and vulnerabilities: fix immediately
-   - Code smells: fix if the change is localised and safe; flag if it requires broader refactoring
+5. **SonarQube findings** — treat ALL open issues as mandatory fixes, regardless of whether the quality gate passed
+   - **BUG**: fix immediately
+   - **VULNERABILITY**: fix immediately
+   - **CODE_SMELL**: fix all of them — a passing quality gate does not make them acceptable
+   - **SECURITY_HOTSPOT**: review each one; fix if it represents a real risk, otherwise document why it is a false positive
 
 ## Step 5: Commit the fixes
 
