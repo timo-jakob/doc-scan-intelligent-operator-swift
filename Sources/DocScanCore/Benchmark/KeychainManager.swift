@@ -6,8 +6,8 @@ public enum KeychainManager {
     /// Service identifier for Keychain entries
     public static let serviceName = "com.docscan.huggingface"
 
-    /// Store a new token in the Keychain
-    public static func storeToken(_ token: String, forAccount account: String) throws {
+    /// Store a new token in the Keychain (use saveToken for upsert)
+    private static func storeToken(_ token: String, forAccount account: String) throws {
         guard let tokenData = token.data(using: .utf8) else {
             throw DocScanError.keychainError("Failed to encode token")
         }
@@ -59,8 +59,8 @@ public enum KeychainManager {
         return token
     }
 
-    /// Update an existing token in the Keychain
-    public static func updateToken(_ token: String, forAccount account: String) throws {
+    /// Update an existing token in the Keychain (use saveToken for upsert)
+    private static func updateToken(_ token: String, forAccount account: String) throws {
         guard let tokenData = token.data(using: .utf8) else {
             throw DocScanError.keychainError("Failed to encode token")
         }

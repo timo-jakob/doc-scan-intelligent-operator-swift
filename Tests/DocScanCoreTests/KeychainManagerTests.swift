@@ -11,11 +11,11 @@ final class KeychainManagerTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Store and Retrieve
+    // MARK: - Save and Retrieve
 
-    func testStoreAndRetrieve() throws {
+    func testSaveAndRetrieve() throws {
         let token = "hf_test_token_12345"
-        try KeychainManager.storeToken(token, forAccount: testAccount)
+        try KeychainManager.saveToken(token, forAccount: testAccount)
 
         let retrieved = try KeychainManager.retrieveToken(forAccount: testAccount)
         XCTAssertEqual(retrieved, token)
@@ -28,14 +28,14 @@ final class KeychainManagerTests: XCTestCase {
         XCTAssertNil(retrieved)
     }
 
-    // MARK: - Update
+    // MARK: - Update via Save
 
-    func testUpdateChangesStoredValue() throws {
+    func testSaveUpdatesExistingValue() throws {
         let original = "original_token"
         let updated = "updated_token"
 
-        try KeychainManager.storeToken(original, forAccount: testAccount)
-        try KeychainManager.updateToken(updated, forAccount: testAccount)
+        try KeychainManager.saveToken(original, forAccount: testAccount)
+        try KeychainManager.saveToken(updated, forAccount: testAccount)
 
         let retrieved = try KeychainManager.retrieveToken(forAccount: testAccount)
         XCTAssertEqual(retrieved, updated)
@@ -45,7 +45,7 @@ final class KeychainManagerTests: XCTestCase {
 
     func testDeleteRemovesEntry() throws {
         let token = "token_to_delete"
-        try KeychainManager.storeToken(token, forAccount: testAccount)
+        try KeychainManager.saveToken(token, forAccount: testAccount)
 
         try KeychainManager.deleteToken(forAccount: testAccount)
 
@@ -72,7 +72,7 @@ final class KeychainManagerTests: XCTestCase {
         let original = "original_upsert"
         let updated = "updated_upsert"
 
-        try KeychainManager.storeToken(original, forAccount: testAccount)
+        try KeychainManager.saveToken(original, forAccount: testAccount)
         try KeychainManager.saveToken(updated, forAccount: testAccount)
 
         let retrieved = try KeychainManager.retrieveToken(forAccount: testAccount)
@@ -81,8 +81,8 @@ final class KeychainManagerTests: XCTestCase {
 
     // MARK: - Empty String
 
-    func testStoreEmptyStringToken() throws {
-        try KeychainManager.storeToken("", forAccount: testAccount)
+    func testSaveEmptyStringToken() throws {
+        try KeychainManager.saveToken("", forAccount: testAccount)
 
         let retrieved = try KeychainManager.retrieveToken(forAccount: testAccount)
         XCTAssertEqual(retrieved, "")
