@@ -5,6 +5,13 @@
 [![MLX](https://img.shields.io/badge/MLX-Swift-green.svg)](https://github.com/ml-explore/mlx-swift)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=timo-jakob_doc-scan-intelligent-operator-swift&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=timo-jakob_doc-scan-intelligent-operator-swift)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=timo-jakob_doc-scan-intelligent-operator-swift&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=timo-jakob_doc-scan-intelligent-operator-swift)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=timo-jakob_doc-scan-intelligent-operator-swift&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=timo-jakob_doc-scan-intelligent-operator-swift)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=timo-jakob_doc-scan-intelligent-operator-swift&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=timo-jakob_doc-scan-intelligent-operator-swift)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=timo-jakob_doc-scan-intelligent-operator-swift&metric=coverage)](https://sonarcloud.io/summary/new_code?id=timo-jakob_doc-scan-intelligent-operator-swift)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=timo-jakob_doc-scan-intelligent-operator-swift&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=timo-jakob_doc-scan-intelligent-operator-swift)
+
 An AI-powered document detection and renaming system built in Swift, optimized for Apple Silicon using MLX Vision-Language Models. Analyzes PDF documents, extracts key information, and renames files intelligently.
 
 Supported document types:
