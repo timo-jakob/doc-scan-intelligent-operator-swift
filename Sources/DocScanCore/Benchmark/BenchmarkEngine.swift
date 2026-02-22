@@ -126,8 +126,8 @@ public class BenchmarkEngine {
 
                 if isMatch {
                     let extraction = try await detector.extractData()
-                    if let d = extraction.date {
-                        date = DateUtils.formatDate(d)
+                    if let extractedDate = extraction.date {
+                        date = DateUtils.formatDate(extractedDate)
                     }
                     secondaryField = extraction.secondaryField
                     patientName = extraction.patientName
@@ -280,8 +280,8 @@ public class BenchmarkEngine {
 
         if isMatch {
             let extraction = try await detector.extractData()
-            if let d = extraction.date {
-                actualDate = DateUtils.formatDate(d)
+            if let extractedDate = extraction.date {
+                actualDate = DateUtils.formatDate(extractedDate)
             }
             actualSecondaryField = extraction.secondaryField
             actualPatientName = extraction.patientName

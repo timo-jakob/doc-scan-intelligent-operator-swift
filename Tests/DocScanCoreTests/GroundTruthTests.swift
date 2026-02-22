@@ -132,8 +132,8 @@ final class GroundTruthTests: XCTestCase {
         let isMatchRange = content.range(of: "\"isMatch\"")
         XCTAssertNotNil(dateRange)
         XCTAssertNotNil(isMatchRange)
-        if let d = dateRange, let i = isMatchRange {
-            XCTAssertTrue(d.lowerBound < i.lowerBound, "Keys should be sorted: date before isMatch")
+        if let dateR = dateRange, let isMatchR = isMatchRange {
+            XCTAssertTrue(dateR.lowerBound < isMatchR.lowerBound, "Keys should be sorted: date before isMatch")
         }
     }
 
@@ -146,8 +146,8 @@ final class GroundTruthTests: XCTestCase {
                 XCTFail("Expected DocScanError, got \(error)")
                 return
             }
-            if case let .fileNotFound(p) = docError {
-                XCTAssertEqual(p, path)
+            if case let .fileNotFound(errorPath) = docError {
+                XCTAssertEqual(errorPath, path)
             } else {
                 XCTFail("Expected fileNotFound error")
             }

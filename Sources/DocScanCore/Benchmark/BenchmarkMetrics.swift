@@ -102,11 +102,10 @@ public struct BenchmarkMetrics: Equatable {
         let precision: Double? = (tp + fp) > 0 ? Double(tp) / Double(tp + fp) : nil
         let recall: Double? = (tp + fn) > 0 ? Double(tp) / Double(tp + fn) : nil
 
-        let f1Score: Double?
-        if let p = precision, let r = recall, (p + r) > 0 {
-            f1Score = 2 * p * r / (p + r)
+        let f1Score: Double? = if let prec = precision, let rec = recall, (prec + rec) > 0 {
+            2 * prec * rec / (prec + rec)
         } else {
-            f1Score = nil
+            nil
         }
 
         let hasNegatives = results.contains { !$0.isPositiveSample }

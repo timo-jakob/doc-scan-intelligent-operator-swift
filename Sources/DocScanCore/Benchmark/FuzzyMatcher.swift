@@ -10,9 +10,9 @@ public enum FuzzyMatcher {
             return true
         case (nil, _), (_, nil):
             return false
-        case let (e?, a?):
-            guard let expectedDate = DateUtils.parseDate(e, validate: false),
-                  let actualDate = DateUtils.parseDate(a, validate: false)
+        case let (exp?, act?):
+            guard let expectedDate = DateUtils.parseDate(exp, validate: false),
+                  let actualDate = DateUtils.parseDate(act, validate: false)
             else {
                 return false
             }
@@ -29,9 +29,9 @@ public enum FuzzyMatcher {
             return true
         case (nil, _), (_, nil):
             return false
-        case let (e?, a?):
-            guard let expectedNum = Double(e.trimmingCharacters(in: .whitespaces)),
-                  let actualNum = Double(a.trimmingCharacters(in: .whitespaces))
+        case let (exp?, act?):
+            guard let expectedNum = Double(exp.trimmingCharacters(in: .whitespaces)),
+                  let actualNum = Double(act.trimmingCharacters(in: .whitespaces))
             else {
                 return false
             }
@@ -49,9 +49,9 @@ public enum FuzzyMatcher {
             return true
         case (nil, _), (_, nil):
             return false
-        case let (e?, a?):
-            let normalizedExpected = normalizeField(e)
-            let normalizedActual = normalizeField(a)
+        case let (exp?, act?):
+            let normalizedExpected = normalizeField(exp)
+            let normalizedActual = normalizeField(act)
             return normalizedExpected == normalizedActual
         }
     }

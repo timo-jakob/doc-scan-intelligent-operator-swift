@@ -163,8 +163,7 @@ final class BenchmarkEngineTests: XCTestCase {
 
         XCTAssertThrowsError(try engine.loadGroundTruths(pdfPaths: [pdfPath.path])) { error in
             if let docError = error as? DocScanError,
-               case let .benchmarkError(msg) = docError
-            {
+               case let .benchmarkError(msg) = docError {
                 XCTAssertTrue(msg.contains("Missing ground truth"))
             } else {
                 XCTFail("Expected benchmarkError")

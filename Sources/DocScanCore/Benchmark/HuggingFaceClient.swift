@@ -17,9 +17,9 @@ public struct HFModel: Codable, Equatable {
 
     public var isGated: Bool {
         switch gated {
-        case .bool(let value): return value
-        case .string: return true
-        case nil: return false
+        case let .bool(value): value
+        case .string: true
+        case nil: false
         }
     }
 

@@ -10,8 +10,14 @@ final class TerminalUtilsTests: XCTestCase {
 
     func testModelPairResultRowFromResult() {
         let metrics = BenchmarkMetrics.compute(from: [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
+            DocumentResult(
+                filename: "a.pdf", isPositiveSample: true,
+                predictedIsMatch: true, extractionCorrect: true
+            ),
+            DocumentResult(
+                filename: "b.pdf", isPositiveSample: false,
+                predictedIsMatch: false, extractionCorrect: true
+            ),
         ])
 
         let result = ModelPairResult(
@@ -31,8 +37,14 @@ final class TerminalUtilsTests: XCTestCase {
 
     func testMetricsTableWithPerfectScores() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
+            DocumentResult(
+                filename: "a.pdf", isPositiveSample: true,
+                predictedIsMatch: true, extractionCorrect: true
+            ),
+            DocumentResult(
+                filename: "b.pdf", isPositiveSample: false,
+                predictedIsMatch: false, extractionCorrect: true
+            ),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -102,12 +114,12 @@ final class TerminalUtilsTests: XCTestCase {
         let total = 10
         let correct = Int(accuracy * Double(total))
 
-        for i in 0 ..< total {
+        for index in 0 ..< total {
             results.append(DocumentResult(
-                filename: "\(i).pdf",
+                filename: "\(index).pdf",
                 isPositiveSample: true,
                 predictedIsMatch: true,
-                extractionCorrect: i < correct
+                extractionCorrect: index < correct
             ))
         }
 

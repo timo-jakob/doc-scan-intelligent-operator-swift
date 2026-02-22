@@ -81,7 +81,7 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     // MARK: - Mixed Results
 
-    func testMixedResults() {
+    func testMixedResults() throws {
         let results = [
             // 3 TP
             DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
@@ -105,11 +105,14 @@ final class BenchmarkMetricsTests: XCTestCase {
         // accuracy = (3+2)/7
         XCTAssertEqual(metrics.accuracy, 5.0 / 7.0, accuracy: 0.001)
         // precision = 3/(3+1) = 0.75
-        XCTAssertEqual(metrics.precision!, 0.75, accuracy: 0.001)
+        let precision = try XCTUnwrap(metrics.precision)
+        XCTAssertEqual(precision, 0.75, accuracy: 0.001)
         // recall = 3/(3+1) = 0.75
-        XCTAssertEqual(metrics.recall!, 0.75, accuracy: 0.001)
+        let recall = try XCTUnwrap(metrics.recall)
+        XCTAssertEqual(recall, 0.75, accuracy: 0.001)
         // F1 = 2 * 0.75 * 0.75 / (0.75 + 0.75) = 0.75
-        XCTAssertEqual(metrics.f1Score!, 0.75, accuracy: 0.001)
+        let f1 = try XCTUnwrap(metrics.f1Score)
+        XCTAssertEqual(f1, 0.75, accuracy: 0.001)
     }
 
     // MARK: - No Negatives

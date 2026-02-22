@@ -19,7 +19,7 @@ final class HuggingFaceClientTests: XCTestCase {
         _ = try await client.searchVLMModels()
 
         XCTAssertEqual(mockSession.requestHistory.count, 1)
-        let url = mockSession.requestHistory[0].url!.absoluteString
+        let url = try XCTUnwrap(mockSession.requestHistory[0].url).absoluteString
         XCTAssertTrue(url.hasPrefix("https://huggingface.co/api/models"))
         XCTAssertTrue(url.contains("sort=downloads"))
     }

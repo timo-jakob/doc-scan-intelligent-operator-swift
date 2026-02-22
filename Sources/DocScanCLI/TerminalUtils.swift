@@ -70,43 +70,37 @@ enum TerminalUtils {
         let f1Width = 8
         let statusWidth = 14
 
+        let widths = ColumnWidths(
+            rank: rankWidth, vlm: vlmWidth, text: textWidth,
+            accuracy: accWidth, precision: precWidth, recall: recWidth,
+            f1Score: f1Width, status: statusWidth
+        )
+
         var lines: [String] = []
 
         // Header
-        let header = formatRow(
-            rank: "#",
-            vlm: "VLM Model",
-            text: "Text Model",
-            accuracy: "Accuracy",
-            precision: "Precision",
-            recall: "Recall",
-            f1: "F1",
-            status: "Status",
-            widths: (rankWidth, vlmWidth, textWidth, accWidth, precWidth, recWidth, f1Width, statusWidth)
+        let headerRow = RowData(
+            rank: "#", vlm: "VLM Model", text: "Text Model",
+            accuracy: "Accuracy", precision: "Precision", recall: "Recall",
+            f1Score: "F1", status: "Status"
         )
+        let header = formatRow(headerRow, widths: widths)
         lines.append(header)
         lines.append(String(repeating: "─", count: header.count))
 
         // Rows
         for (index, row) in results.enumerated() {
-            let rank = "\(index + 1)"
-            let status = row.isDisqualified ? "[DISQUALIFIED]" : "OK"
-            let accuracy = row.isDisqualified ? "  ---" : formatPercent(row.accuracy)
-            let precision = row.isDisqualified ? "  ---" : formatOptionalPercent(row.precision)
-            let recall = row.isDisqualified ? "  ---" : formatOptionalPercent(row.recall)
-            let f1 = row.isDisqualified ? "  ---" : formatOptionalPercent(row.f1Score)
-
-            lines.append(formatRow(
-                rank: rank,
+            let rowData = RowData(
+                rank: "\(index + 1)",
                 vlm: row.vlmModelName,
                 text: row.textModelName,
-                accuracy: accuracy,
-                precision: precision,
-                recall: recall,
-                f1: f1,
-                status: status,
-                widths: (rankWidth, vlmWidth, textWidth, accWidth, precWidth, recWidth, f1Width, statusWidth)
-            ))
+                accuracy: row.isDisqualified ? "  ---" : formatPercent(row.accuracy),
+                precision: row.isDisqualified ? "  ---" : formatOptionalPercent(row.precision),
+                recall: row.isDisqualified ? "  ---" : formatOptionalPercent(row.recall),
+                f1Score: row.isDisqualified ? "  ---" : formatOptionalPercent(row.f1Score),
+                status: row.isDisqualified ? "[DISQUALIFIED]" : "OK"
+            )
+            lines.append(formatRow(rowData, widths: widths))
         }
 
         return lines.joined(separator: "\n")
@@ -161,30 +155,44 @@ enum TerminalUtils {
     }
 
     private static func formatOptionalPercent(_ value: Double?) -> String {
-        guard let v = value else { return "  N/A" }
-        return formatPercent(v)
+        guard let val = value else { return "  N/A" }
+        return formatPercent(val)
     }
 
-    private static func formatRow(
-        rank: String,
-        vlm: String,
-        text: String,
-        accuracy: String,
-        precision: String,
-        recall: String,
-        f1: String,
-        status: String,
-        widths: (Int, Int, Int, Int, Int, Int, Int, Int)
-    ) -> String {
-        let r = rank.padding(toLength: widths.0, withPad: " ", startingAt: 0)
-        let v = vlm.padding(toLength: widths.1, withPad: " ", startingAt: 0)
-        let t = text.padding(toLength: widths.2, withPad: " ", startingAt: 0)
-        let a = accuracy.leftPadded(toLength: widths.3)
-        let p = precision.leftPadded(toLength: widths.4)
-        let rc = recall.leftPadded(toLength: widths.5)
-        let f = f1.leftPadded(toLength: widths.6)
-        let s = status.padding(toLength: widths.7, withPad: " ", startingAt: 0)
-        return "\(r) \(v) \(t) \(a) \(p) \(rc) \(f) \(s)"
+    /// Column widths for table formatting
+    struct ColumnWidths {
+        let rank: Int
+        let vlm: Int
+        let text: Int
+        let accuracy: Int
+        let precision: Int
+        let recall: Int
+        let f1Score: Int
+        let status: Int
+    }
+
+    /// A single row of cell values for table formatting
+    struct RowData {
+        let rank: String
+        let vlm: String
+        let text: String
+        let accuracy: String
+        let precision: String
+        let recall: String
+        let f1Score: String
+        let status: String
+    }
+
+    private static func formatRow(_ row: RowData, widths: ColumnWidths) -> String {
+        let rankCol = row.rank.padding(toLength: widths.rank, withPad: " ", startingAt: 0)
+        let vlmCol = row.vlm.padding(toLength: widths.vlm, withPad: " ", startingAt: 0)
+        let textCol = row.text.padding(toLength: widths.text, withPad: " ", startingAt: 0)
+        let accCol = row.accuracy.leftPadded(toLength: widths.accuracy)
+        let precCol = row.precision.leftPadded(toLength: widths.precision)
+        let recCol = row.recall.leftPadded(toLength: widths.recall)
+        let f1Col = row.f1Score.leftPadded(toLength: widths.f1Score)
+        let statusCol = row.status.padding(toLength: widths.status, withPad: " ", startingAt: 0)
+        return "\(rankCol) \(vlmCol) \(textCol) \(accCol) \(precCol) \(recCol) \(f1Col) \(statusCol)"
     }
 }
 
