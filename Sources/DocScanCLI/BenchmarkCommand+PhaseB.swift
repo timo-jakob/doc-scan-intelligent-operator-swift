@@ -12,14 +12,48 @@ extension BenchmarkCommand {
         printBenchmarkPhaseHeader("B", title: "Model Discovery")
 
         let client = HuggingFaceClient(apiToken: apiToken)
+        var requestCount = 5
 
+        while true {
+            let pairs = try await discoverAndDisplayPairs(
+                client: client, configuration: configuration, count: requestCount
+            )
+
+            guard let choice = TerminalUtils.menu(
+                "How would you like to proceed?",
+                options: [
+                    "Benchmark these pairs",
+                    "Request 10 different models",
+                    "Skip model discovery",
+                ]
+            ) else {
+                return nil
+            }
+
+            switch choice {
+            case 0: return pairs
+            case 1:
+                requestCount = 10
+                print()
+                continue
+            default: return nil
+            }
+        }
+    }
+
+    /// Discover model pairs and display them with gated-model warnings
+    private func discoverAndDisplayPairs(
+        client: HuggingFaceClient,
+        configuration: Configuration,
+        count: Int
+    ) async throws -> [ModelPair] {
         print("Searching for alternative MLX model pairs on Hugging Face...")
         print()
 
         let pairs = try await client.discoverModelPairs(
             currentVLM: configuration.modelName,
             currentTextLLM: configuration.textModelName,
-            count: 5
+            count: count
         )
 
         print("Discovered \(pairs.count) model pairs:")
@@ -31,7 +65,6 @@ extension BenchmarkCommand {
             print()
         }
 
-        // Check for gated models
         for pair in pairs {
             let vlmGated = try? await client.isModelGated(pair.vlmModelName)
             let textGated = try? await client.isModelGated(pair.textModelName)
@@ -43,21 +76,6 @@ extension BenchmarkCommand {
                 print("  ⚠️  \(pair.textModelName) is gated — access approval may be required")
                 print("     \(HuggingFaceClient.modelURL(for: pair.textModelName))")
             }
-        }
-
-        // Interactive approval
-        guard let choice = TerminalUtils.menu(
-            "How would you like to proceed?",
-            options: [
-                "Benchmark these pairs",
-                "Skip model discovery",
-            ]
-        ) else {
-            return nil
-        }
-
-        if choice == 1 {
-            return nil
         }
 
         return pairs
