@@ -65,8 +65,10 @@ struct BenchmarkCommand: AsyncParsableCommand {
         let timeout = runPhaseB1()
 
         // Load verified ground truths
-        let allPDFs = try engine.enumeratePDFs(in: resolvedPositiveDir)
-            + (resolvedNegativeDir.map { try engine.enumeratePDFs(in: $0) } ?? [])
+        var allPDFs = try engine.enumeratePDFs(in: resolvedPositiveDir)
+        if let negDir = resolvedNegativeDir {
+            allPDFs += try engine.enumeratePDFs(in: negDir)
+        }
         let groundTruths = try engine.loadGroundTruths(pdfPaths: allPDFs)
 
         // Phase C: Benchmark pairs

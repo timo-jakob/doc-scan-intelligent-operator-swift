@@ -1,3 +1,5 @@
+import AppKit
+import ArgumentParser
 import DocScanCore
 import Foundation
 
@@ -41,7 +43,7 @@ extension BenchmarkCommand {
         }
     }
 
-    /// Discover model pairs and display them with gated-model warnings
+    /// Discover model pairs, check for gated models, and let the user handle them
     private func discoverAndDisplayPairs(
         client: HuggingFaceClient,
         configuration: Configuration,
@@ -50,7 +52,7 @@ extension BenchmarkCommand {
         print("Searching for alternative MLX model pairs on Hugging Face...")
         print()
 
-        let pairs = try await client.discoverModelPairs(
+        var pairs = try await client.discoverModelPairs(
             currentVLM: configuration.modelName,
             currentTextLLM: configuration.textModelName,
             count: count
@@ -65,20 +67,73 @@ extension BenchmarkCommand {
             print()
         }
 
+        // Check for gated models and collect unique gated model IDs
+        var gatedModelIds: Set<String> = []
         for pair in pairs {
-            let vlmGated = try? await client.isModelGated(pair.vlmModelName)
-            let textGated = try? await client.isModelGated(pair.textModelName)
-            if vlmGated == true {
-                print("  ⚠️  \(pair.vlmModelName) is gated — access approval may be required")
-                print("     \(HuggingFaceClient.modelURL(for: pair.vlmModelName))")
+            if await (try? client.isModelGated(pair.vlmModelName)) == true {
+                gatedModelIds.insert(pair.vlmModelName)
             }
-            if textGated == true {
-                print("  ⚠️  \(pair.textModelName) is gated — access approval may be required")
-                print("     \(HuggingFaceClient.modelURL(for: pair.textModelName))")
+            if await (try? client.isModelGated(pair.textModelName)) == true {
+                gatedModelIds.insert(pair.textModelName)
             }
         }
 
+        if !gatedModelIds.isEmpty {
+            pairs = try promptForGatedModels(gatedModelIds: gatedModelIds, pairs: pairs)
+        }
+
         return pairs
+    }
+
+    /// Prompt user to handle gated models: remove affected pairs or open browser to accept licenses
+    private func promptForGatedModels(
+        gatedModelIds: Set<String>,
+        pairs: [ModelPair]
+    ) throws -> [ModelPair] {
+        let affectedCount = pairs.count(where: { pair in
+            gatedModelIds.contains(pair.vlmModelName) || gatedModelIds.contains(pair.textModelName)
+        })
+
+        print("⚠️  Found \(gatedModelIds.count) gated model(s) affecting \(affectedCount) pair(s):")
+        for modelId in gatedModelIds.sorted() {
+            print("     \(modelId)")
+            print("     \(HuggingFaceClient.modelURL(for: modelId))")
+        }
+        print()
+
+        guard let choice = TerminalUtils.menu(
+            "Gated models require license approval on Hugging Face. How to proceed?",
+            options: [
+                "Remove pairs with gated models",
+                "Open license pages in browser, then keep all pairs",
+                "Keep all pairs (may fail during benchmark)",
+            ]
+        ) else {
+            throw ExitCode.success
+        }
+
+        switch choice {
+        case 0:
+            let filtered = pairs.filter { pair in
+                !gatedModelIds.contains(pair.vlmModelName) && !gatedModelIds.contains(pair.textModelName)
+            }
+            print("Removed \(pairs.count - filtered.count) pair(s). \(filtered.count) remaining.")
+            print()
+            return filtered
+        case 1:
+            for modelId in gatedModelIds.sorted() {
+                let urlString = HuggingFaceClient.modelURL(for: modelId)
+                if let url = URL(string: urlString) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            print("Opened \(gatedModelIds.count) license page(s) in your browser.")
+            print("Accept the licenses, then press Enter to continue...")
+            _ = readLine()
+            return pairs
+        default:
+            return pairs
+        }
     }
 
     /// Phase B.1: Timeout selection

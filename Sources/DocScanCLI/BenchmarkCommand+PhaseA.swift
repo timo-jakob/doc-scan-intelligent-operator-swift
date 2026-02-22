@@ -138,8 +138,17 @@ extension BenchmarkCommand {
 
         // Offer to open sidecar files
         if TerminalUtils.confirm("Open sidecar files in default editor?") {
-            let sidecarDir = URL(fileURLWithPath: positiveDir)
-            NSWorkspace.shared.open(sidecarDir)
+            for file in posContents.sorted() where file.hasSuffix(".pdf.json") {
+                let path = (positiveDir as NSString).appendingPathComponent(file)
+                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            }
+            if let negDir = negativeDir {
+                let negFiles = try fileManager.contentsOfDirectory(atPath: negDir)
+                for file in negFiles.sorted() where file.hasSuffix(".pdf.json") {
+                    let path = (negDir as NSString).appendingPathComponent(file)
+                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
+                }
+            }
         }
 
         print()
