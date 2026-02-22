@@ -65,42 +65,17 @@ public struct BenchmarkMetrics: Equatable {
     /// Compute metrics from document results
     public static func compute(from results: [DocumentResult]) -> BenchmarkMetrics {
         guard !results.isEmpty else {
-            return BenchmarkMetrics(
-                accuracy: 0,
-                precision: nil,
-                recall: nil,
-                f1Score: nil,
-                hasNegativeSamples: false,
-                truePositives: 0,
-                falsePositives: 0,
-                trueNegatives: 0,
-                falseNegatives: 0
-            )
+            return .empty
         }
 
-        var tp = 0, fp = 0, tn = 0, fn = 0
+        let counts = classifyCounts(from: results)
+        let total = counts.truePos + counts.falsePos + counts.trueNeg + counts.falseNeg
+        let accuracy = total > 0 ? Double(counts.truePos + counts.trueNeg) / Double(total) : 0
 
-        for result in results {
-            if result.isPositiveSample {
-                if result.isFullyCorrect {
-                    tp += 1
-                } else {
-                    fn += 1
-                }
-            } else {
-                if !result.predictedIsMatch {
-                    tn += 1
-                } else {
-                    fp += 1
-                }
-            }
-        }
-
-        let total = tp + fp + tn + fn
-        let accuracy = total > 0 ? Double(tp + tn) / Double(total) : 0
-
-        let precision: Double? = (tp + fp) > 0 ? Double(tp) / Double(tp + fp) : nil
-        let recall: Double? = (tp + fn) > 0 ? Double(tp) / Double(tp + fn) : nil
+        let precision: Double? = (counts.truePos + counts.falsePos) > 0
+            ? Double(counts.truePos) / Double(counts.truePos + counts.falsePos) : nil
+        let recall: Double? = (counts.truePos + counts.falseNeg) > 0
+            ? Double(counts.truePos) / Double(counts.truePos + counts.falseNeg) : nil
 
         let f1Score: Double? = if let prec = precision, let rec = recall, (prec + rec) > 0 {
             2 * prec * rec / (prec + rec)
@@ -108,19 +83,43 @@ public struct BenchmarkMetrics: Equatable {
             nil
         }
 
-        let hasNegatives = results.contains { !$0.isPositiveSample }
-
         return BenchmarkMetrics(
             accuracy: accuracy,
             precision: precision,
             recall: recall,
             f1Score: f1Score,
-            hasNegativeSamples: hasNegatives,
-            truePositives: tp,
-            falsePositives: fp,
-            trueNegatives: tn,
-            falseNegatives: fn
+            hasNegativeSamples: results.contains { !$0.isPositiveSample },
+            truePositives: counts.truePos,
+            falsePositives: counts.falsePos,
+            trueNegatives: counts.trueNeg,
+            falseNegatives: counts.falseNeg
         )
+    }
+
+    /// Empty metrics for zero-document case
+    static let empty = BenchmarkMetrics(
+        accuracy: 0, precision: nil, recall: nil, f1Score: nil,
+        hasNegativeSamples: false,
+        truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0
+    )
+
+    private struct ConfusionCounts {
+        var truePos = 0
+        var falsePos = 0
+        var trueNeg = 0
+        var falseNeg = 0
+    }
+
+    private static func classifyCounts(from results: [DocumentResult]) -> ConfusionCounts {
+        var counts = ConfusionCounts()
+        for result in results {
+            if result.isPositiveSample {
+                if result.isFullyCorrect { counts.truePos += 1 } else { counts.falseNeg += 1 }
+            } else {
+                if !result.predictedIsMatch { counts.trueNeg += 1 } else { counts.falsePos += 1 }
+            }
+        }
+        return counts
     }
 }
 

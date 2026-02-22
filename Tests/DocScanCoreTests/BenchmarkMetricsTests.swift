@@ -48,9 +48,9 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     func testPerfectScores() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "b.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "c.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
+            makeResult("a.pdf", positive: true, predicted: true, correct: true),
+            makeResult("b.pdf", positive: true, predicted: true, correct: true),
+            makeResult("c.pdf", positive: false, predicted: false, correct: true),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -69,8 +69,8 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     func testAllWrong() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: false, extractionCorrect: false),
-            DocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: true, extractionCorrect: false),
+            makeResult("a.pdf", positive: true, predicted: false, correct: false),
+            makeResult("b.pdf", positive: false, predicted: true, correct: false),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -84,16 +84,16 @@ final class BenchmarkMetricsTests: XCTestCase {
     func testMixedResults() throws {
         let results = [
             // 3 TP
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "b.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "c.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
+            makeResult("a.pdf", positive: true, predicted: true, correct: true),
+            makeResult("b.pdf", positive: true, predicted: true, correct: true),
+            makeResult("c.pdf", positive: true, predicted: true, correct: true),
             // 1 FP
-            DocumentResult(filename: "d.pdf", isPositiveSample: false, predictedIsMatch: true, extractionCorrect: false),
+            makeResult("d.pdf", positive: false, predicted: true, correct: false),
             // 1 FN
-            DocumentResult(filename: "e.pdf", isPositiveSample: true, predictedIsMatch: false, extractionCorrect: false),
+            makeResult("e.pdf", positive: true, predicted: false, correct: false),
             // 2 TN
-            DocumentResult(filename: "f.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
-            DocumentResult(filename: "g.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
+            makeResult("f.pdf", positive: false, predicted: false, correct: true),
+            makeResult("g.pdf", positive: false, predicted: false, correct: true),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -111,16 +111,16 @@ final class BenchmarkMetricsTests: XCTestCase {
         let recall = try XCTUnwrap(metrics.recall)
         XCTAssertEqual(recall, 0.75, accuracy: 0.001)
         // F1 = 2 * 0.75 * 0.75 / (0.75 + 0.75) = 0.75
-        let f1 = try XCTUnwrap(metrics.f1Score)
-        XCTAssertEqual(f1, 0.75, accuracy: 0.001)
+        let f1Score = try XCTUnwrap(metrics.f1Score)
+        XCTAssertEqual(f1Score, 0.75, accuracy: 0.001)
     }
 
     // MARK: - No Negatives
 
     func testNoNegativeSamples() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
-            DocumentResult(filename: "b.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
+            makeResult("a.pdf", positive: true, predicted: true, correct: true),
+            makeResult("b.pdf", positive: true, predicted: true, correct: true),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -135,8 +135,8 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     func testNoPositiveSamples() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
-            DocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: false, extractionCorrect: true),
+            makeResult("a.pdf", positive: false, predicted: false, correct: true),
+            makeResult("b.pdf", positive: false, predicted: false, correct: true),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -153,7 +153,7 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     func testSingleTruePositive() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
+            makeResult("a.pdf", positive: true, predicted: true, correct: true),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
@@ -212,12 +212,28 @@ final class BenchmarkMetricsTests: XCTestCase {
     func testExtractionWrongCountsAsFalseNegative() {
         let results = [
             // Positive sample, correctly categorized but extraction wrong -> FN
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: false),
+            makeResult("a.pdf", positive: true, predicted: true, correct: false),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
         XCTAssertEqual(metrics.truePositives, 0)
         XCTAssertEqual(metrics.falseNegatives, 1)
         XCTAssertEqual(metrics.accuracy, 0.0)
+    }
+
+    // MARK: - Helpers
+
+    private func makeResult(
+        _ filename: String,
+        positive: Bool,
+        predicted: Bool,
+        correct: Bool
+    ) -> DocumentResult {
+        DocumentResult(
+            filename: filename,
+            isPositiveSample: positive,
+            predictedIsMatch: predicted,
+            extractionCorrect: correct
+        )
     }
 }

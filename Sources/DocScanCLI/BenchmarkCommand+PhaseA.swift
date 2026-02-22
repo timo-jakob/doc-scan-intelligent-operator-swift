@@ -46,15 +46,15 @@ extension BenchmarkCommand {
         print()
         print("Sidecar locations:")
 
-        let fm = FileManager.default
-        let posContents = try fm.contentsOfDirectory(atPath: positiveDir)
+        let fileManager = FileManager.default
+        let posContents = try fileManager.contentsOfDirectory(atPath: positiveDir)
         for file in posContents.sorted() where file.hasSuffix(".pdf.json") {
             let path = (positiveDir as NSString).appendingPathComponent(file)
             print("  \(path)")
         }
 
         if let negDir = negativeDir {
-            let negContents = try fm.contentsOfDirectory(atPath: negDir)
+            let negContents = try fileManager.contentsOfDirectory(atPath: negDir)
             for file in negContents.sorted() where file.hasSuffix(".pdf.json") {
                 let path = (negDir as NSString).appendingPathComponent(file)
                 print("  \(path)")

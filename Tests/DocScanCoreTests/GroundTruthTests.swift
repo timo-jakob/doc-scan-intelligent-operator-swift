@@ -34,7 +34,7 @@ final class GroundTruthTests: XCTestCase {
     // MARK: - Encode/Decode Round-Trip
 
     func testEncodeDecodeRoundTripAllFields() throws {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
@@ -50,17 +50,17 @@ final class GroundTruthTests: XCTestCase {
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(gt)
+        let data = try encoder.encode(groundTruth)
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let decoded = try decoder.decode(GroundTruth.self, from: data)
 
-        XCTAssertEqual(gt, decoded)
+        XCTAssertEqual(groundTruth, decoded)
     }
 
     func testEncodeDecodeRoundTripOptionalFieldsNil() throws {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: false,
             documentType: .prescription,
             date: nil,
@@ -71,13 +71,13 @@ final class GroundTruthTests: XCTestCase {
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(gt)
+        let data = try encoder.encode(groundTruth)
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let decoded = try decoder.decode(GroundTruth.self, from: data)
 
-        XCTAssertEqual(gt, decoded)
+        XCTAssertEqual(groundTruth, decoded)
         XCTAssertNil(decoded.date)
         XCTAssertNil(decoded.secondaryField)
         XCTAssertNil(decoded.patientName)
@@ -86,7 +86,7 @@ final class GroundTruthTests: XCTestCase {
     // MARK: - Save and Load
 
     func testSaveAndLoadRoundTrip() throws {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-01-15",
@@ -99,7 +99,7 @@ final class GroundTruthTests: XCTestCase {
         )
 
         let path = tempDirectory.appendingPathComponent("test.pdf.json").path
-        try gt.save(to: path)
+        try groundTruth.save(to: path)
 
         let loaded = try GroundTruth.load(from: path)
 
@@ -113,7 +113,7 @@ final class GroundTruthTests: XCTestCase {
     }
 
     func testSaveProducesPrettyPrintedJSON() throws {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
@@ -121,7 +121,7 @@ final class GroundTruthTests: XCTestCase {
         )
 
         let path = tempDirectory.appendingPathComponent("pretty.pdf.json").path
-        try gt.save(to: path)
+        try groundTruth.save(to: path)
 
         let content = try String(contentsOfFile: path, encoding: .utf8)
         // Pretty-printed JSON should contain newlines and indentation
@@ -171,8 +171,8 @@ final class GroundTruthTests: XCTestCase {
     }
 
     func testFreshGroundTruthMetadataVerifiedIsFalse() {
-        let gt = GroundTruth(isMatch: true, documentType: .invoice)
-        XCTAssertFalse(gt.metadata.verified)
+        let groundTruth = GroundTruth(isMatch: true, documentType: .invoice)
+        XCTAssertFalse(groundTruth.metadata.verified)
     }
 
     // MARK: - Equatable
@@ -210,7 +210,7 @@ final class GroundTruthTests: XCTestCase {
     // MARK: - Prescription Ground Truth
 
     func testPrescriptionGroundTruthWithPatientName() throws {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .prescription,
             date: "2025-04-08",
@@ -219,7 +219,7 @@ final class GroundTruthTests: XCTestCase {
         )
 
         let path = tempDirectory.appendingPathComponent("rx.pdf.json").path
-        try gt.save(to: path)
+        try groundTruth.save(to: path)
         let loaded = try GroundTruth.load(from: path)
 
         XCTAssertEqual(loaded.documentType, .prescription)

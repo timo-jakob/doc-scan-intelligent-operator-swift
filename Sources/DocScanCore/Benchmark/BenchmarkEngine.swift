@@ -37,12 +37,12 @@ public class BenchmarkEngine {
 
     /// Enumerate PDF files in a directory
     public func enumeratePDFs(in directory: String) throws -> [String] {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: directory) else {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: directory) else {
             throw DocScanError.fileNotFound(directory)
         }
 
-        let contents = try fm.contentsOfDirectory(atPath: directory)
+        let contents = try fileManager.contentsOfDirectory(atPath: directory)
         return contents
             .filter { $0.lowercased().hasSuffix(".pdf") }
             .sorted()
@@ -54,19 +54,19 @@ public class BenchmarkEngine {
     /// Check which PDFs already have sidecar files
     public func checkExistingSidecars(positiveDir: String, negativeDir: String?) throws -> [String: Bool] {
         var result: [String: Bool] = [:]
-        let fm = FileManager.default
+        let fileManager = FileManager.default
 
         let positivePDFs = try enumeratePDFs(in: positiveDir)
         for pdf in positivePDFs {
             let sidecar = GroundTruth.sidecarPath(for: pdf)
-            result[pdf] = fm.fileExists(atPath: sidecar)
+            result[pdf] = fileManager.fileExists(atPath: sidecar)
         }
 
         if let negDir = negativeDir {
             let negativePDFs = try enumeratePDFs(in: negDir)
             for pdf in negativePDFs {
                 let sidecar = GroundTruth.sidecarPath(for: pdf)
-                result[pdf] = fm.fileExists(atPath: sidecar)
+                result[pdf] = fileManager.fileExists(atPath: sidecar)
             }
         }
 
@@ -106,70 +106,9 @@ public class BenchmarkEngine {
         }
 
         var documentResults: [DocumentResult] = []
-
         for (pdfPath, isPositive) in allPDFs {
-            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-            if verbose {
-                print("Processing: \(filename)")
-            }
-
-            do {
-                let detector = try await detectorFactory.makeDetector(
-                    config: configuration, documentType: documentType
-                )
-                let categorization = try await detector.categorize(pdfPath: pdfPath)
-                let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
-
-                var date: String?
-                var secondaryField: String?
-                var patientName: String?
-
-                if isMatch {
-                    let extraction = try await detector.extractData()
-                    if let extractedDate = extraction.date {
-                        date = DateUtils.formatDate(extractedDate)
-                    }
-                    secondaryField = extraction.secondaryField
-                    patientName = extraction.patientName
-                }
-
-                // Generate ground truth sidecar
-                let gt = GroundTruth(
-                    isMatch: isPositive, // Ground truth is based on directory placement
-                    documentType: documentType,
-                    date: date,
-                    secondaryField: secondaryField,
-                    patientName: patientName,
-                    metadata: GroundTruthMetadata(
-                        vlmModel: configuration.modelName,
-                        textModel: configuration.textModelName,
-                        generatedAt: Date(),
-                        verified: false
-                    )
-                )
-                let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
-                try gt.save(to: sidecarPath)
-
-                // The initial benchmark treats the model output as "correct" for reporting
-                let extractionCorrect = isPositive == isMatch
-                documentResults.append(DocumentResult(
-                    filename: filename,
-                    isPositiveSample: isPositive,
-                    predictedIsMatch: isMatch,
-                    extractionCorrect: extractionCorrect
-                ))
-
-            } catch {
-                if verbose {
-                    print("Error processing \(filename): \(error.localizedDescription)")
-                }
-                documentResults.append(DocumentResult(
-                    filename: filename,
-                    isPositiveSample: isPositive,
-                    predictedIsMatch: false,
-                    extractionCorrect: false
-                ))
-            }
+            let result = await processInitialDocument(pdfPath: pdfPath, isPositive: isPositive)
+            documentResults.append(result)
         }
 
         let metrics = BenchmarkMetrics.compute(from: documentResults)
@@ -179,6 +118,75 @@ public class BenchmarkEngine {
             metrics: metrics,
             documentResults: documentResults
         )]
+    }
+
+    private func processInitialDocument(pdfPath: String, isPositive: Bool) async -> DocumentResult {
+        let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+        if verbose {
+            print("Processing: \(filename)")
+        }
+
+        do {
+            let detector = try await detectorFactory.makeDetector(
+                config: configuration, documentType: documentType
+            )
+            let categorization = try await detector.categorize(pdfPath: pdfPath)
+            let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
+
+            let sidecar = try await buildGroundTruth(
+                detector: detector, isMatch: isMatch, isPositive: isPositive
+            )
+            let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+            try sidecar.save(to: sidecarPath)
+
+            return DocumentResult(
+                filename: filename,
+                isPositiveSample: isPositive,
+                predictedIsMatch: isMatch,
+                extractionCorrect: isPositive == isMatch
+            )
+        } catch {
+            if verbose {
+                print("Error processing \(filename): \(error.localizedDescription)")
+            }
+            return DocumentResult(
+                filename: filename,
+                isPositiveSample: isPositive,
+                predictedIsMatch: false,
+                extractionCorrect: false
+            )
+        }
+    }
+
+    private func buildGroundTruth(
+        detector: DocumentDetector, isMatch: Bool, isPositive: Bool
+    ) async throws -> GroundTruth {
+        var date: String?
+        var secondaryField: String?
+        var patientName: String?
+
+        if isMatch {
+            let extraction = try await detector.extractData()
+            if let extractedDate = extraction.date {
+                date = DateUtils.formatDate(extractedDate)
+            }
+            secondaryField = extraction.secondaryField
+            patientName = extraction.patientName
+        }
+
+        return GroundTruth(
+            isMatch: isPositive,
+            documentType: documentType,
+            date: date,
+            secondaryField: secondaryField,
+            patientName: patientName,
+            metadata: GroundTruthMetadata(
+                vlmModel: configuration.modelName,
+                textModel: configuration.textModelName,
+                generatedAt: Date(),
+                verified: false
+            )
+        )
     }
 
     // MARK: - Benchmark a Model Pair
@@ -198,14 +206,14 @@ public class BenchmarkEngine {
 
         for pdfPath in pdfPaths {
             let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-            guard let gt = groundTruths[pdfPath] else { continue }
+            guard let truth = groundTruths[pdfPath] else { continue }
 
             do {
-                let result = try await withTimeout(seconds: timeoutSeconds) {
+                let result = try await runWithTimeout(seconds: timeoutSeconds) {
                     try await self.processSingleDocument(
                         pdfPath: pdfPath,
                         config: pairConfig,
-                        groundTruth: gt
+                        groundTruth: truth
                     )
                 }
                 documentResults.append(result)
@@ -224,7 +232,7 @@ public class BenchmarkEngine {
                 }
                 documentResults.append(DocumentResult(
                     filename: filename,
-                    isPositiveSample: gt.isMatch,
+                    isPositiveSample: truth.isMatch,
                     predictedIsMatch: false,
                     extractionCorrect: false
                 ))
@@ -259,10 +267,12 @@ public class BenchmarkEngine {
         let inactive = UInt64(stats.inactive_count) * pageSize
         return (free + inactive) / 1_000_000
     }
+}
 
-    // MARK: - Private
+// MARK: - Private Helpers
 
-    private func processSingleDocument(
+extension BenchmarkEngine {
+    func processSingleDocument(
         pdfPath: String,
         config: Configuration,
         groundTruth: GroundTruth
@@ -303,7 +313,7 @@ public class BenchmarkEngine {
         )
     }
 
-    private func withTimeout<T>(
+    func runWithTimeout<T>(
         seconds: TimeInterval,
         operation: @escaping () async throws -> T
     ) async throws -> T {

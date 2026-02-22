@@ -18,40 +18,28 @@ extension BenchmarkCommand {
         print(TerminalUtils.formatMetricsTable(rows))
         print()
 
-        // Leaderboards by metric
-        let accuracyBoard = TerminalUtils.formatLeaderboard(
-            title: "Leaderboard: Accuracy",
-            results: rows,
-            sortBy: { $0.accuracy }
-        )
-        print(accuracyBoard)
-        print()
+        printLeaderboards(rows)
+        try promptConfigUpdate(results: results, configuration: configuration, configPath: configPath)
+    }
 
-        let f1Board = TerminalUtils.formatLeaderboard(
-            title: "Leaderboard: F1 Score",
-            results: rows,
-            sortBy: { $0.f1Score }
-        )
-        print(f1Board)
-        print()
+    private func printLeaderboards(_ rows: [ModelPairResultRow]) {
+        let boards: [(String, (ModelPairResultRow) -> Double?)] = [
+            ("Leaderboard: Accuracy", { $0.accuracy }),
+            ("Leaderboard: F1 Score", { $0.f1Score }),
+            ("Leaderboard: Precision", { $0.precision }),
+            ("Leaderboard: Recall", { $0.recall }),
+        ]
+        for (title, sortBy) in boards {
+            print(TerminalUtils.formatLeaderboard(title: title, results: rows, sortBy: sortBy))
+            print()
+        }
+    }
 
-        let precisionBoard = TerminalUtils.formatLeaderboard(
-            title: "Leaderboard: Precision",
-            results: rows,
-            sortBy: { $0.precision }
-        )
-        print(precisionBoard)
-        print()
-
-        let recallBoard = TerminalUtils.formatLeaderboard(
-            title: "Leaderboard: Recall",
-            results: rows,
-            sortBy: { $0.recall }
-        )
-        print(recallBoard)
-        print()
-
-        // Find the best non-disqualified pair by accuracy
+    private func promptConfigUpdate(
+        results: [ModelPairResult],
+        configuration: Configuration,
+        configPath: String?
+    ) throws {
         let best = results
             .filter { !$0.isDisqualified }
             .max(by: { $0.metrics.accuracy < $1.metrics.accuracy })

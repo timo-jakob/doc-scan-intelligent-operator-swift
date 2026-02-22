@@ -26,7 +26,9 @@ final class BenchmarkEngineTests: XCTestCase {
     }
 
     /// Create a minimal valid PDF file with text content for testing
-    private func createTestPDF(at url: URL, text: String = "Rechnung Nr. 12345\nRechnungsdatum: 27.06.2025\nTest Company GmbH") {
+    private static let defaultPDFText = "Rechnung Nr. 12345\nRechnungsdatum: 27.06.2025\nTest Company GmbH"
+
+    private func createTestPDF(at url: URL, text: String = defaultPDFText) {
         let pdfData = NSMutableData()
         guard let consumer = CGDataConsumer(data: pdfData as CFMutableData) else { return }
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
@@ -121,8 +123,8 @@ final class BenchmarkEngineTests: XCTestCase {
         createTestPDF(at: pdfPath)
 
         // Create a sidecar
-        let gt = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01")
-        try gt.save(to: pdfPath.path + ".json")
+        let groundTruth = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01")
+        try groundTruth.save(to: pdfPath.path + ".json")
 
         let config = Configuration()
         let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
@@ -184,7 +186,7 @@ final class BenchmarkEngineTests: XCTestCase {
         let pdfPath = positiveDir.appendingPathComponent("invoice.pdf")
         createTestPDF(at: pdfPath)
 
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
@@ -207,7 +209,7 @@ final class BenchmarkEngineTests: XCTestCase {
         let result = try await engine.benchmarkModelPair(
             pair,
             pdfPaths: [pdfPath.path],
-            groundTruths: [pdfPath.path: gt],
+            groundTruths: [pdfPath.path: groundTruth],
             timeoutSeconds: 30
         )
 
@@ -219,7 +221,7 @@ final class BenchmarkEngineTests: XCTestCase {
         let pdfPath = positiveDir.appendingPathComponent("invoice.pdf")
         createTestPDF(at: pdfPath)
 
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
@@ -242,7 +244,7 @@ final class BenchmarkEngineTests: XCTestCase {
         let result = try await engine.benchmarkModelPair(
             pair,
             pdfPaths: [pdfPath.path],
-            groundTruths: [pdfPath.path: gt],
+            groundTruths: [pdfPath.path: groundTruth],
             timeoutSeconds: 30
         )
 

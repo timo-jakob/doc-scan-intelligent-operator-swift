@@ -257,9 +257,11 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertTrue(description.contains("150"))
         XCTAssertTrue(description.contains("false"))
     }
+}
 
-    // MARK: - TextModelName Tests
+// MARK: - Benchmark Configuration Tests
 
+extension ConfigurationTests {
     func testDefaultTextModelName() {
         let config = Configuration.defaultConfiguration
         XCTAssertEqual(config.textModelName, "mlx-community/Qwen2.5-7B-Instruct-4bit")
@@ -274,11 +276,8 @@ final class ConfigurationTests: XCTestCase {
         let customModel = "mlx-community/Qwen2.5-3B-Instruct-4bit"
         let config = Configuration(textModelName: customModel)
         XCTAssertEqual(config.textModelName, customModel)
-        // VLM model should still be default
         XCTAssertEqual(config.modelName, "mlx-community/Qwen2-VL-2B-Instruct-4bit")
     }
-
-    // MARK: - HuggingFaceUsername Tests
 
     func testDefaultHuggingFaceUsernameIsNil() {
         let config = Configuration.defaultConfiguration
@@ -289,8 +288,6 @@ final class ConfigurationTests: XCTestCase {
         let config = Configuration(huggingFaceUsername: "my-hf-user")
         XCTAssertEqual(config.huggingFaceUsername, "my-hf-user")
     }
-
-    // MARK: - YAML Backwards Compatibility Tests
 
     func testYAMLBackwardsCompatibilityWithoutTextModelName() throws {
         let yamlContent = """

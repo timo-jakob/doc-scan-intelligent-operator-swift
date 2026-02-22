@@ -98,14 +98,14 @@ final class FuzzyMatcherTests: XCTestCase {
     // MARK: - documentIsCorrect
 
     func testDocumentIsCorrectAllCorrect() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "DB_Fernverkehr_AG"
         )
         XCTAssertTrue(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: true,
             actualDate: "27.06.2025",
             actualSecondaryField: "db fernverkehr ag",
@@ -114,14 +114,14 @@ final class FuzzyMatcherTests: XCTestCase {
     }
 
     func testDocumentIsCorrectWrongCategorization() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "Company"
         )
         XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: false,
             actualDate: "2025-06-27",
             actualSecondaryField: "Company",
@@ -130,14 +130,14 @@ final class FuzzyMatcherTests: XCTestCase {
     }
 
     func testDocumentIsCorrectWrongDate() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "Company"
         )
         XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-07-27",
             actualSecondaryField: "Company",
@@ -146,14 +146,14 @@ final class FuzzyMatcherTests: XCTestCase {
     }
 
     func testDocumentIsCorrectWrongSecondaryField() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "Company_A"
         )
         XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-06-27",
             actualSecondaryField: "Company_B",
@@ -162,7 +162,7 @@ final class FuzzyMatcherTests: XCTestCase {
     }
 
     func testDocumentIsCorrectWrongPatientName() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .prescription,
             date: "2025-04-08",
@@ -170,7 +170,7 @@ final class FuzzyMatcherTests: XCTestCase {
             patientName: "Penelope"
         )
         XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-04-08",
             actualSecondaryField: "Kaiser",
@@ -179,13 +179,13 @@ final class FuzzyMatcherTests: XCTestCase {
     }
 
     func testDocumentIsCorrectCategorizationWrongButFieldsRight() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: false,
             documentType: .invoice
         )
         // actualIsMatch is true but expected is false -> incorrect
         XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: true,
             actualDate: nil,
             actualSecondaryField: nil,
@@ -194,13 +194,13 @@ final class FuzzyMatcherTests: XCTestCase {
     }
 
     func testDocumentIsCorrectBothNotMatch() {
-        let gt = GroundTruth(
+        let groundTruth = GroundTruth(
             isMatch: false,
             documentType: .invoice
         )
         // Both agree it's not a match -> correct (no fields to check)
         XCTAssertTrue(FuzzyMatcher.documentIsCorrect(
-            expected: gt,
+            expected: groundTruth,
             actualIsMatch: false,
             actualDate: nil,
             actualSecondaryField: nil,

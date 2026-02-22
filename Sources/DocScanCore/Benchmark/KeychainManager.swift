@@ -21,7 +21,9 @@ public enum KeychainManager {
 
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
-            throw DocScanError.keychainError("Failed to store token: \(SecCopyErrorMessageString(status, nil) ?? "unknown error" as CFString)")
+            throw DocScanError.keychainError(
+                "Failed to store token: \(keychainErrorMessage(status))"
+            )
         }
     }
 
@@ -43,7 +45,9 @@ public enum KeychainManager {
         }
 
         guard status == errSecSuccess else {
-            throw DocScanError.keychainError("Failed to retrieve token: \(SecCopyErrorMessageString(status, nil) ?? "unknown error" as CFString)")
+            throw DocScanError.keychainError(
+                "Failed to retrieve token: \(keychainErrorMessage(status))"
+            )
         }
 
         guard let data = result as? Data,
@@ -73,7 +77,9 @@ public enum KeychainManager {
 
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         guard status == errSecSuccess else {
-            throw DocScanError.keychainError("Failed to update token: \(SecCopyErrorMessageString(status, nil) ?? "unknown error" as CFString)")
+            throw DocScanError.keychainError(
+                "Failed to update token: \(keychainErrorMessage(status))"
+            )
         }
     }
 
@@ -87,7 +93,9 @@ public enum KeychainManager {
 
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw DocScanError.keychainError("Failed to delete token: \(SecCopyErrorMessageString(status, nil) ?? "unknown error" as CFString)")
+            throw DocScanError.keychainError(
+                "Failed to delete token: \(keychainErrorMessage(status))"
+            )
         }
     }
 
@@ -99,5 +107,12 @@ public enum KeychainManager {
         } else {
             try storeToken(token, forAccount: account)
         }
+    }
+
+    // MARK: - Private
+
+    private static func keychainErrorMessage(_ status: OSStatus) -> String {
+        let message = SecCopyErrorMessageString(status, nil) ?? "unknown error" as CFString
+        return message as String
     }
 }
