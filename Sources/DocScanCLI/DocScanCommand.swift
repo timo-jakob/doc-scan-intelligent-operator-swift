@@ -3,20 +3,10 @@ import Darwin
 import DocScanCore
 import Foundation
 
-@main
-struct DocScanCommand: AsyncParsableCommand {
+struct ScanCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "docscan",
-        abstract: "AI-powered document detection and renaming using two-phase verification",
-        discussion: """
-        Phase 1: Categorization (VLM + OCR in parallel) - Does this match the document type?
-        Phase 2: Data Extraction (OCR + TextLLM only) - Extract date and secondary field
-
-        Supported document types:
-          invoice      - Invoices, bills, receipts (extracts: date, company)
-          prescription - Doctor's prescriptions (extracts: date, doctor)
-        """,
-        version: "2.0.0"
+        commandName: "scan",
+        abstract: "Scan and rename a single PDF document"
     )
 
     @Argument(help: "Path to the PDF file to analyze")
@@ -186,7 +176,7 @@ struct DocScanCommand: AsyncParsableCommand {
 
 // MARK: - Setup Helpers
 
-extension DocScanCommand {
+extension ScanCommand {
     private func parseDocumentType() throws -> DocumentType {
         switch type.lowercased() {
         case "invoice": return .invoice
@@ -238,7 +228,7 @@ extension DocScanCommand {
 
 // MARK: - Startup
 
-extension DocScanCommand {
+extension ScanCommand {
     /// Print model info lines and preload both models, showing a progress bar when downloading.
     /// On a non-TTY stdout (piped/redirected), skips in-place \r rewrites to avoid garbled output.
     private func printStartupAndPreload(

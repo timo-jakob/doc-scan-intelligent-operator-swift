@@ -1,0 +1,325 @@
+import Foundation
+
+/// Factory protocol for creating DocumentDetectors with different model configurations
+public protocol DocumentDetectorFactory {
+    func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector
+}
+
+/// Default factory that creates real DocumentDetectors
+public struct DefaultDocumentDetectorFactory: DocumentDetectorFactory {
+    public init() {}
+
+    public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
+        DocumentDetector(config: config, documentType: documentType)
+    }
+}
+
+/// Core benchmark orchestration engine
+public class BenchmarkEngine {
+    private let configuration: Configuration
+    private let documentType: DocumentType
+    private let verbose: Bool
+    private let detectorFactory: DocumentDetectorFactory
+
+    public init(
+        configuration: Configuration,
+        documentType: DocumentType,
+        verbose: Bool = false,
+        detectorFactory: DocumentDetectorFactory = DefaultDocumentDetectorFactory()
+    ) {
+        self.configuration = configuration
+        self.documentType = documentType
+        self.verbose = verbose
+        self.detectorFactory = detectorFactory
+    }
+
+    // MARK: - PDF Enumeration
+
+    /// Enumerate PDF files in a directory
+    public func enumeratePDFs(in directory: String) throws -> [String] {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: directory) else {
+            throw DocScanError.fileNotFound(directory)
+        }
+
+        let contents = try fm.contentsOfDirectory(atPath: directory)
+        return contents
+            .filter { $0.lowercased().hasSuffix(".pdf") }
+            .sorted()
+            .map { (directory as NSString).appendingPathComponent($0) }
+    }
+
+    // MARK: - Sidecar Management
+
+    /// Check which PDFs already have sidecar files
+    public func checkExistingSidecars(positiveDir: String, negativeDir: String?) throws -> [String: Bool] {
+        var result: [String: Bool] = [:]
+        let fm = FileManager.default
+
+        let positivePDFs = try enumeratePDFs(in: positiveDir)
+        for pdf in positivePDFs {
+            let sidecar = GroundTruth.sidecarPath(for: pdf)
+            result[pdf] = fm.fileExists(atPath: sidecar)
+        }
+
+        if let negDir = negativeDir {
+            let negativePDFs = try enumeratePDFs(in: negDir)
+            for pdf in negativePDFs {
+                let sidecar = GroundTruth.sidecarPath(for: pdf)
+                result[pdf] = fm.fileExists(atPath: sidecar)
+            }
+        }
+
+        return result
+    }
+
+    /// Load all ground truth sidecar files for given PDF paths
+    public func loadGroundTruths(pdfPaths: [String]) throws -> [String: GroundTruth] {
+        var groundTruths: [String: GroundTruth] = [:]
+
+        for pdfPath in pdfPaths {
+            let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+            guard FileManager.default.fileExists(atPath: sidecarPath) else {
+                throw DocScanError.benchmarkError(
+                    "Missing ground truth sidecar for: \(URL(fileURLWithPath: pdfPath).lastPathComponent)"
+                )
+            }
+            groundTruths[pdfPath] = try GroundTruth.load(from: sidecarPath)
+        }
+
+        return groundTruths
+    }
+
+    // MARK: - Initial Benchmark Run
+
+    /// Run the initial benchmark to generate ground truth sidecar files
+    public func runInitialBenchmark(
+        positiveDir: String,
+        negativeDir: String?
+    ) async throws -> [ModelPairResult] {
+        let positivePDFs = try enumeratePDFs(in: positiveDir)
+        var allPDFs = positivePDFs.map { ($0, true) } // (path, isPositive)
+
+        if let negDir = negativeDir {
+            let negativePDFs = try enumeratePDFs(in: negDir)
+            allPDFs += negativePDFs.map { ($0, false) }
+        }
+
+        var documentResults: [DocumentResult] = []
+
+        for (pdfPath, isPositive) in allPDFs {
+            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+            if verbose {
+                print("Processing: \(filename)")
+            }
+
+            do {
+                let detector = try await detectorFactory.makeDetector(
+                    config: configuration, documentType: documentType
+                )
+                let categorization = try await detector.categorize(pdfPath: pdfPath)
+                let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
+
+                var date: String?
+                var secondaryField: String?
+                var patientName: String?
+
+                if isMatch {
+                    let extraction = try await detector.extractData()
+                    if let d = extraction.date {
+                        date = DateUtils.formatDate(d)
+                    }
+                    secondaryField = extraction.secondaryField
+                    patientName = extraction.patientName
+                }
+
+                // Generate ground truth sidecar
+                let gt = GroundTruth(
+                    isMatch: isPositive, // Ground truth is based on directory placement
+                    documentType: documentType,
+                    date: date,
+                    secondaryField: secondaryField,
+                    patientName: patientName,
+                    metadata: GroundTruthMetadata(
+                        vlmModel: configuration.modelName,
+                        textModel: configuration.textModelName,
+                        generatedAt: Date(),
+                        verified: false
+                    )
+                )
+                let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+                try gt.save(to: sidecarPath)
+
+                // The initial benchmark treats the model output as "correct" for reporting
+                let extractionCorrect = isPositive == isMatch
+                documentResults.append(DocumentResult(
+                    filename: filename,
+                    isPositiveSample: isPositive,
+                    predictedIsMatch: isMatch,
+                    extractionCorrect: extractionCorrect
+                ))
+
+            } catch {
+                if verbose {
+                    print("Error processing \(filename): \(error.localizedDescription)")
+                }
+                documentResults.append(DocumentResult(
+                    filename: filename,
+                    isPositiveSample: isPositive,
+                    predictedIsMatch: false,
+                    extractionCorrect: false
+                ))
+            }
+        }
+
+        let metrics = BenchmarkMetrics.compute(from: documentResults)
+        return [ModelPairResult(
+            vlmModelName: configuration.modelName,
+            textModelName: configuration.textModelName,
+            metrics: metrics,
+            documentResults: documentResults
+        )]
+    }
+
+    // MARK: - Benchmark a Model Pair
+
+    /// Benchmark a specific model pair against verified ground truths
+    public func benchmarkModelPair(
+        _ pair: ModelPair,
+        pdfPaths: [String],
+        groundTruths: [String: GroundTruth],
+        timeoutSeconds: TimeInterval = 30
+    ) async throws -> ModelPairResult {
+        var pairConfig = configuration
+        pairConfig.modelName = pair.vlmModelName
+        pairConfig.textModelName = pair.textModelName
+
+        var documentResults: [DocumentResult] = []
+
+        for pdfPath in pdfPaths {
+            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+            guard let gt = groundTruths[pdfPath] else { continue }
+
+            do {
+                let result = try await withTimeout(seconds: timeoutSeconds) {
+                    try await self.processSingleDocument(
+                        pdfPath: pdfPath,
+                        config: pairConfig,
+                        groundTruth: gt
+                    )
+                }
+                documentResults.append(result)
+            } catch is TimeoutError {
+                return ModelPairResult(
+                    vlmModelName: pair.vlmModelName,
+                    textModelName: pair.textModelName,
+                    metrics: BenchmarkMetrics.compute(from: documentResults),
+                    documentResults: documentResults,
+                    isDisqualified: true,
+                    disqualificationReason: "Exceeded \(Int(timeoutSeconds))s timeout on \(filename)"
+                )
+            } catch {
+                if verbose {
+                    print("Error on \(filename): \(error.localizedDescription)")
+                }
+                documentResults.append(DocumentResult(
+                    filename: filename,
+                    isPositiveSample: gt.isMatch,
+                    predictedIsMatch: false,
+                    extractionCorrect: false
+                ))
+            }
+        }
+
+        let metrics = BenchmarkMetrics.compute(from: documentResults)
+        return ModelPairResult(
+            vlmModelName: pair.vlmModelName,
+            textModelName: pair.textModelName,
+            metrics: metrics,
+            documentResults: documentResults
+        )
+    }
+
+    // MARK: - Memory
+
+    /// Get available system memory in MB
+    public static func availableMemoryMB() -> UInt64 {
+        var stats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &stats) { ptr in
+            ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, intPtr, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else {
+            return 0
+        }
+        let pageSize = UInt64(vm_kernel_page_size)
+        let free = UInt64(stats.free_count) * pageSize
+        let inactive = UInt64(stats.inactive_count) * pageSize
+        return (free + inactive) / 1_000_000
+    }
+
+    // MARK: - Private
+
+    private func processSingleDocument(
+        pdfPath: String,
+        config: Configuration,
+        groundTruth: GroundTruth
+    ) async throws -> DocumentResult {
+        let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+        let detector = try await detectorFactory.makeDetector(
+            config: config, documentType: documentType
+        )
+        let categorization = try await detector.categorize(pdfPath: pdfPath)
+        let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
+
+        var actualDate: String?
+        var actualSecondaryField: String?
+        var actualPatientName: String?
+
+        if isMatch {
+            let extraction = try await detector.extractData()
+            if let d = extraction.date {
+                actualDate = DateUtils.formatDate(d)
+            }
+            actualSecondaryField = extraction.secondaryField
+            actualPatientName = extraction.patientName
+        }
+
+        let extractionCorrect = FuzzyMatcher.documentIsCorrect(
+            expected: groundTruth,
+            actualIsMatch: isMatch,
+            actualDate: actualDate,
+            actualSecondaryField: actualSecondaryField,
+            actualPatientName: actualPatientName
+        )
+
+        return DocumentResult(
+            filename: filename,
+            isPositiveSample: groundTruth.isMatch,
+            predictedIsMatch: isMatch,
+            extractionCorrect: extractionCorrect
+        )
+    }
+
+    private func withTimeout<T>(
+        seconds: TimeInterval,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                let nanoseconds = UInt64(seconds * 1_000_000_000)
+                try await Task.sleep(nanoseconds: nanoseconds)
+                throw TimeoutError()
+            }
+            guard let result = try await group.next() else {
+                group.cancelAll()
+                throw TimeoutError()
+            }
+            group.cancelAll()
+            return result
+        }
+    }
+}

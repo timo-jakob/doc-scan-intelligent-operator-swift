@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - Phase 1: Verbose Output
 
-extension DocScanCommand {
+extension ScanCommand {
     func printPhaseHeader(number: Int, title: String) {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("Phase \(number): \(title)")
@@ -154,7 +154,7 @@ extension DocScanCommand {
 
 // MARK: - Phase 1: Compact Output
 
-extension DocScanCommand {
+extension ScanCommand {
     func determineIsMatchCompact(
         _ categorization: CategorizationVerification,
         documentType: DocumentType

@@ -21,6 +21,11 @@ public enum DocScanError: LocalizedError {
     case extractionFailed(String)
     case insufficientDiskSpace(required: UInt64, available: UInt64)
     case invalidInput(String)
+    case keychainError(String)
+    case networkError(String)
+    case huggingFaceAPIError(String)
+    case benchmarkError(String)
+    case memoryInsufficient(required: UInt64, available: UInt64)
 
     public var errorDescription: String? {
         switch self {
@@ -51,6 +56,19 @@ public enum DocScanError: LocalizedError {
                           requiredGB, availableGB)
         case let .invalidInput(message):
             return "Invalid input: \(message)"
+        case let .keychainError(message):
+            return "Keychain error: \(message)"
+        case let .networkError(message):
+            return "Network error: \(message)"
+        case let .huggingFaceAPIError(message):
+            return "Hugging Face API error: \(message)"
+        case let .benchmarkError(message):
+            return "Benchmark error: \(message)"
+        case let .memoryInsufficient(required, available):
+            let requiredMB = Double(required) / 1_000_000
+            let availableMB = Double(available) / 1_000_000
+            return String(format: "Insufficient memory: %.0f MB required, %.0f MB available",
+                          requiredMB, availableMB)
         }
     }
 }

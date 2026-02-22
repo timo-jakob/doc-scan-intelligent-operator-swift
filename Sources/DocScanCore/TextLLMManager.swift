@@ -7,15 +7,12 @@ import MLXLMCommon
 open class TextLLMManager {
     private let config: Configuration
 
-    /// Default text-only model for analyzing OCR results (Qwen2.5-7B optimized for Apple Silicon)
-    private let defaultTextModel = "mlx-community/Qwen2.5-7B-Instruct-4bit"
-
     /// Model container (lazy loaded)
     private var modelContainer: ModelContainer?
 
     /// The model identifier used for text LLM inference
     public var modelName: String {
-        defaultTextModel
+        config.textModelName
     }
 
     public init(config: Configuration) {
@@ -29,7 +26,7 @@ open class TextLLMManager {
         guard modelContainer == nil else { return }
 
         modelContainer = try await LLMModelFactory.shared.loadContainer(
-            configuration: .init(id: defaultTextModel)
+            configuration: .init(id: config.textModelName)
         ) { progress in
             progressHandler(progress.fractionCompleted)
         }
@@ -317,12 +314,12 @@ extension TextLLMManager {
         }
 
         if config.verbose {
-            print("Loading Text-LLM: \(defaultTextModel)")
+            print("Loading Text-LLM: \(config.textModelName)")
         }
 
         // Load model using LLMModelFactory
         modelContainer = try await LLMModelFactory.shared.loadContainer(
-            configuration: .init(id: defaultTextModel)
+            configuration: .init(id: config.textModelName)
         ) { [self] progress in
             if config.verbose {
                 let percent = Int(progress.fractionCompleted * 100)
