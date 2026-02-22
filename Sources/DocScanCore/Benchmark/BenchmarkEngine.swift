@@ -120,7 +120,7 @@ public class BenchmarkEngine {
                     filename: filename,
                     isPositiveSample: isPositive,
                     predictedIsMatch: truth.isMatch,
-                    extractionCorrect: true
+                    documentScore: 2
                 ))
             } else {
                 let result = await processInitialDocument(pdfPath: pdfPath, isPositive: isPositive)
@@ -160,7 +160,7 @@ public class BenchmarkEngine {
                 filename: filename,
                 isPositiveSample: isPositive,
                 predictedIsMatch: isMatch,
-                extractionCorrect: isPositive == isMatch
+                documentScore: (isPositive == isMatch) ? 2 : 0
             )
         } catch {
             if verbose {
@@ -170,7 +170,7 @@ public class BenchmarkEngine {
                 filename: filename,
                 isPositiveSample: isPositive,
                 predictedIsMatch: false,
-                extractionCorrect: false
+                documentScore: 0
             )
         }
     }
@@ -251,7 +251,7 @@ public class BenchmarkEngine {
                     filename: filename,
                     isPositiveSample: truth.isMatch,
                     predictedIsMatch: false,
-                    extractionCorrect: false
+                    documentScore: 0
                 ))
             }
         }
@@ -314,7 +314,7 @@ extension BenchmarkEngine {
             actualPatientName = extraction.patientName
         }
 
-        let extractionCorrect = FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: isMatch,
             actualDate: actualDate,
@@ -326,7 +326,7 @@ extension BenchmarkEngine {
             filename: filename,
             isPositiveSample: groundTruth.isMatch,
             predictedIsMatch: isMatch,
-            extractionCorrect: extractionCorrect
+            documentScore: scoring.score
         )
     }
 

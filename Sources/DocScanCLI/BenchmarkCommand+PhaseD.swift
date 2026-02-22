@@ -18,21 +18,11 @@ extension BenchmarkCommand {
         print(TerminalUtils.formatMetricsTable(rows))
         print()
 
-        printLeaderboards(rows)
-        try promptConfigUpdate(results: results, configuration: configuration, configPath: configPath)
-    }
+        // Single leaderboard sorted by score
+        print(TerminalUtils.formatLeaderboard(title: "Leaderboard: Score", results: rows))
+        print()
 
-    private func printLeaderboards(_ rows: [ModelPairResultRow]) {
-        let boards: [(String, (ModelPairResultRow) -> Double?)] = [
-            ("Leaderboard: Accuracy", { $0.accuracy }),
-            ("Leaderboard: F1 Score", { $0.f1Score }),
-            ("Leaderboard: Precision", { $0.precision }),
-            ("Leaderboard: Recall", { $0.recall }),
-        ]
-        for (title, sortBy) in boards {
-            print(TerminalUtils.formatLeaderboard(title: title, results: rows, sortBy: sortBy))
-            print()
-        }
+        try promptConfigUpdate(results: results, configuration: configuration, configPath: configPath)
     }
 
     private func promptConfigUpdate(
@@ -42,7 +32,7 @@ extension BenchmarkCommand {
     ) throws {
         let best = results
             .filter { !$0.isDisqualified }
-            .max(by: { $0.metrics.accuracy < $1.metrics.accuracy })
+            .max(by: { $0.metrics.score < $1.metrics.score })
 
         guard let bestPair = best else {
             print("No qualifying model pairs to recommend.")
@@ -60,7 +50,7 @@ extension BenchmarkCommand {
         print("Best performing pair:")
         print("  VLM:  \(bestPair.vlmModelName)")
         print("  Text: \(bestPair.textModelName)")
-        print("  Accuracy: \(String(format: "%.1f%%", bestPair.metrics.accuracy * 100))")
+        print("  Score: \(String(format: "%.1f%%", bestPair.metrics.score * 100))")
         print()
 
         if TerminalUtils.confirm("Update your configuration to use this pair?") {

@@ -64,16 +64,15 @@ enum TerminalUtils {
         let rankWidth = 4
         let vlmWidth = max(10, results.map(\.vlmModelName.count).max() ?? 10)
         let textWidth = max(12, results.map(\.textModelName.count).max() ?? 12)
-        let accWidth = 8
-        let precWidth = 9
-        let recWidth = 8
-        let f1Width = 8
+        let scoreWidth = 8
+        let pointsWidth = 8
+        let breakdownWidth = 11
         let statusWidth = 14
 
         let widths = ColumnWidths(
             rank: rankWidth, vlm: vlmWidth, text: textWidth,
-            accuracy: accWidth, precision: precWidth, recall: recWidth,
-            f1Score: f1Width, status: statusWidth
+            score: scoreWidth, points: pointsWidth,
+            breakdown: breakdownWidth, status: statusWidth
         )
 
         var lines: [String] = []
@@ -81,8 +80,8 @@ enum TerminalUtils {
         // Header
         let headerRow = RowData(
             rank: "#", vlm: "VLM Model", text: "Text Model",
-            accuracy: "Accuracy", precision: "Precision", recall: "Recall",
-            f1Score: "F1", status: "Status"
+            score: "Score", points: "Points",
+            breakdown: "2s/1s/0s", status: "Status"
         )
         let header = formatRow(headerRow, widths: widths)
         lines.append(header)
@@ -94,10 +93,11 @@ enum TerminalUtils {
                 rank: "\(index + 1)",
                 vlm: row.vlmModelName,
                 text: row.textModelName,
-                accuracy: row.isDisqualified ? "  ---" : formatPercent(row.accuracy),
-                precision: row.isDisqualified ? "  ---" : formatOptionalPercent(row.precision),
-                recall: row.isDisqualified ? "  ---" : formatOptionalPercent(row.recall),
-                f1Score: row.isDisqualified ? "  ---" : formatOptionalPercent(row.f1Score),
+                score: row.isDisqualified ? "  ---" : formatPercent(row.score),
+                points: row.isDisqualified ? "  ---" : "\(row.totalScore)/\(row.maxScore)",
+                breakdown: row.isDisqualified
+                    ? "  ---"
+                    : "\(row.fullyCorrectCount)/\(row.partiallyCorrectCount)/\(row.fullyWrongCount)",
                 status: row.isDisqualified ? "[DISQUALIFIED]" : "OK"
             )
             lines.append(formatRow(rowData, widths: widths))
@@ -106,24 +106,19 @@ enum TerminalUtils {
         return lines.joined(separator: "\n")
     }
 
-    /// Format a leaderboard sorted by a specific metric
+    /// Format a leaderboard sorted by score
     static func formatLeaderboard(
         title: String,
-        results: [ModelPairResultRow],
-        sortBy: (ModelPairResultRow) -> Double?
+        results: [ModelPairResultRow]
     ) -> String {
         var lines: [String] = []
         lines.append(title)
         lines.append(String(repeating: "═", count: title.count))
 
-        // Sort: non-disqualified first, then by metric descending, nil values last
+        // Sort: non-disqualified first, then by score descending
         let sorted = results
             .filter { !$0.isDisqualified }
-            .sorted { lhs, rhs in
-                let lVal = sortBy(lhs) ?? -1
-                let rVal = sortBy(rhs) ?? -1
-                return lVal > rVal
-            }
+            .sorted { $0.score > $1.score }
 
         if sorted.isEmpty {
             lines.append("  No qualifying results.")
@@ -131,8 +126,9 @@ enum TerminalUtils {
         }
 
         for (index, row) in sorted.enumerated() {
-            let value = sortBy(row).map { formatPercent($0) } ?? "N/A"
-            lines.append("  \(index + 1). \(row.vlmModelName) + \(row.textModelName)  \(value)")
+            let value = formatPercent(row.score)
+            let points = "\(row.totalScore)/\(row.maxScore)"
+            lines.append("  \(index + 1). \(row.vlmModelName) + \(row.textModelName)  \(value)  (\(points) pts)")
         }
 
         // Add disqualified entries
@@ -154,20 +150,14 @@ enum TerminalUtils {
         String(format: "%5.1f%%", value * 100)
     }
 
-    private static func formatOptionalPercent(_ value: Double?) -> String {
-        guard let val = value else { return "  N/A" }
-        return formatPercent(val)
-    }
-
     /// Column widths for table formatting
     struct ColumnWidths {
         let rank: Int
         let vlm: Int
         let text: Int
-        let accuracy: Int
-        let precision: Int
-        let recall: Int
-        let f1Score: Int
+        let score: Int
+        let points: Int
+        let breakdown: Int
         let status: Int
     }
 
@@ -176,10 +166,9 @@ enum TerminalUtils {
         let rank: String
         let vlm: String
         let text: String
-        let accuracy: String
-        let precision: String
-        let recall: String
-        let f1Score: String
+        let score: String
+        let points: String
+        let breakdown: String
         let status: String
     }
 
@@ -187,12 +176,11 @@ enum TerminalUtils {
         let rankCol = row.rank.padding(toLength: widths.rank, withPad: " ", startingAt: 0)
         let vlmCol = row.vlm.padding(toLength: widths.vlm, withPad: " ", startingAt: 0)
         let textCol = row.text.padding(toLength: widths.text, withPad: " ", startingAt: 0)
-        let accCol = row.accuracy.leftPadded(toLength: widths.accuracy)
-        let precCol = row.precision.leftPadded(toLength: widths.precision)
-        let recCol = row.recall.leftPadded(toLength: widths.recall)
-        let f1Col = row.f1Score.leftPadded(toLength: widths.f1Score)
+        let scoreCol = row.score.leftPadded(toLength: widths.score)
+        let pointsCol = row.points.leftPadded(toLength: widths.points)
+        let breakdownCol = row.breakdown.leftPadded(toLength: widths.breakdown)
         let statusCol = row.status.padding(toLength: widths.status, withPad: " ", startingAt: 0)
-        return "\(rankCol) \(vlmCol) \(textCol) \(accCol) \(precCol) \(recCol) \(f1Col) \(statusCol)"
+        return "\(rankCol) \(vlmCol) \(textCol) \(scoreCol) \(pointsCol) \(breakdownCol) \(statusCol)"
     }
 }
 
@@ -200,20 +188,24 @@ enum TerminalUtils {
 struct ModelPairResultRow {
     let vlmModelName: String
     let textModelName: String
-    let accuracy: Double
-    let precision: Double?
-    let recall: Double?
-    let f1Score: Double?
+    let score: Double
+    let totalScore: Int
+    let maxScore: Int
+    let fullyCorrectCount: Int
+    let partiallyCorrectCount: Int
+    let fullyWrongCount: Int
     let isDisqualified: Bool
     let disqualificationReason: String?
 
     init(from result: ModelPairResult) {
         vlmModelName = result.vlmModelName
         textModelName = result.textModelName
-        accuracy = result.metrics.accuracy
-        precision = result.metrics.precision
-        recall = result.metrics.recall
-        f1Score = result.metrics.f1Score
+        score = result.metrics.score
+        totalScore = result.metrics.totalScore
+        maxScore = result.metrics.maxScore
+        fullyCorrectCount = result.metrics.fullyCorrectCount
+        partiallyCorrectCount = result.metrics.partiallyCorrectCount
+        fullyWrongCount = result.metrics.fullyWrongCount
         isDisqualified = result.isDisqualified
         disqualificationReason = result.disqualificationReason
     }
@@ -221,19 +213,23 @@ struct ModelPairResultRow {
     init(
         vlmModelName: String,
         textModelName: String,
-        accuracy: Double,
-        precision: Double? = nil,
-        recall: Double? = nil,
-        f1Score: Double? = nil,
+        score: Double,
+        totalScore: Int = 0,
+        maxScore: Int = 0,
+        fullyCorrectCount: Int = 0,
+        partiallyCorrectCount: Int = 0,
+        fullyWrongCount: Int = 0,
         isDisqualified: Bool = false,
         disqualificationReason: String? = nil
     ) {
         self.vlmModelName = vlmModelName
         self.textModelName = textModelName
-        self.accuracy = accuracy
-        self.precision = precision
-        self.recall = recall
-        self.f1Score = f1Score
+        self.score = score
+        self.totalScore = totalScore
+        self.maxScore = maxScore
+        self.fullyCorrectCount = fullyCorrectCount
+        self.partiallyCorrectCount = partiallyCorrectCount
+        self.fullyWrongCount = fullyWrongCount
         self.isDisqualified = isDisqualified
         self.disqualificationReason = disqualificationReason
     }

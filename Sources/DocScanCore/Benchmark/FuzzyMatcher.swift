@@ -1,5 +1,14 @@
 import Foundation
 
+/// Per-document scoring breakdown
+public struct DocumentScoring: Equatable {
+    public let categorizationCorrect: Bool
+    public let extractionCorrect: Bool
+    public var score: Int {
+        (categorizationCorrect ? 1 : 0) + (extractionCorrect ? 1 : 0)
+    }
+}
+
 /// Fuzzy comparison utilities for benchmark scoring
 public enum FuzzyMatcher {
     /// Compare two date strings by parsing them into Date objects
@@ -56,37 +65,31 @@ public enum FuzzyMatcher {
         }
     }
 
-    /// Check if a document result is fully correct against ground truth
-    /// Categorization AND all fields must match
-    public static func documentIsCorrect(
+    /// Score a document result against ground truth (0/1/2 points)
+    public static func scoreDocument(
         expected: GroundTruth,
         actualIsMatch: Bool,
         actualDate: String?,
         actualSecondaryField: String?,
         actualPatientName: String?
-    ) -> Bool {
-        // Categorization must match
-        guard expected.isMatch == actualIsMatch else {
-            return false
+    ) -> DocumentScoring {
+        let categorizationCorrect = (expected.isMatch == actualIsMatch)
+
+        guard categorizationCorrect else {
+            return DocumentScoring(categorizationCorrect: false, extractionCorrect: false)
         }
 
-        // If not a match, no further fields to check
+        // Correct rejection of a negative sample — full marks
         guard expected.isMatch else {
-            return true
+            return DocumentScoring(categorizationCorrect: true, extractionCorrect: true)
         }
 
-        // All fields must match
-        guard datesMatch(expected.date, actualDate) else {
-            return false
-        }
-        guard fieldsMatch(expected.secondaryField, actualSecondaryField) else {
-            return false
-        }
-        guard fieldsMatch(expected.patientName, actualPatientName) else {
-            return false
-        }
+        // Positive sample: check all fields
+        let fieldsCorrect = datesMatch(expected.date, actualDate)
+            && fieldsMatch(expected.secondaryField, actualSecondaryField)
+            && fieldsMatch(expected.patientName, actualPatientName)
 
-        return true
+        return DocumentScoring(categorizationCorrect: true, extractionCorrect: fieldsCorrect)
     }
 
     /// Normalize a field string for comparison

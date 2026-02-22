@@ -40,11 +40,11 @@ extension BenchmarkEngineTests {
         let first = try XCTUnwrap(results.first)
         XCTAssertEqual(first.documentResults.count, 2)
 
-        // pdf1 was skipped — result uses existing sidecar (isMatch=true, extractionCorrect=true)
+        // pdf1 was skipped — result uses existing sidecar (isMatch=true, documentScore=2)
         let skipped = first.documentResults.first { $0.filename == "invoice1.pdf" }
         XCTAssertNotNil(skipped)
         XCTAssertTrue(try XCTUnwrap(skipped?.predictedIsMatch))
-        XCTAssertTrue(try XCTUnwrap(skipped?.extractionCorrect))
+        XCTAssertEqual(try XCTUnwrap(skipped?.documentScore), 2)
 
         // pdf2 was processed normally — detector was called
         let processed = first.documentResults.first { $0.filename == "invoice2.pdf" }
@@ -174,9 +174,10 @@ extension BenchmarkEngineTests {
             timeoutSeconds: 30
         )
 
-        // VLM says NO for both: positive=FN, negative=TN
-        XCTAssertEqual(result.metrics.trueNegatives, 1)
-        XCTAssertEqual(result.metrics.falseNegatives, 1)
+        // VLM says NO for both: positive gets 0 (wrong categorization), negative gets 2 (correct rejection)
+        XCTAssertEqual(result.metrics.totalScore, 2) // 0 + 2
+        XCTAssertEqual(result.metrics.maxScore, 4) // 2 * 2
+        XCTAssertEqual(result.metrics.score, 0.5)
         XCTAssertTrue(result.metrics.hasNegativeSamples)
     }
 }

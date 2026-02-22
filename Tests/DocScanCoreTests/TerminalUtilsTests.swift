@@ -12,11 +12,11 @@ final class TerminalUtilsTests: XCTestCase {
         let metrics = BenchmarkMetrics.compute(from: [
             DocumentResult(
                 filename: "a.pdf", isPositiveSample: true,
-                predictedIsMatch: true, extractionCorrect: true
+                predictedIsMatch: true, documentScore: 2
             ),
             DocumentResult(
                 filename: "b.pdf", isPositiveSample: false,
-                predictedIsMatch: false, extractionCorrect: true
+                predictedIsMatch: false, documentScore: 2
             ),
         ])
 
@@ -29,7 +29,7 @@ final class TerminalUtilsTests: XCTestCase {
 
         XCTAssertEqual(result.vlmModelName, "test/vlm")
         XCTAssertEqual(result.textModelName, "test/text")
-        XCTAssertEqual(result.metrics.accuracy, 1.0)
+        XCTAssertEqual(result.metrics.score, 1.0)
         XCTAssertFalse(result.isDisqualified)
     }
 
@@ -39,19 +39,19 @@ final class TerminalUtilsTests: XCTestCase {
         let results = [
             DocumentResult(
                 filename: "a.pdf", isPositiveSample: true,
-                predictedIsMatch: true, extractionCorrect: true
+                predictedIsMatch: true, documentScore: 2
             ),
             DocumentResult(
                 filename: "b.pdf", isPositiveSample: false,
-                predictedIsMatch: false, extractionCorrect: true
+                predictedIsMatch: false, documentScore: 2
             ),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
-        XCTAssertEqual(metrics.accuracy, 1.0)
-        XCTAssertEqual(metrics.precision, 1.0)
-        XCTAssertEqual(metrics.recall, 1.0)
-        XCTAssertEqual(metrics.f1Score, 1.0)
+        XCTAssertEqual(metrics.score, 1.0)
+        XCTAssertEqual(metrics.totalScore, 4)
+        XCTAssertEqual(metrics.maxScore, 4)
+        XCTAssertEqual(metrics.fullyCorrectCount, 2)
     }
 
     func testMetricsTableWithDisqualified() {
@@ -70,25 +70,25 @@ final class TerminalUtilsTests: XCTestCase {
 
     func testMetricsWithNoNegativeSamples() {
         let results = [
-            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, extractionCorrect: true),
+            DocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true, documentScore: 2),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
         XCTAssertFalse(metrics.hasNegativeSamples)
-        XCTAssertEqual(metrics.accuracy, 1.0)
+        XCTAssertEqual(metrics.score, 1.0)
     }
 
     // MARK: - Leaderboard Sorting
 
-    func testLeaderboardSortingByAccuracy() {
+    func testLeaderboardSortingByScore() {
         let results = [
-            makeResult(vlm: "low", accuracy: 0.5),
-            makeResult(vlm: "high", accuracy: 0.9),
-            makeResult(vlm: "mid", accuracy: 0.7),
+            makeResult(vlm: "low", score: 0.5),
+            makeResult(vlm: "high", score: 0.9),
+            makeResult(vlm: "mid", score: 0.7),
         ]
 
         let sorted = results
-            .sorted { $0.metrics.accuracy > $1.metrics.accuracy }
+            .sorted { $0.metrics.score > $1.metrics.score }
 
         XCTAssertEqual(sorted[0].vlmModelName, "high")
         XCTAssertEqual(sorted[1].vlmModelName, "mid")
@@ -97,7 +97,7 @@ final class TerminalUtilsTests: XCTestCase {
 
     func testLeaderboardExcludesDisqualified() {
         let results = [
-            makeResult(vlm: "good", accuracy: 0.9),
+            makeResult(vlm: "good", score: 0.9),
             makeDisqualifiedResult(vlm: "dq"),
         ]
 
@@ -108,18 +108,29 @@ final class TerminalUtilsTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeResult(vlm: String, accuracy: Double) -> ModelPairResult {
-        // Create DocumentResults that produce the desired accuracy
+    private func makeResult(vlm: String, score: Double) -> ModelPairResult {
+        // Create DocumentResults that produce the desired score
         var results: [DocumentResult] = []
         let total = 10
-        let correct = Int(accuracy * Double(total))
+        let targetTotalScore = Int(score * Double(total) * 2)
+
+        // Fill with score-2 docs first, then score-0
+        let fullCorrect = targetTotalScore / 2
+        let remainder = targetTotalScore % 2
 
         for index in 0 ..< total {
+            let docScore = if index < fullCorrect {
+                2
+            } else if index == fullCorrect, remainder > 0 {
+                1
+            } else {
+                0
+            }
             results.append(DocumentResult(
                 filename: "\(index).pdf",
                 isPositiveSample: true,
                 predictedIsMatch: true,
-                extractionCorrect: index < correct
+                documentScore: docScore
             ))
         }
 

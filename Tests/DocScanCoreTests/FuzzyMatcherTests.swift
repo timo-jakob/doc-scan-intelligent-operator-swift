@@ -95,73 +95,85 @@ final class FuzzyMatcherTests: XCTestCase {
         XCTAssertFalse(FuzzyMatcher.fieldsMatch("Company A", "Company B"))
     }
 
-    // MARK: - documentIsCorrect
+    // MARK: - scoreDocument
 
-    func testDocumentIsCorrectAllCorrect() {
+    func testScoreDocumentAllCorrect() {
         let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "DB_Fernverkehr_AG"
         )
-        XCTAssertTrue(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "27.06.2025",
             actualSecondaryField: "db fernverkehr ag",
             actualPatientName: nil
-        ))
+        )
+        XCTAssertTrue(scoring.categorizationCorrect)
+        XCTAssertTrue(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 2)
     }
 
-    func testDocumentIsCorrectWrongCategorization() {
+    func testScoreDocumentWrongCategorization() {
         let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "Company"
         )
-        XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: false,
             actualDate: "2025-06-27",
             actualSecondaryField: "Company",
             actualPatientName: nil
-        ))
+        )
+        XCTAssertFalse(scoring.categorizationCorrect)
+        XCTAssertFalse(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 0)
     }
 
-    func testDocumentIsCorrectWrongDate() {
+    func testScoreDocumentCorrectCategorizationWrongDate() {
         let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "Company"
         )
-        XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-07-27",
             actualSecondaryField: "Company",
             actualPatientName: nil
-        ))
+        )
+        XCTAssertTrue(scoring.categorizationCorrect)
+        XCTAssertFalse(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 1)
     }
 
-    func testDocumentIsCorrectWrongSecondaryField() {
+    func testScoreDocumentCorrectCategorizationWrongSecondaryField() {
         let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
             secondaryField: "Company_A"
         )
-        XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-06-27",
             actualSecondaryField: "Company_B",
             actualPatientName: nil
-        ))
+        )
+        XCTAssertTrue(scoring.categorizationCorrect)
+        XCTAssertFalse(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 1)
     }
 
-    func testDocumentIsCorrectWrongPatientName() {
+    func testScoreDocumentWrongPatientName() {
         let groundTruth = GroundTruth(
             isMatch: true,
             documentType: .prescription,
@@ -169,42 +181,49 @@ final class FuzzyMatcherTests: XCTestCase {
             secondaryField: "Kaiser",
             patientName: "Penelope"
         )
-        XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-04-08",
             actualSecondaryField: "Kaiser",
             actualPatientName: "Charlotte"
-        ))
+        )
+        XCTAssertTrue(scoring.categorizationCorrect)
+        XCTAssertFalse(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 1)
     }
 
-    func testDocumentIsCorrectCategorizationWrongButFieldsRight() {
+    func testScoreDocumentFalsePositive() {
         let groundTruth = GroundTruth(
             isMatch: false,
             documentType: .invoice
         )
-        // actualIsMatch is true but expected is false -> incorrect
-        XCTAssertFalse(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: nil,
             actualSecondaryField: nil,
             actualPatientName: nil
-        ))
+        )
+        XCTAssertFalse(scoring.categorizationCorrect)
+        XCTAssertFalse(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 0)
     }
 
-    func testDocumentIsCorrectBothNotMatch() {
+    func testScoreDocumentCorrectRejection() {
         let groundTruth = GroundTruth(
             isMatch: false,
             documentType: .invoice
         )
-        // Both agree it's not a match -> correct (no fields to check)
-        XCTAssertTrue(FuzzyMatcher.documentIsCorrect(
+        let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: false,
             actualDate: nil,
             actualSecondaryField: nil,
             actualPatientName: nil
-        ))
+        )
+        XCTAssertTrue(scoring.categorizationCorrect)
+        XCTAssertTrue(scoring.extractionCorrect)
+        XCTAssertEqual(scoring.score, 2)
     }
 }

@@ -31,10 +31,9 @@ extension BenchmarkCommand {
             if result.isDisqualified {
                 print("  ❌ DISQUALIFIED: \(result.disqualificationReason ?? "Unknown")")
             } else {
-                let acc = String(format: "%.1f%%", result.metrics.accuracy * 100)
-                let correct = result.documentResults.filter(\.isFullyCorrect).count
-                let total = result.documentResults.count
-                print("  ✅ Accuracy: \(acc) (\(correct)/\(total) correct)")
+                let scoreStr = String(format: "%.1f%%", result.metrics.score * 100)
+                let points = "\(result.metrics.totalScore)/\(result.metrics.maxScore)"
+                print("  ✅ Score: \(scoreStr) (\(points) pts)")
             }
             print()
 

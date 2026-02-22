@@ -32,13 +32,13 @@ extension BenchmarkCommand {
         if let first = results.first {
             print("Initial run complete:")
             print("  Documents processed: \(first.documentResults.count)")
-            print("  Accuracy: \(String(format: "%.1f%%", first.metrics.accuracy * 100))")
+            print("  Score: \(String(format: "%.1f%%", first.metrics.score * 100))")
             print()
 
             for doc in first.documentResults {
-                let status = doc.isFullyCorrect ? "✅" : "❌"
+                let icon = doc.documentScore == 2 ? "✅" : doc.documentScore == 1 ? "⚠️" : "❌"
                 let match = doc.predictedIsMatch ? "match" : "no match"
-                print("  \(status) \(doc.filename) (\(match))")
+                print("  \(icon) \(doc.filename) (\(match)) [\(doc.documentScore)/2]")
             }
             print()
         }

@@ -11,56 +11,57 @@ public struct DocumentResult: Equatable {
     /// Whether the model predicted this as a match
     public let predictedIsMatch: Bool
 
-    /// Whether all extracted fields are correct (only meaningful if categorization is correct)
-    public let extractionCorrect: Bool
+    /// Document score: 0 (fully wrong), 1 (categorization correct, extraction wrong), 2 (fully correct)
+    public let documentScore: Int
 
-    /// Whether categorization AND extraction are both fully correct
+    /// Whether categorization was correct
+    public var categorizationCorrect: Bool {
+        isPositiveSample == predictedIsMatch
+    }
+
+    /// Whether categorization AND extraction are both fully correct (score == 2)
     public var isFullyCorrect: Bool {
-        let categorizationCorrect = isPositiveSample == predictedIsMatch
-        return categorizationCorrect && extractionCorrect
+        documentScore == 2
     }
 
     public init(
         filename: String,
         isPositiveSample: Bool,
         predictedIsMatch: Bool,
-        extractionCorrect: Bool
+        documentScore: Int
     ) {
         self.filename = filename
         self.isPositiveSample = isPositiveSample
         self.predictedIsMatch = predictedIsMatch
-        self.extractionCorrect = extractionCorrect
+        self.documentScore = documentScore
     }
 }
 
 /// Computed metrics for a benchmark run
 public struct BenchmarkMetrics: Equatable {
-    /// Overall accuracy (correct / total)
-    public let accuracy: Double
+    /// Normalized score: totalScore / (2 * documentCount), range [0.0, 1.0]
+    public let score: Double
 
-    /// Precision (TP / (TP + FP)) - nil if no predicted positives
-    public let precision: Double?
+    /// Sum of all document scores
+    public let totalScore: Int
 
-    /// Recall (TP / (TP + FN)) - nil if no actual positives
-    public let recall: Double?
+    /// Number of documents evaluated
+    public let documentCount: Int
 
-    /// F1 Score (harmonic mean of precision and recall) - nil if either is nil
-    public let f1Score: Double?
+    /// Maximum possible score (2 * documentCount)
+    public let maxScore: Int
 
     /// Whether the corpus included negative samples
     public let hasNegativeSamples: Bool
 
-    /// Number of true positives
-    public let truePositives: Int
+    /// Number of documents scoring 2 (fully correct)
+    public let fullyCorrectCount: Int
 
-    /// Number of false positives
-    public let falsePositives: Int
+    /// Number of documents scoring 1 (categorization correct, extraction wrong)
+    public let partiallyCorrectCount: Int
 
-    /// Number of true negatives
-    public let trueNegatives: Int
-
-    /// Number of false negatives
-    public let falseNegatives: Int
+    /// Number of documents scoring 0 (fully wrong)
+    public let fullyWrongCount: Int
 
     /// Compute metrics from document results
     public static func compute(from results: [DocumentResult]) -> BenchmarkMetrics {
@@ -68,59 +69,33 @@ public struct BenchmarkMetrics: Equatable {
             return .empty
         }
 
-        let counts = classifyCounts(from: results)
-        let total = counts.truePos + counts.falsePos + counts.trueNeg + counts.falseNeg
-        let accuracy = total > 0 ? Double(counts.truePos + counts.trueNeg) / Double(total) : 0
-
-        let precision: Double? = (counts.truePos + counts.falsePos) > 0
-            ? Double(counts.truePos) / Double(counts.truePos + counts.falsePos) : nil
-        let recall: Double? = (counts.truePos + counts.falseNeg) > 0
-            ? Double(counts.truePos) / Double(counts.truePos + counts.falseNeg) : nil
-
-        let f1Score: Double? = if let prec = precision, let rec = recall, (prec + rec) > 0 {
-            2 * prec * rec / (prec + rec)
-        } else {
-            nil
-        }
+        let totalScore = results.reduce(0) { $0 + $1.documentScore }
+        let maxScore = 2 * results.count
+        let score = Double(totalScore) / Double(maxScore)
 
         return BenchmarkMetrics(
-            accuracy: accuracy,
-            precision: precision,
-            recall: recall,
-            f1Score: f1Score,
+            score: score,
+            totalScore: totalScore,
+            documentCount: results.count,
+            maxScore: maxScore,
             hasNegativeSamples: results.contains { !$0.isPositiveSample },
-            truePositives: counts.truePos,
-            falsePositives: counts.falsePos,
-            trueNegatives: counts.trueNeg,
-            falseNegatives: counts.falseNeg
+            fullyCorrectCount: results.count(where: { $0.documentScore == 2 }),
+            partiallyCorrectCount: results.count(where: { $0.documentScore == 1 }),
+            fullyWrongCount: results.count(where: { $0.documentScore == 0 })
         )
     }
 
     /// Empty metrics for zero-document case
     static let empty = BenchmarkMetrics(
-        accuracy: 0, precision: nil, recall: nil, f1Score: nil,
+        score: 0,
+        totalScore: 0,
+        documentCount: 0,
+        maxScore: 0,
         hasNegativeSamples: false,
-        truePositives: 0, falsePositives: 0, trueNegatives: 0, falseNegatives: 0
+        fullyCorrectCount: 0,
+        partiallyCorrectCount: 0,
+        fullyWrongCount: 0
     )
-
-    private struct ConfusionCounts {
-        var truePos = 0
-        var falsePos = 0
-        var trueNeg = 0
-        var falseNeg = 0
-    }
-
-    private static func classifyCounts(from results: [DocumentResult]) -> ConfusionCounts {
-        var counts = ConfusionCounts()
-        for result in results {
-            if result.isPositiveSample {
-                if result.isFullyCorrect { counts.truePos += 1 } else { counts.falseNeg += 1 }
-            } else {
-                if !result.predictedIsMatch { counts.trueNeg += 1 } else { counts.falsePos += 1 }
-            }
-        }
-        return counts
-    }
 }
 
 /// Result for a single model pair benchmark

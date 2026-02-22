@@ -9,9 +9,10 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             predictedIsMatch: true,
-            extractionCorrect: true
+            documentScore: 2
         )
         XCTAssertTrue(result.isFullyCorrect)
+        XCTAssertTrue(result.categorizationCorrect)
     }
 
     func testDocumentResultWrongCategorization() {
@@ -19,19 +20,21 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             predictedIsMatch: false,
-            extractionCorrect: true
+            documentScore: 0
         )
         XCTAssertFalse(result.isFullyCorrect)
+        XCTAssertFalse(result.categorizationCorrect)
     }
 
-    func testDocumentResultWrongExtraction() {
+    func testDocumentResultPartiallyCorrect() {
         let result = DocumentResult(
             filename: "invoice.pdf",
             isPositiveSample: true,
             predictedIsMatch: true,
-            extractionCorrect: false
+            documentScore: 1
         )
         XCTAssertFalse(result.isFullyCorrect)
+        XCTAssertTrue(result.categorizationCorrect)
     }
 
     func testDocumentResultCorrectNegative() {
@@ -39,126 +42,109 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "not_invoice.pdf",
             isPositiveSample: false,
             predictedIsMatch: false,
-            extractionCorrect: true
+            documentScore: 2
         )
         XCTAssertTrue(result.isFullyCorrect)
+        XCTAssertTrue(result.categorizationCorrect)
     }
 
     // MARK: - Perfect Scores
 
     func testPerfectScores() {
         let results = [
-            makeResult("a.pdf", positive: true, predicted: true, correct: true),
-            makeResult("b.pdf", positive: true, predicted: true, correct: true),
-            makeResult("c.pdf", positive: false, predicted: false, correct: true),
+            makeResult("a.pdf", positive: true, predicted: true, score: 2),
+            makeResult("b.pdf", positive: true, predicted: true, score: 2),
+            makeResult("c.pdf", positive: false, predicted: false, score: 2),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
-        XCTAssertEqual(metrics.accuracy, 1.0)
-        XCTAssertEqual(metrics.precision, 1.0)
-        XCTAssertEqual(metrics.recall, 1.0)
-        XCTAssertEqual(metrics.f1Score, 1.0)
+        XCTAssertEqual(metrics.score, 1.0)
+        XCTAssertEqual(metrics.totalScore, 6)
+        XCTAssertEqual(metrics.maxScore, 6)
+        XCTAssertEqual(metrics.documentCount, 3)
         XCTAssertTrue(metrics.hasNegativeSamples)
-        XCTAssertEqual(metrics.truePositives, 2)
-        XCTAssertEqual(metrics.trueNegatives, 1)
-        XCTAssertEqual(metrics.falsePositives, 0)
-        XCTAssertEqual(metrics.falseNegatives, 0)
+        XCTAssertEqual(metrics.fullyCorrectCount, 3)
+        XCTAssertEqual(metrics.partiallyCorrectCount, 0)
+        XCTAssertEqual(metrics.fullyWrongCount, 0)
     }
 
     // MARK: - All Wrong
 
     func testAllWrong() {
         let results = [
-            makeResult("a.pdf", positive: true, predicted: false, correct: false),
-            makeResult("b.pdf", positive: false, predicted: true, correct: false),
+            makeResult("a.pdf", positive: true, predicted: false, score: 0),
+            makeResult("b.pdf", positive: false, predicted: true, score: 0),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
-        XCTAssertEqual(metrics.accuracy, 0.0)
-        XCTAssertEqual(metrics.precision, 0.0)
-        XCTAssertEqual(metrics.recall, 0.0)
+        XCTAssertEqual(metrics.score, 0.0)
+        XCTAssertEqual(metrics.totalScore, 0)
+        XCTAssertEqual(metrics.maxScore, 4)
+        XCTAssertEqual(metrics.fullyWrongCount, 2)
     }
 
     // MARK: - Mixed Results
 
-    func testMixedResults() throws {
+    func testMixedResults() {
         let results = [
-            // 3 TP
-            makeResult("a.pdf", positive: true, predicted: true, correct: true),
-            makeResult("b.pdf", positive: true, predicted: true, correct: true),
-            makeResult("c.pdf", positive: true, predicted: true, correct: true),
-            // 1 FP
-            makeResult("d.pdf", positive: false, predicted: true, correct: false),
-            // 1 FN
-            makeResult("e.pdf", positive: true, predicted: false, correct: false),
-            // 2 TN
-            makeResult("f.pdf", positive: false, predicted: false, correct: true),
-            makeResult("g.pdf", positive: false, predicted: false, correct: true),
+            makeResult("a.pdf", positive: true, predicted: true, score: 2),
+            makeResult("b.pdf", positive: true, predicted: true, score: 2),
+            makeResult("c.pdf", positive: true, predicted: true, score: 1), // partial
+            makeResult("d.pdf", positive: false, predicted: true, score: 0), // FP
+            makeResult("e.pdf", positive: true, predicted: false, score: 0), // FN
+            makeResult("f.pdf", positive: false, predicted: false, score: 2),
+            makeResult("g.pdf", positive: false, predicted: false, score: 2),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
-        XCTAssertEqual(metrics.truePositives, 3)
-        XCTAssertEqual(metrics.falsePositives, 1)
-        XCTAssertEqual(metrics.falseNegatives, 1)
-        XCTAssertEqual(metrics.trueNegatives, 2)
-
-        // accuracy = (3+2)/7
-        XCTAssertEqual(metrics.accuracy, 5.0 / 7.0, accuracy: 0.001)
-        // precision = 3/(3+1) = 0.75
-        let precision = try XCTUnwrap(metrics.precision)
-        XCTAssertEqual(precision, 0.75, accuracy: 0.001)
-        // recall = 3/(3+1) = 0.75
-        let recall = try XCTUnwrap(metrics.recall)
-        XCTAssertEqual(recall, 0.75, accuracy: 0.001)
-        // F1 = 2 * 0.75 * 0.75 / (0.75 + 0.75) = 0.75
-        let f1Score = try XCTUnwrap(metrics.f1Score)
-        XCTAssertEqual(f1Score, 0.75, accuracy: 0.001)
+        // totalScore = 2+2+1+0+0+2+2 = 9, maxScore = 14
+        XCTAssertEqual(metrics.totalScore, 9)
+        XCTAssertEqual(metrics.maxScore, 14)
+        XCTAssertEqual(metrics.score, 9.0 / 14.0, accuracy: 0.001)
+        XCTAssertEqual(metrics.documentCount, 7)
+        XCTAssertTrue(metrics.hasNegativeSamples)
+        XCTAssertEqual(metrics.fullyCorrectCount, 4)
+        XCTAssertEqual(metrics.partiallyCorrectCount, 1)
+        XCTAssertEqual(metrics.fullyWrongCount, 2)
     }
 
     // MARK: - No Negatives
 
     func testNoNegativeSamples() {
         let results = [
-            makeResult("a.pdf", positive: true, predicted: true, correct: true),
-            makeResult("b.pdf", positive: true, predicted: true, correct: true),
+            makeResult("a.pdf", positive: true, predicted: true, score: 2),
+            makeResult("b.pdf", positive: true, predicted: true, score: 2),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
         XCTAssertFalse(metrics.hasNegativeSamples)
-        XCTAssertEqual(metrics.accuracy, 1.0)
-        XCTAssertEqual(metrics.recall, 1.0)
-        // precision = 2/(2+0) = 1.0
-        XCTAssertEqual(metrics.precision, 1.0)
+        XCTAssertEqual(metrics.score, 1.0)
     }
 
     // MARK: - No Positives
 
     func testNoPositiveSamples() {
         let results = [
-            makeResult("a.pdf", positive: false, predicted: false, correct: true),
-            makeResult("b.pdf", positive: false, predicted: false, correct: true),
+            makeResult("a.pdf", positive: false, predicted: false, score: 2),
+            makeResult("b.pdf", positive: false, predicted: false, score: 2),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
         XCTAssertTrue(metrics.hasNegativeSamples)
-        XCTAssertEqual(metrics.accuracy, 1.0)
-        // recall is nil (no actual positives: TP+FN = 0)
-        XCTAssertNil(metrics.recall)
-        // precision is nil (no predicted positives: TP+FP = 0)
-        XCTAssertNil(metrics.precision)
-        XCTAssertNil(metrics.f1Score)
+        XCTAssertEqual(metrics.score, 1.0)
     }
 
     // MARK: - Single Document
 
-    func testSingleTruePositive() {
+    func testSingleFullyCorrect() {
         let results = [
-            makeResult("a.pdf", positive: true, predicted: true, correct: true),
+            makeResult("a.pdf", positive: true, predicted: true, score: 2),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
-        XCTAssertEqual(metrics.accuracy, 1.0)
-        XCTAssertEqual(metrics.recall, 1.0)
+        XCTAssertEqual(metrics.score, 1.0)
+        XCTAssertEqual(metrics.totalScore, 2)
+        XCTAssertEqual(metrics.maxScore, 2)
     }
 
     // MARK: - Empty Results
@@ -166,15 +152,14 @@ final class BenchmarkMetricsTests: XCTestCase {
     func testEmptyResults() {
         let metrics = BenchmarkMetrics.compute(from: [])
 
-        XCTAssertEqual(metrics.accuracy, 0)
-        XCTAssertNil(metrics.precision)
-        XCTAssertNil(metrics.recall)
-        XCTAssertNil(metrics.f1Score)
+        XCTAssertEqual(metrics.score, 0)
+        XCTAssertEqual(metrics.totalScore, 0)
+        XCTAssertEqual(metrics.maxScore, 0)
+        XCTAssertEqual(metrics.documentCount, 0)
         XCTAssertFalse(metrics.hasNegativeSamples)
-        XCTAssertEqual(metrics.truePositives, 0)
-        XCTAssertEqual(metrics.falsePositives, 0)
-        XCTAssertEqual(metrics.trueNegatives, 0)
-        XCTAssertEqual(metrics.falseNegatives, 0)
+        XCTAssertEqual(metrics.fullyCorrectCount, 0)
+        XCTAssertEqual(metrics.partiallyCorrectCount, 0)
+        XCTAssertEqual(metrics.fullyWrongCount, 0)
     }
 
     // MARK: - ModelPairResult
@@ -207,18 +192,20 @@ final class BenchmarkMetricsTests: XCTestCase {
         XCTAssertNil(pair.disqualificationReason)
     }
 
-    // MARK: - Extraction Wrong but Categorization Right
+    // MARK: - Categorization Right but Extraction Wrong → Score 1
 
-    func testExtractionWrongCountsAsFalseNegative() {
+    func testCategorizationRightExtractionWrongGivesScore1() {
         let results = [
-            // Positive sample, correctly categorized but extraction wrong -> FN
-            makeResult("a.pdf", positive: true, predicted: true, correct: false),
+            makeResult("a.pdf", positive: true, predicted: true, score: 1),
         ]
         let metrics = BenchmarkMetrics.compute(from: results)
 
-        XCTAssertEqual(metrics.truePositives, 0)
-        XCTAssertEqual(metrics.falseNegatives, 1)
-        XCTAssertEqual(metrics.accuracy, 0.0)
+        XCTAssertEqual(metrics.score, 0.5)
+        XCTAssertEqual(metrics.totalScore, 1)
+        XCTAssertEqual(metrics.maxScore, 2)
+        XCTAssertEqual(metrics.partiallyCorrectCount, 1)
+        XCTAssertEqual(metrics.fullyCorrectCount, 0)
+        XCTAssertEqual(metrics.fullyWrongCount, 0)
     }
 
     // MARK: - Helpers
@@ -227,13 +214,13 @@ final class BenchmarkMetricsTests: XCTestCase {
         _ filename: String,
         positive: Bool,
         predicted: Bool,
-        correct: Bool
+        score: Int
     ) -> DocumentResult {
         DocumentResult(
             filename: filename,
             isPositiveSample: positive,
             predictedIsMatch: predicted,
-            extractionCorrect: correct
+            documentScore: score
         )
     }
 }

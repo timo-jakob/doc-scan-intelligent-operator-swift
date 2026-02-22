@@ -214,7 +214,7 @@ final class BenchmarkEngineTests: XCTestCase {
         )
 
         XCTAssertFalse(result.isDisqualified)
-        XCTAssertEqual(result.metrics.accuracy, 1.0)
+        XCTAssertEqual(result.metrics.score, 1.0)
     }
 
     func testBenchmarkModelPairWrongResult() async throws {
@@ -248,6 +248,7 @@ final class BenchmarkEngineTests: XCTestCase {
             timeoutSeconds: 30
         )
 
-        XCTAssertEqual(result.metrics.accuracy, 0.0)
+        // Categorization correct but extraction wrong → score 1/2 = 0.5
+        XCTAssertEqual(result.metrics.score, 0.5)
     }
 }
