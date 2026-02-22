@@ -93,9 +93,11 @@ public class BenchmarkEngine {
     // MARK: - Initial Benchmark Run
 
     /// Run the initial benchmark to generate ground truth sidecar files
+    /// - Parameter skipPaths: PDF paths to skip processing for; existing sidecars are reused instead
     public func runInitialBenchmark(
         positiveDir: String,
-        negativeDir: String?
+        negativeDir: String?,
+        skipPaths: Set<String> = []
     ) async throws -> [ModelPairResult] {
         let positivePDFs = try enumeratePDFs(in: positiveDir)
         var allPDFs = positivePDFs.map { ($0, true) } // (path, isPositive)
@@ -107,8 +109,23 @@ public class BenchmarkEngine {
 
         var documentResults: [DocumentResult] = []
         for (pdfPath, isPositive) in allPDFs {
-            let result = await processInitialDocument(pdfPath: pdfPath, isPositive: isPositive)
-            documentResults.append(result)
+            if skipPaths.contains(pdfPath) {
+                let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+                let truth = try GroundTruth.load(from: sidecarPath)
+                let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+                if verbose {
+                    print("Reusing existing sidecar: \(filename).json")
+                }
+                documentResults.append(DocumentResult(
+                    filename: filename,
+                    isPositiveSample: isPositive,
+                    predictedIsMatch: truth.isMatch,
+                    extractionCorrect: true
+                ))
+            } else {
+                let result = await processInitialDocument(pdfPath: pdfPath, isPositive: isPositive)
+                documentResults.append(result)
+            }
         }
 
         let metrics = BenchmarkMetrics.compute(from: documentResults)

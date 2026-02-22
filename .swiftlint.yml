@@ -2,3 +2,7 @@
 # trailing_comma disabled: SwiftFormat (Swift 6 mode) adds trailing commas
 disabled_rules:
   - trailing_comma
+
+excluded:
+  - .build
+  - Package.swift

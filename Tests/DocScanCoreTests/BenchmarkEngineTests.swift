@@ -26,9 +26,9 @@ final class BenchmarkEngineTests: XCTestCase {
     }
 
     /// Create a minimal valid PDF file with text content for testing
-    private static let defaultPDFText = "Rechnung Nr. 12345\nRechnungsdatum: 27.06.2025\nTest Company GmbH"
+    static let defaultPDFText = "Rechnung Nr. 12345\nRechnungsdatum: 27.06.2025\nTest Company GmbH"
 
-    private func createTestPDF(at url: URL, text: String = defaultPDFText) {
+    func createTestPDF(at url: URL, text: String = defaultPDFText) {
         let pdfData = NSMutableData()
         guard let consumer = CGDataConsumer(data: pdfData as CFMutableData) else { return }
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
@@ -51,7 +51,7 @@ final class BenchmarkEngineTests: XCTestCase {
     }
 
     /// Create a text file (non-PDF)
-    private func createTextFile(at url: URL) {
+    func createTextFile(at url: URL) {
         try? "not a pdf".write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -249,39 +249,5 @@ final class BenchmarkEngineTests: XCTestCase {
         )
 
         XCTAssertEqual(result.metrics.accuracy, 0.0)
-    }
-
-    func testBenchmarkWithNegativeDirectory() async throws {
-        let posPDF = positiveDir.appendingPathComponent("invoice.pdf")
-        let negPDF = negativeDir.appendingPathComponent("not_invoice.pdf")
-        createTestPDF(at: posPDF)
-        createTestPDF(at: negPDF, text: "Lorem ipsum dolor sit amet")
-
-        let posGT = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01", secondaryField: "Company")
-        let negGT = GroundTruth(isMatch: false, documentType: .invoice)
-
-        let factory = MockDocumentDetectorFactory()
-        factory.mockVLMResponse = "NO" // Says it's NOT an invoice
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(
-            configuration: config,
-            documentType: .invoice,
-            detectorFactory: factory
-        )
-
-        let pair = ModelPair(vlmModelName: config.modelName, textModelName: config.textModelName)
-        let groundTruths = [posPDF.path: posGT, negPDF.path: negGT]
-        let result = try await engine.benchmarkModelPair(
-            pair,
-            pdfPaths: [posPDF.path, negPDF.path],
-            groundTruths: groundTruths,
-            timeoutSeconds: 30
-        )
-
-        // VLM says NO for both: positive=FN, negative=TN
-        XCTAssertEqual(result.metrics.trueNegatives, 1)
-        XCTAssertEqual(result.metrics.falseNegatives, 1)
-        XCTAssertTrue(result.metrics.hasNegativeSamples)
     }
 }

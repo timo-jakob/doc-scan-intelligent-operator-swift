@@ -1,4 +1,5 @@
 import AppKit
+import ArgumentParser
 import DocScanCore
 import Foundation
 
@@ -12,12 +13,20 @@ extension BenchmarkCommand {
         negativeDir: String?
     ) async throws -> [ModelPairResult] {
         printBenchmarkPhaseHeader("A", title: "Initial Benchmark Run")
+
+        let existingMap = try engine.checkExistingSidecars(
+            positiveDir: positiveDir, negativeDir: negativeDir
+        )
+        let existingPaths = existingMap.filter(\.value).map(\.key).sorted()
+        let skipPaths = try promptForExistingSidecars(existingPaths)
+
         print("Running current model pair against document corpus...")
         print()
 
         let results = try await engine.runInitialBenchmark(
             positiveDir: positiveDir,
-            negativeDir: negativeDir
+            negativeDir: negativeDir,
+            skipPaths: skipPaths
         )
 
         if let first = results.first {
@@ -35,6 +44,70 @@ extension BenchmarkCommand {
         }
 
         return results
+    }
+
+    /// Prompt user about existing sidecar files, returning paths to skip
+    private func promptForExistingSidecars(_ existingPaths: [String]) throws -> Set<String> {
+        guard !existingPaths.isEmpty else { return [] }
+
+        print("Found \(existingPaths.count) existing sidecar file(s):")
+        for path in existingPaths {
+            let filename = URL(fileURLWithPath: path).lastPathComponent
+            print("  \(filename).json")
+        }
+        print()
+
+        guard let choice = TerminalUtils.menu(
+            "How would you like to handle existing sidecars?",
+            options: [
+                "Reuse all (keep existing ground truth)",
+                "Regenerate all (overwrite with fresh results)",
+                "Decide per-document",
+                "Cancel benchmarking",
+            ]
+        ) else {
+            throw ExitCode.success
+        }
+
+        var skipPaths: Set<String> = []
+
+        switch choice {
+        case 0: // Reuse all
+            skipPaths = Set(existingPaths)
+        case 1: // Regenerate all
+            break
+        case 2: // Per-document
+            skipPaths = try promptPerDocument(existingPaths)
+        default: // Cancel
+            throw ExitCode.success
+        }
+
+        print()
+        return skipPaths
+    }
+
+    /// Prompt for each existing sidecar individually
+    private func promptPerDocument(_ paths: [String]) throws -> Set<String> {
+        var skipPaths: Set<String> = []
+        for path in paths {
+            let filename = URL(fileURLWithPath: path).lastPathComponent
+            guard let docChoice = TerminalUtils.menu(
+                "\(filename).json exists. What to do?",
+                options: [
+                    "Reuse existing",
+                    "Regenerate",
+                    "Cancel benchmarking",
+                ]
+            ) else {
+                throw ExitCode.success
+            }
+            switch docChoice {
+            case 0: skipPaths.insert(path)
+            case 2: throw ExitCode.success
+            default: break
+            }
+        }
+        return skipPaths
     }
 
     /// Phase A.1: Verification pause — let user review sidecar files
