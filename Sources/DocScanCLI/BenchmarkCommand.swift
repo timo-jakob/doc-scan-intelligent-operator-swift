@@ -113,7 +113,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         return Configuration.defaultConfiguration
     }
 
-    func printBenchmarkHeader(_ configuration: Configuration, documentType: DocumentType) {
+    private func printBenchmarkHeader(_ configuration: Configuration, documentType: DocumentType) {
         print("DocScan Benchmark")
         print("=================")
         print("Document type: \(documentType.displayName)")
