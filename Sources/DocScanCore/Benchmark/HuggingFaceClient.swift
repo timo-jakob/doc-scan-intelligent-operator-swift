@@ -75,10 +75,16 @@ public class HuggingFaceClient {
     private let session: URLSessionProtocol
     private let apiToken: String?
     private let baseURL = "https://huggingface.co/api"
+    private let retryDelays: [UInt64]
 
-    public init(session: URLSessionProtocol = URLSession.shared, apiToken: String? = nil) {
+    public init(
+        session: URLSessionProtocol = URLSession.shared,
+        apiToken: String? = nil,
+        retryDelays: [UInt64] = [2, 5, 10]
+    ) {
         self.session = session
         self.apiToken = apiToken
+        self.retryDelays = retryDelays
     }
 
     /// Search for VLM models on Hugging Face
@@ -181,13 +187,30 @@ public class HuggingFaceClient {
     }
 
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await session.data(for: request)
-        } catch let error as DocScanError {
-            throw error
-        } catch {
-            throw DocScanError.networkError(error.localizedDescription)
+        let maxAttempts = retryDelays.count + 1
+
+        for attempt in 0 ..< maxAttempts {
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await session.data(for: request)
+            } catch let error as DocScanError {
+                throw error
+            } catch {
+                throw DocScanError.networkError(error.localizedDescription)
+            }
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 429,
+               attempt < retryDelays.count {
+                try await Task.sleep(nanoseconds: retryDelays[attempt] * 1_000_000_000)
+                continue
+            }
+
+            return (data, response)
         }
+
+        // Unreachable, but satisfies the compiler
+        throw DocScanError.huggingFaceAPIError("Rate limited (429): Too many requests after retries")
     }
 
     private func validateResponse(_ response: URLResponse) throws {
@@ -201,7 +224,7 @@ public class HuggingFaceClient {
         case 403:
             throw DocScanError.huggingFaceAPIError("Forbidden (403): Insufficient permissions")
         case 429:
-            throw DocScanError.huggingFaceAPIError("Rate limited (429): Too many requests, please try again later")
+            throw DocScanError.huggingFaceAPIError("Rate limited (429): Too many requests after retries")
         default:
             throw DocScanError.huggingFaceAPIError("HTTP \(httpResponse.statusCode)")
         }

@@ -203,11 +203,12 @@ final class HuggingFaceClientTests: XCTestCase {
         }
     }
 
-    func testRateLimitedThrows() async {
+    func testRateLimitedRetriesThenThrows() async {
         mockSession.mockData = Data()
         mockSession.mockResponse = MockURLSession.httpResponse(statusCode: 429)
 
-        let client = HuggingFaceClient(session: mockSession)
+        // Zero-delay retries for fast tests; 2 entries = 3 total attempts
+        let client = HuggingFaceClient(session: mockSession, retryDelays: [0, 0])
 
         do {
             _ = try await client.searchVLMModels()
@@ -216,11 +217,14 @@ final class HuggingFaceClientTests: XCTestCase {
             if case let .huggingFaceAPIError(msg) = error {
                 XCTAssertTrue(msg.contains("429"))
             } else {
-                XCTFail("Expected huggingFaceAPIError")
+                XCTFail("Expected huggingFaceAPIError, got \(error)")
             }
         } catch {
             XCTFail("Expected DocScanError")
         }
+
+        // 1 initial + 2 retries = 3 requests total
+        XCTAssertEqual(mockSession.requestHistory.count, 3)
     }
 
     // MARK: - Empty Results
