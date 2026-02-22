@@ -4,12 +4,14 @@ import Foundation
 // MARK: - Phase D: Leaderboards and Configuration
 
 extension BenchmarkCommand {
-    /// Phase D: Display leaderboards and optionally update config
+    /// Phase D: Display leaderboards and optionally update config.
+    /// Returns the final selected model pair (VLM, TextLLM) after any config update.
+    @discardableResult
     func runPhaseD(
         results: [ModelPairResult],
         configuration: Configuration,
         configPath: String?
-    ) throws {
+    ) throws -> (vlm: String, text: String) {
         printBenchmarkPhaseHeader("D", title: "Results & Leaderboards")
 
         let rows = results.map { ModelPairResultRow(from: $0) }
@@ -22,21 +24,25 @@ extension BenchmarkCommand {
         print(TerminalUtils.formatLeaderboard(title: "Leaderboard: Score", results: rows))
         print()
 
-        try promptConfigUpdate(results: results, configuration: configuration, configPath: configPath)
+        return try promptConfigUpdate(
+            results: results, configuration: configuration, configPath: configPath
+        )
     }
 
     private func promptConfigUpdate(
         results: [ModelPairResult],
         configuration: Configuration,
         configPath: String?
-    ) throws {
+    ) throws -> (vlm: String, text: String) {
+        let currentPair = (vlm: configuration.modelName, text: configuration.textModelName)
+
         let qualifying = results
             .filter { !$0.isDisqualified }
             .sorted { $0.metrics.score > $1.metrics.score }
 
         guard !qualifying.isEmpty else {
             print("No qualifying model pairs to recommend.")
-            return
+            return currentPair
         }
 
         // Build menu options: each pair with its score, mark current
@@ -53,13 +59,13 @@ extension BenchmarkCommand {
             "Select a model pair to use as your default:",
             options: options
         ) else {
-            return
+            return currentPair
         }
 
         // Last option = keep current
         guard choice < qualifying.count else {
             print("Keeping current configuration.")
-            return
+            return currentPair
         }
 
         let selected = qualifying[choice]
@@ -68,7 +74,7 @@ extension BenchmarkCommand {
 
         if isCurrent {
             print("That is already your current configuration.")
-            return
+            return currentPair
         }
 
         var newConfig = configuration
@@ -83,5 +89,7 @@ extension BenchmarkCommand {
             try newConfig.save(to: defaultPath)
             print("Configuration saved to \(defaultPath)")
         }
+
+        return (vlm: selected.vlmModelName, text: selected.textModelName)
     }
 }

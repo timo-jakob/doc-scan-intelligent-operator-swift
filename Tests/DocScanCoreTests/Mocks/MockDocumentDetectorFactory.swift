@@ -14,6 +14,10 @@ final class MockDocumentDetectorFactory: DocumentDetectorFactory {
     /// Count of detectors created
     private(set) var detectorsCreated = 0
 
+    func preloadModels(config _: Configuration) async throws {
+        // No-op for tests — no real models to download
+    }
+
     func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
         detectorsCreated += 1
 

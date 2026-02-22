@@ -87,11 +87,28 @@ struct BenchmarkCommand: AsyncParsableCommand {
         }
         let allResults = results + uniqueInitial
 
-        // Phase D: Leaderboards and config update
-        try runPhaseD(
+        // Phase D + Cleanup
+        try runPhaseDAndCleanup(
+            engine: engine, allResults: allResults,
+            configuration: configuration, pairs: pairs
+        )
+    }
+
+    private func runPhaseDAndCleanup(
+        engine: BenchmarkEngine, allResults: [ModelPairResult],
+        configuration: Configuration, pairs: [ModelPair]
+    ) throws {
+        let finalPair = try runPhaseD(
             results: allResults,
             configuration: configuration,
             configPath: config
+        )
+
+        printBenchmarkPhaseHeader("Cleanup", title: "Model Cache Cleanup")
+        engine.cleanupBenchmarkedModels(
+            benchmarkedPairs: pairs,
+            keepVLM: finalPair.vlm,
+            keepText: finalPair.text
         )
     }
 
