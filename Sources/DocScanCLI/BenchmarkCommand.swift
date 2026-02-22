@@ -40,7 +40,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         )
 
         // Phase A: Initial benchmark run
-        _ = try await runPhaseA(
+        let initialResults = try await runPhaseA(
             engine: engine,
             positiveDir: resolvedPositiveDir,
             negativeDir: resolvedNegativeDir
@@ -78,9 +78,16 @@ struct BenchmarkCommand: AsyncParsableCommand {
             timeoutSeconds: timeout
         )
 
+        // Merge Phase A results with Phase C, avoiding duplicates
+        let phaseCPairs = Set(results.map { "\($0.vlmModelName)\n\($0.textModelName)" })
+        let uniqueInitial = initialResults.filter {
+            !phaseCPairs.contains("\($0.vlmModelName)\n\($0.textModelName)")
+        }
+        let allResults = results + uniqueInitial
+
         // Phase D: Leaderboards and config update
         try runPhaseD(
-            results: results,
+            results: allResults,
             configuration: configuration,
             configPath: config
         )
