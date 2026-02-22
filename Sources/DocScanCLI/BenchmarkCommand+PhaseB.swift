@@ -12,7 +12,7 @@ extension BenchmarkCommand {
         printBenchmarkPhaseHeader("B", title: "Model Discovery")
 
         let client = HuggingFaceClient(apiToken: apiToken)
-        var requestCount = 5
+        var requestCount = 50
 
         while true {
             let pairs = try await discoverAndDisplayPairs(
@@ -23,7 +23,7 @@ extension BenchmarkCommand {
                 "How would you like to proceed?",
                 options: [
                     "Benchmark these pairs",
-                    "Request 10 different models",
+                    "Request 100 model pairs",
                     "Skip model discovery",
                 ]
             ) else {
@@ -33,7 +33,7 @@ extension BenchmarkCommand {
             switch choice {
             case 0: return pairs
             case 1:
-                requestCount = 10
+                requestCount = 100
                 print()
                 continue
             default: return nil

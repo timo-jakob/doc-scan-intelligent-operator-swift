@@ -100,14 +100,15 @@ public class HuggingFaceClient {
     }
 
     /// Discover model pairs for benchmarking
-    /// Generates the full cross-product of all VLM × text model combinations
+    /// Generates the cross-product of VLM × text model combinations using diagonal
+    /// interleaving so that any prefix covers diverse VLMs and text models equally.
     public func discoverModelPairs(
         currentVLM: String,
         currentTextLLM: String,
-        count: Int = 5
+        count: Int = 50
     ) async throws -> [ModelPair] {
-        let vlmModels = try await searchVLMModels(limit: count * 2)
-        let textModels = try await searchTextModels(limit: count * 2)
+        let vlmModels = try await searchVLMModels(limit: count)
+        let textModels = try await searchTextModels(limit: count)
 
         // Build unique VLM and text model lists, current models first
         var allVLMs = [currentVLM]
@@ -120,12 +121,19 @@ public class HuggingFaceClient {
             allTexts.append(model.modelId)
         }
 
-        // Full cross-product, current pair first
+        // Diagonal interleaving: iterate by index sum so that small prefixes
+        // cover diverse VLMs and text models instead of exhausting one dimension first.
+        // sum=0 → (v0,t0), sum=1 → (v0,t1),(v1,t0), sum=2 → (v0,t2),(v1,t1),(v2,t0), …
         var pairs: [ModelPair] = []
-        for vlm in allVLMs {
-            for text in allTexts {
-                pairs.append(ModelPair(vlmModelName: vlm, textModelName: text))
+        let maxSum = allVLMs.count + allTexts.count - 2
+        for sum in 0 ... maxSum {
+            let vlmStart = max(0, sum - allTexts.count + 1)
+            let vlmEnd = min(sum, allVLMs.count - 1)
+            for vlmIdx in vlmStart ... vlmEnd {
+                let textIdx = sum - vlmIdx
+                pairs.append(ModelPair(vlmModelName: allVLMs[vlmIdx], textModelName: allTexts[textIdx]))
             }
+            if pairs.count >= count { break }
         }
 
         return Array(pairs.prefix(count))
