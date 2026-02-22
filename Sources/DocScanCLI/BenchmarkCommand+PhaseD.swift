@@ -30,42 +30,58 @@ extension BenchmarkCommand {
         configuration: Configuration,
         configPath: String?
     ) throws {
-        let best = results
+        let qualifying = results
             .filter { !$0.isDisqualified }
-            .max(by: { $0.metrics.score < $1.metrics.score })
+            .sorted { $0.metrics.score > $1.metrics.score }
 
-        guard let bestPair = best else {
+        guard !qualifying.isEmpty else {
             print("No qualifying model pairs to recommend.")
             return
         }
 
-        let isCurrent = bestPair.vlmModelName == configuration.modelName
-            && bestPair.textModelName == configuration.textModelName
+        // Build menu options: each pair with its score, mark current
+        var options: [String] = qualifying.map { pair in
+            let scoreStr = String(format: "%.1f%%", pair.metrics.score * 100)
+            let points = "\(pair.metrics.totalScore)/\(pair.metrics.maxScore)"
+            let current = (pair.vlmModelName == configuration.modelName
+                && pair.textModelName == configuration.textModelName) ? " (current)" : ""
+            return "\(pair.vlmModelName) + \(pair.textModelName)  \(scoreStr) (\(points) pts)\(current)"
+        }
+        options.append("Keep current configuration")
 
-        if isCurrent {
-            print("Your current model pair is already the best performer!")
+        guard let choice = TerminalUtils.menu(
+            "Select a model pair to use as your default:",
+            options: options
+        ) else {
             return
         }
 
-        print("Best performing pair:")
-        print("  VLM:  \(bestPair.vlmModelName)")
-        print("  Text: \(bestPair.textModelName)")
-        print("  Score: \(String(format: "%.1f%%", bestPair.metrics.score * 100))")
-        print()
+        // Last option = keep current
+        guard choice < qualifying.count else {
+            print("Keeping current configuration.")
+            return
+        }
 
-        if TerminalUtils.confirm("Update your configuration to use this pair?") {
-            var newConfig = configuration
-            newConfig.modelName = bestPair.vlmModelName
-            newConfig.textModelName = bestPair.textModelName
+        let selected = qualifying[choice]
+        let isCurrent = selected.vlmModelName == configuration.modelName
+            && selected.textModelName == configuration.textModelName
 
-            if let path = configPath {
-                try newConfig.save(to: path)
-                print("Configuration saved to \(path)")
-            } else {
-                let defaultPath = "docscan-config.yaml"
-                try newConfig.save(to: defaultPath)
-                print("Configuration saved to \(defaultPath)")
-            }
+        if isCurrent {
+            print("That is already your current configuration.")
+            return
+        }
+
+        var newConfig = configuration
+        newConfig.modelName = selected.vlmModelName
+        newConfig.textModelName = selected.textModelName
+
+        if let path = configPath {
+            try newConfig.save(to: path)
+            print("Configuration saved to \(path)")
+        } else {
+            let defaultPath = "docscan-config.yaml"
+            try newConfig.save(to: defaultPath)
+            print("Configuration saved to \(defaultPath)")
         }
     }
 }
