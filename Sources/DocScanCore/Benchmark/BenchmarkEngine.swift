@@ -230,7 +230,7 @@ public class BenchmarkEngine {
             guard let truth = groundTruths[pdfPath] else { continue }
 
             do {
-                let result = try await runWithTimeout(seconds: timeoutSeconds) {
+                let result = try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
                     try await self.processSingleDocument(
                         pdfPath: pdfPath,
                         config: pairConfig,
@@ -333,25 +333,5 @@ private extension BenchmarkEngine {
             predictedIsMatch: isMatch,
             documentScore: scoring.score
         )
-    }
-
-    func runWithTimeout<T>(
-        seconds: TimeInterval,
-        operation: @escaping () async throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                let nanoseconds = UInt64(seconds * 1_000_000_000)
-                try await Task.sleep(nanoseconds: nanoseconds)
-                throw TimeoutError()
-            }
-            guard let result = try await group.next() else {
-                group.cancelAll()
-                throw TimeoutError()
-            }
-            group.cancelAll()
-            return result
-        }
     }
 }

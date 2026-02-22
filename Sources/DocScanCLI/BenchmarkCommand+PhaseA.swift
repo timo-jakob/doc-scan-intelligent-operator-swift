@@ -157,11 +157,28 @@ extension BenchmarkCommand {
     }
 
     /// Phase A.2: Credential check for HF API
-    func runPhaseA2() throws -> String? {
+    func runPhaseA2(configuration: inout Configuration) throws -> String? {
         printBenchmarkPhaseHeader("A.2", title: "Hugging Face Credentials")
 
+        // Prompt for username if not already set
+        let account: String
+        if let existing = configuration.huggingFaceUsername, !existing.isEmpty {
+            account = existing
+            print("Hugging Face username: \(account)")
+        } else {
+            if let entered = TerminalUtils.prompt("Enter your Hugging Face username (or press Enter to skip):"),
+               !entered.isEmpty {
+                account = entered
+                configuration.huggingFaceUsername = account
+                print("Username set to: \(account)")
+            } else {
+                account = "default"
+            }
+        }
+        print()
+
         // Check Keychain first
-        if let stored = try KeychainManager.retrieveToken(forAccount: "default") {
+        if let stored = try KeychainManager.retrieveToken(forAccount: account) {
             print("Found existing Hugging Face token in Keychain.")
             if TerminalUtils.confirm("Use stored token?") {
                 return stored
@@ -189,7 +206,7 @@ extension BenchmarkCommand {
                 print("No token entered. Continuing without authentication.")
                 return nil
             }
-            try KeychainManager.saveToken(token, forAccount: "default")
+            try KeychainManager.saveToken(token, forAccount: account)
             print("Token saved to Keychain.")
             return token
         }

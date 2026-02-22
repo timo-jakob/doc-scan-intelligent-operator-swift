@@ -50,7 +50,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         try runPhaseA1(positiveDir: resolvedPositiveDir, negativeDir: resolvedNegativeDir)
 
         // Phase A.2: Credential check
-        let apiToken = try runPhaseA2()
+        let apiToken = try runPhaseA2(configuration: &configuration)
 
         // Phase B: Model discovery
         guard let pairs = try await runPhaseB(

@@ -182,7 +182,7 @@ extension DocumentDetector {
         let vlmTask = Task { try await self.categorizeWithVLM(image: image) }
 
         do {
-            return try await withTimeout(seconds: timeoutSeconds) {
+            return try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
                 try await vlmTask.value
             }
         } catch is TimeoutError {
@@ -218,7 +218,7 @@ extension DocumentDetector {
         }
 
         do {
-            return try await withTimeout(seconds: timeoutSeconds) {
+            return try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
                 try await ocrTask.value
             }
         } catch is TimeoutError {
@@ -358,28 +358,5 @@ extension DocumentDetector {
             isMatch: result.isMatch, confidence: result.confidence,
             method: "OCR", reason: result.reason
         )
-    }
-
-    // MARK: - Helper Methods
-
-    /// Execute an async operation with a timeout
-    func withTimeout<T>(
-        seconds: TimeInterval,
-        operation: @escaping () async throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                let nanoseconds = UInt64(seconds * 1_000_000_000)
-                try await Task.sleep(nanoseconds: nanoseconds)
-                throw TimeoutError()
-            }
-            guard let result = try await group.next() else {
-                group.cancelAll()
-                throw TimeoutError()
-            }
-            group.cancelAll()
-            return result
-        }
     }
 }

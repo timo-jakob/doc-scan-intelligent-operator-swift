@@ -5,6 +5,27 @@ public struct TimeoutError: Error, LocalizedError {
     public var errorDescription: String? {
         "Operation timed out"
     }
+
+    /// Execute an async operation with a timeout
+    public static func withTimeout<T>(
+        seconds: TimeInterval,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                let nanoseconds = UInt64(seconds * 1_000_000_000)
+                try await Task.sleep(nanoseconds: nanoseconds)
+                throw TimeoutError()
+            }
+            guard let result = try await group.next() else {
+                group.cancelAll()
+                throw TimeoutError()
+            }
+            group.cancelAll()
+            return result
+        }
+    }
 }
 
 /// Errors that can occur during document scanning and processing
