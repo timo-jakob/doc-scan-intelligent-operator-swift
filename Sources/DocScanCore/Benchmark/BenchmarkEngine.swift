@@ -215,6 +215,24 @@ public class BenchmarkEngine {
         groundTruths: [String: GroundTruth],
         timeoutSeconds: TimeInterval = 30
     ) async throws -> ModelPairResult {
+        // Pre-flight memory check — disqualify pairs that would likely exhaust memory
+        let estimatedMB = Self.estimateMemoryMB(vlm: pair.vlmModelName, text: pair.textModelName)
+        let availableMB = Self.availableMemoryMB()
+        if estimatedMB > 0, availableMB > 0, estimatedMB > availableMB {
+            if verbose {
+                print("Skipping \(pair.vlmModelName) + \(pair.textModelName): "
+                    + "needs ~\(estimatedMB) MB, only \(availableMB) MB available")
+            }
+            return ModelPairResult(
+                vlmModelName: pair.vlmModelName,
+                textModelName: pair.textModelName,
+                metrics: BenchmarkMetrics.compute(from: []),
+                documentResults: [],
+                isDisqualified: true,
+                disqualificationReason: "Insufficient memory (~\(estimatedMB) MB needed, \(availableMB) MB available)"
+            )
+        }
+
         var pairConfig = configuration
         pairConfig.modelName = pair.vlmModelName
         pairConfig.textModelName = pair.textModelName
@@ -266,6 +284,37 @@ public class BenchmarkEngine {
     }
 
     // MARK: - Memory
+
+    /// Estimate total memory needed for a VLM + text model pair in MB.
+    /// Parses parameter counts from model IDs (e.g. "Qwen2-VL-7B" → 7B params).
+    /// 4-bit quantized models use ~0.5 bytes/param + ~20% overhead for KV cache and runtime.
+    /// Returns 0 if neither model ID contains a recognizable size.
+    public static func estimateMemoryMB(vlm: String, text: String) -> UInt64 {
+        let vlmParams = parseParamBillions(from: vlm)
+        let textParams = parseParamBillions(from: text)
+        guard vlmParams > 0 || textParams > 0 else { return 0 }
+        // 4-bit ≈ 0.5 bytes/param; apply 1.2x overhead for KV cache + runtime buffers
+        let bytesPerParam = 0.5 * 1.2
+        let totalBytes = (vlmParams + textParams) * bytesPerParam * 1_000_000_000
+        return UInt64(totalBytes / 1_000_000)
+    }
+
+    /// Extract parameter count in billions from a model ID string.
+    /// Matches patterns like "7B", "2B", "0.5B", "72B" (case-insensitive).
+    static func parseParamBillions(from modelId: String) -> Double {
+        let pattern = #"(\d+\.?\d*)\s*[Bb](?:\b|-)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(
+                  in: modelId,
+                  range: NSRange(modelId.startIndex ..< modelId.endIndex, in: modelId)
+              ),
+              let range = Range(match.range(at: 1), in: modelId),
+              let value = Double(modelId[range])
+        else {
+            return 0
+        }
+        return value
+    }
 
     /// Get available system memory in MB
     public static func availableMemoryMB() -> UInt64 {

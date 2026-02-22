@@ -180,6 +180,54 @@ final class BenchmarkEngineTests: XCTestCase {
         XCTAssertGreaterThan(memory, 0)
     }
 
+    // MARK: - Parameter Parsing
+
+    func testParseParamBillions7B() {
+        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "mlx-community/Qwen2-VL-7B-Instruct-4bit"), 7.0)
+    }
+
+    func testParseParamBillions2B() {
+        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "mlx-community/Qwen2-VL-2B-Instruct-4bit"), 2.0)
+    }
+
+    func testParseParamBillionsFractional() {
+        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "org/model-0.5B-instruct"), 0.5)
+    }
+
+    func testParseParamBillions72B() {
+        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "org/Qwen2.5-72B-Instruct-4bit"), 72.0)
+    }
+
+    func testParseParamBillionsNoMatch() {
+        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "org/some-model-instruct"), 0)
+    }
+
+    // MARK: - Memory Estimation
+
+    func testEstimateMemoryMBTwoModels() {
+        // 7B + 7B = 14B params; 4-bit ≈ 0.5 * 1.2 bytes/param = 0.6 bytes/param
+        // 14B * 0.6 = 8.4 GB = 8400 MB
+        let estimate = BenchmarkEngine.estimateMemoryMB(
+            vlm: "org/vlm-7B-4bit", text: "org/text-7B-4bit"
+        )
+        XCTAssertEqual(estimate, 8400)
+    }
+
+    func testEstimateMemoryMBUnknownModels() {
+        let estimate = BenchmarkEngine.estimateMemoryMB(
+            vlm: "org/unknown-model", text: "org/another-model"
+        )
+        XCTAssertEqual(estimate, 0)
+    }
+
+    func testEstimateMemoryMBOneKnown() {
+        // Only VLM has a parseable size: 2B * 0.6 = 1.2 GB = 1200 MB
+        let estimate = BenchmarkEngine.estimateMemoryMB(
+            vlm: "org/vlm-2B-4bit", text: "org/unknown"
+        )
+        XCTAssertEqual(estimate, 1200)
+    }
+
     // MARK: - Benchmark with Mocks
 
     func testBenchmarkModelPairAllCorrect() async throws {
