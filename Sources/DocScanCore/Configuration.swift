@@ -59,10 +59,14 @@ public struct Configuration: Codable {
         set { output.filenamePattern = newValue }
     }
 
-    /// Default text model name
-    public static let defaultTextModelName = "mlx-community/Qwen2.5-7B-Instruct-4bit"
+    // MARK: - Default Values
 
-    /// Default cache directory path
+    public static let defaultModelName = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
+    public static let defaultTextModelName = "mlx-community/Qwen2.5-7B-Instruct-4bit"
+    public static let defaultMaxTokens = 256
+    public static let defaultTemperature = 0.1
+    public static let defaultPdfDPI = 150
+
     private static var defaultCacheDir: String {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".cache/docscan/models")
@@ -70,12 +74,12 @@ public struct Configuration: Codable {
     }
 
     public init(
-        modelName: String = "mlx-community/Qwen2-VL-2B-Instruct-4bit",
+        modelName: String = Configuration.defaultModelName,
         textModelName: String = Configuration.defaultTextModelName,
         modelCacheDir: String? = nil,
-        maxTokens: Int = 256,
-        temperature: Double = 0.1,
-        pdfDPI: Int = 150,
+        maxTokens: Int = Configuration.defaultMaxTokens,
+        temperature: Double = Configuration.defaultTemperature,
+        pdfDPI: Int = Configuration.defaultPdfDPI,
         verbose: Bool = false,
         output: OutputSettings = OutputSettings(),
         huggingFaceUsername: String? = nil
@@ -94,14 +98,17 @@ public struct Configuration: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         modelName = try container.decodeIfPresent(String.self, forKey: .modelName)
-            ?? "mlx-community/Qwen2-VL-2B-Instruct-4bit"
+            ?? Self.defaultModelName
         textModelName = try container.decodeIfPresent(String.self, forKey: .textModelName)
-            ?? Configuration.defaultTextModelName
+            ?? Self.defaultTextModelName
         modelCacheDir = try container.decodeIfPresent(String.self, forKey: .modelCacheDir)
             ?? Self.defaultCacheDir
-        maxTokens = try container.decodeIfPresent(Int.self, forKey: .maxTokens) ?? 256
-        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature) ?? 0.1
-        pdfDPI = try container.decodeIfPresent(Int.self, forKey: .pdfDPI) ?? 150
+        maxTokens = try container.decodeIfPresent(Int.self, forKey: .maxTokens)
+            ?? Self.defaultMaxTokens
+        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
+            ?? Self.defaultTemperature
+        pdfDPI = try container.decodeIfPresent(Int.self, forKey: .pdfDPI)
+            ?? Self.defaultPdfDPI
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
         huggingFaceUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
