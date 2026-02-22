@@ -107,15 +107,17 @@ public class BenchmarkEngine {
             allPDFs += negativePDFs.map { ($0, false) }
         }
 
+        let totalCount = allPDFs.count
+        print("  Found \(totalCount) document(s) to process\n")
+
         var documentResults: [DocumentResult] = []
-        for (pdfPath, isPositive) in allPDFs {
+        for (index, (pdfPath, isPositive)) in allPDFs.enumerated() {
+            let docNumber = index + 1
+            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
             if skipPaths.contains(pdfPath) {
                 let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
                 let truth = try GroundTruth.load(from: sidecarPath)
-                let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-                if verbose {
-                    print("Reusing existing sidecar: \(filename).json")
-                }
+                print("  [\(docNumber)/\(totalCount)] \(filename) — reusing existing sidecar")
                 documentResults.append(DocumentResult(
                     filename: filename,
                     isPositiveSample: isPositive,
@@ -123,7 +125,10 @@ public class BenchmarkEngine {
                     documentScore: 2
                 ))
             } else {
-                let result = await processInitialDocument(pdfPath: pdfPath, isPositive: isPositive)
+                let result = await processInitialDocument(
+                    pdfPath: pdfPath, isPositive: isPositive,
+                    index: docNumber, total: totalCount
+                )
                 documentResults.append(result)
             }
         }
@@ -137,11 +142,13 @@ public class BenchmarkEngine {
         )]
     }
 
-    private func processInitialDocument(pdfPath: String, isPositive: Bool) async -> DocumentResult {
+    private func processInitialDocument(
+        pdfPath: String, isPositive: Bool,
+        index: Int, total: Int
+    ) async -> DocumentResult {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-        if verbose {
-            print("Processing: \(filename)")
-        }
+        print("  [\(index)/\(total)] \(filename) — Categorizing...", terminator: "")
+        fflush(stdout)
 
         do {
             let detector = try await detectorFactory.makeDetector(
@@ -150,11 +157,17 @@ public class BenchmarkEngine {
             let categorization = try await detector.categorize(pdfPath: pdfPath)
             let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
 
+            if isMatch {
+                print(" Extracting...", terminator: "")
+                fflush(stdout)
+            }
             let sidecar = try await buildGroundTruth(
                 detector: detector, isMatch: isMatch, isPositive: isPositive
             )
             let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
             try sidecar.save(to: sidecarPath)
+
+            print(isMatch ? " Done" : " No match")
 
             return DocumentResult(
                 filename: filename,
@@ -163,9 +176,7 @@ public class BenchmarkEngine {
                 documentScore: (isPositive == isMatch) ? 2 : 0
             )
         } catch {
-            if verbose {
-                print("Error processing \(filename): \(error.localizedDescription)")
-            }
+            print(" Error: \(error.localizedDescription)")
             return DocumentResult(
                 filename: filename,
                 isPositiveSample: isPositive,
@@ -224,10 +235,14 @@ public class BenchmarkEngine {
         pairConfig.textModelName = pair.textModelName
 
         var documentResults: [DocumentResult] = []
+        let totalDocs = pdfPaths.count
 
-        for pdfPath in pdfPaths {
+        for (docIndex, pdfPath) in pdfPaths.enumerated() {
             let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
             guard let truth = groundTruths[pdfPath] else { continue }
+
+            print("    [\(docIndex + 1)/\(totalDocs)] \(filename)...", terminator: "")
+            fflush(stdout)
 
             do {
                 let result = try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
@@ -237,8 +252,10 @@ public class BenchmarkEngine {
                         groundTruth: truth
                     )
                 }
+                print(" Done")
                 documentResults.append(result)
             } catch is TimeoutError {
+                print(" Timeout")
                 return ModelPairResult(
                     vlmModelName: pair.vlmModelName,
                     textModelName: pair.textModelName,
@@ -248,9 +265,7 @@ public class BenchmarkEngine {
                     disqualificationReason: "Exceeded \(Int(timeoutSeconds))s timeout on \(filename)"
                 )
             } catch {
-                if verbose {
-                    print("Error on \(filename): \(error.localizedDescription)")
-                }
+                print(" Error: \(error.localizedDescription)")
                 documentResults.append(DocumentResult(
                     filename: filename,
                     isPositiveSample: truth.isMatch,
