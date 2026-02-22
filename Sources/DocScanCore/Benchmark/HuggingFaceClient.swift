@@ -94,6 +94,7 @@ public class HuggingFaceClient {
     }
 
     /// Discover model pairs for benchmarking
+    /// Generates the full cross-product of all VLM × text model combinations
     public func discoverModelPairs(
         currentVLM: String,
         currentTextLLM: String,
@@ -102,32 +103,22 @@ public class HuggingFaceClient {
         let vlmModels = try await searchVLMModels(limit: count * 2)
         let textModels = try await searchTextModels(limit: count * 2)
 
-        var pairs: [ModelPair] = []
-
-        // Always include the current pair first
-        pairs.append(ModelPair(vlmModelName: currentVLM, textModelName: currentTextLLM))
-
-        // Generate pairs from discovered models
-        let vlmCandidates = vlmModels
-            .filter { $0.modelId != currentVLM }
-            .prefix(count)
-        let textCandidates = textModels
-            .filter { $0.modelId != currentTextLLM }
-            .prefix(count)
-
-        for vlm in vlmCandidates {
-            // Pair each VLM with the current text model
-            let pair = ModelPair(vlmModelName: vlm.modelId, textModelName: currentTextLLM)
-            if !pairs.contains(pair) {
-                pairs.append(pair)
-            }
+        // Build unique VLM and text model lists, current models first
+        var allVLMs = [currentVLM]
+        for model in vlmModels where model.modelId != currentVLM {
+            allVLMs.append(model.modelId)
         }
 
-        for text in textCandidates {
-            // Pair current VLM with each text model
-            let pair = ModelPair(vlmModelName: currentVLM, textModelName: text.modelId)
-            if !pairs.contains(pair) {
-                pairs.append(pair)
+        var allTexts = [currentTextLLM]
+        for model in textModels where model.modelId != currentTextLLM {
+            allTexts.append(model.modelId)
+        }
+
+        // Full cross-product, current pair first
+        var pairs: [ModelPair] = []
+        for vlm in allVLMs {
+            for text in allTexts {
+                pairs.append(ModelPair(vlmModelName: vlm, textModelName: text))
             }
         }
 
