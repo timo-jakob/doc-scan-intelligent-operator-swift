@@ -288,7 +288,7 @@ public class BenchmarkEngine {
 
 // MARK: - Private Helpers
 
-extension BenchmarkEngine {
+private extension BenchmarkEngine {
     func processSingleDocument(
         pdfPath: String,
         config: Configuration,
