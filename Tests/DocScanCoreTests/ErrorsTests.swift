@@ -82,6 +82,31 @@ final class ErrorsTests: XCTestCase {
         XCTAssertEqual(error.errorDescription, "Invalid input: \(msg)")
     }
 
+    func testKeychainErrorDescription() {
+        let error = DocScanError.keychainError("item not found")
+        XCTAssertEqual(error.errorDescription, "Keychain error: item not found")
+    }
+
+    func testNetworkErrorDescription() {
+        let error = DocScanError.networkError("connection refused")
+        XCTAssertEqual(error.errorDescription, "Network error: connection refused")
+    }
+
+    func testHuggingFaceAPIErrorDescription() {
+        let error = DocScanError.huggingFaceAPIError("rate limited")
+        XCTAssertEqual(error.errorDescription, "Hugging Face API error: rate limited")
+    }
+
+    func testBenchmarkErrorDescription() {
+        let error = DocScanError.benchmarkError("no ground truth files")
+        XCTAssertEqual(error.errorDescription, "Benchmark error: no ground truth files")
+    }
+
+    func testMemoryInsufficientErrorDescription() {
+        let error = DocScanError.memoryInsufficient(required: 8_000_000_000, available: 4_000_000_000)
+        XCTAssertEqual(error.errorDescription, "Insufficient memory: 8000 MB required, 4000 MB available")
+    }
+
     // MARK: - LocalizedError Conformance Tests
 
     func testDocScanErrorConformsToLocalizedError() {
@@ -98,6 +123,11 @@ final class ErrorsTests: XCTestCase {
             .extractionFailed("test"),
             .insufficientDiskSpace(required: 1, available: 0),
             .invalidInput("test"),
+            .keychainError("test"),
+            .networkError("test"),
+            .huggingFaceAPIError("test"),
+            .benchmarkError("test"),
+            .memoryInsufficient(required: 1, available: 0),
         ]
 
         for error in errors {

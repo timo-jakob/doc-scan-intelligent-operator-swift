@@ -5,6 +5,27 @@ public struct TimeoutError: Error, LocalizedError {
     public var errorDescription: String? {
         "Operation timed out"
     }
+
+    /// Execute an async operation with a timeout
+    public static func withTimeout<T>(
+        seconds: TimeInterval,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                let nanoseconds = UInt64(seconds * 1_000_000_000)
+                try await Task.sleep(nanoseconds: nanoseconds)
+                throw TimeoutError()
+            }
+            guard let result = try await group.next() else {
+                group.cancelAll()
+                throw TimeoutError()
+            }
+            group.cancelAll()
+            return result
+        }
+    }
 }
 
 /// Errors that can occur during document scanning and processing
@@ -21,6 +42,11 @@ public enum DocScanError: LocalizedError {
     case extractionFailed(String)
     case insufficientDiskSpace(required: UInt64, available: UInt64)
     case invalidInput(String)
+    case keychainError(String)
+    case networkError(String)
+    case huggingFaceAPIError(String)
+    case benchmarkError(String)
+    case memoryInsufficient(required: UInt64, available: UInt64)
 
     public var errorDescription: String? {
         switch self {
@@ -51,6 +77,19 @@ public enum DocScanError: LocalizedError {
                           requiredGB, availableGB)
         case let .invalidInput(message):
             return "Invalid input: \(message)"
+        case let .keychainError(message):
+            return "Keychain error: \(message)"
+        case let .networkError(message):
+            return "Network error: \(message)"
+        case let .huggingFaceAPIError(message):
+            return "Hugging Face API error: \(message)"
+        case let .benchmarkError(message):
+            return "Benchmark error: \(message)"
+        case let .memoryInsufficient(required, available):
+            let requiredMB = Double(required) / 1_000_000
+            let availableMB = Double(available) / 1_000_000
+            return String(format: "Insufficient memory: %.0f MB required, %.0f MB available",
+                          requiredMB, availableMB)
         }
     }
 }

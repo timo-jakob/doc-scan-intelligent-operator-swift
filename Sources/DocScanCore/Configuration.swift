@@ -20,8 +20,11 @@ public struct OutputSettings: Codable, Equatable {
 
 /// Configuration for document scanning and invoice processing
 public struct Configuration: Codable {
-    /// Model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
+    /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
     public var modelName: String
+
+    /// Text LLM model identifier (e.g., "mlx-community/Qwen2.5-7B-Instruct-4bit")
+    public var textModelName: String
 
     /// Directory to cache downloaded models
     public var modelCacheDir: String
@@ -41,6 +44,9 @@ public struct Configuration: Codable {
     /// Output formatting settings
     public var output: OutputSettings
 
+    /// Hugging Face username (for model discovery)
+    public var huggingFaceUsername: String?
+
     /// Date format for invoice filename (convenience accessor)
     public var dateFormat: String {
         get { output.dateFormat }
@@ -53,24 +59,59 @@ public struct Configuration: Codable {
         set { output.filenamePattern = newValue }
     }
 
-    public init(
-        modelName: String = "mlx-community/Qwen2-VL-2B-Instruct-4bit",
-        modelCacheDir: String? = nil,
-        maxTokens: Int = 256,
-        temperature: Double = 0.1,
-        pdfDPI: Int = 150,
-        verbose: Bool = false,
-        output: OutputSettings = OutputSettings()
-    ) {
-        self.modelName = modelName
-        self.modelCacheDir = modelCacheDir ?? FileManager.default.homeDirectoryForCurrentUser
+    // MARK: - Default Values
+
+    public static let defaultModelName = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
+    public static let defaultTextModelName = "mlx-community/Qwen2.5-7B-Instruct-4bit"
+    public static let defaultMaxTokens = 256
+    public static let defaultTemperature = 0.1
+    public static let defaultPdfDPI = 150
+
+    private static var defaultCacheDir: String {
+        FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".cache/docscan/models")
             .path
+    }
+
+    public init(
+        modelName: String = Configuration.defaultModelName,
+        textModelName: String = Configuration.defaultTextModelName,
+        modelCacheDir: String? = nil,
+        maxTokens: Int = Configuration.defaultMaxTokens,
+        temperature: Double = Configuration.defaultTemperature,
+        pdfDPI: Int = Configuration.defaultPdfDPI,
+        verbose: Bool = false,
+        output: OutputSettings = OutputSettings(),
+        huggingFaceUsername: String? = nil
+    ) {
+        self.modelName = modelName
+        self.textModelName = textModelName
+        self.modelCacheDir = modelCacheDir ?? Self.defaultCacheDir
         self.maxTokens = maxTokens
         self.temperature = temperature
         self.pdfDPI = pdfDPI
         self.verbose = verbose
         self.output = output
+        self.huggingFaceUsername = huggingFaceUsername
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        modelName = try container.decodeIfPresent(String.self, forKey: .modelName)
+            ?? Self.defaultModelName
+        textModelName = try container.decodeIfPresent(String.self, forKey: .textModelName)
+            ?? Self.defaultTextModelName
+        modelCacheDir = try container.decodeIfPresent(String.self, forKey: .modelCacheDir)
+            ?? Self.defaultCacheDir
+        maxTokens = try container.decodeIfPresent(Int.self, forKey: .maxTokens)
+            ?? Self.defaultMaxTokens
+        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
+            ?? Self.defaultTemperature
+        pdfDPI = try container.decodeIfPresent(Int.self, forKey: .pdfDPI)
+            ?? Self.defaultPdfDPI
+        verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
+        output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
+        huggingFaceUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
     }
 
     /// Load configuration from YAML file
@@ -103,9 +144,10 @@ public struct Configuration: Codable {
 
 extension Configuration: CustomStringConvertible {
     public var description: String {
-        """
+        var desc = """
         Configuration:
-          Model: \(modelName)
+          VLM Model: \(modelName)
+          Text Model: \(textModelName)
           Cache: \(modelCacheDir)
           Max Tokens: \(maxTokens)
           Temperature: \(temperature)
@@ -114,5 +156,9 @@ extension Configuration: CustomStringConvertible {
           Date Format: \(dateFormat)
           Filename Pattern: \(filenamePattern)
         """
+        if let hfUser = huggingFaceUsername {
+            desc += "\n  HuggingFace User: \(hfUser)"
+        }
+        return desc
     }
 }

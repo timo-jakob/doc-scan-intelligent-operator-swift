@@ -1,0 +1,118 @@
+import Foundation
+import Security
+
+/// Manages secure storage of API tokens in the macOS Keychain
+public enum KeychainManager {
+    /// Service identifier for Keychain entries
+    public static let serviceName = "com.docscan.huggingface"
+
+    /// Store a new token in the Keychain (use saveToken for upsert)
+    private static func storeToken(_ token: String, forAccount account: String) throws {
+        guard let tokenData = token.data(using: .utf8) else {
+            throw DocScanError.keychainError("Failed to encode token")
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: tokenData,
+        ]
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw DocScanError.keychainError(
+                "Failed to store token: \(keychainErrorMessage(status))"
+            )
+        }
+    }
+
+    /// Retrieve a token from the Keychain
+    public static func retrieveToken(forAccount account: String) throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecItemNotFound {
+            return nil
+        }
+
+        guard status == errSecSuccess else {
+            throw DocScanError.keychainError(
+                "Failed to retrieve token: \(keychainErrorMessage(status))"
+            )
+        }
+
+        guard let data = result as? Data,
+              let token = String(data: data, encoding: .utf8)
+        else {
+            throw DocScanError.keychainError("Failed to decode token data")
+        }
+
+        return token
+    }
+
+    /// Update an existing token in the Keychain (use saveToken for upsert)
+    private static func updateToken(_ token: String, forAccount account: String) throws {
+        guard let tokenData = token.data(using: .utf8) else {
+            throw DocScanError.keychainError("Failed to encode token")
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: account,
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: tokenData,
+        ]
+
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        guard status == errSecSuccess else {
+            throw DocScanError.keychainError(
+                "Failed to update token: \(keychainErrorMessage(status))"
+            )
+        }
+    }
+
+    /// Delete a token from the Keychain
+    public static func deleteToken(forAccount account: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: account,
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw DocScanError.keychainError(
+                "Failed to delete token: \(keychainErrorMessage(status))"
+            )
+        }
+    }
+
+    /// Save (upsert) a token — stores if new, updates if existing
+    public static func saveToken(_ token: String, forAccount account: String) throws {
+        let existing = try retrieveToken(forAccount: account)
+        if existing != nil {
+            try updateToken(token, forAccount: account)
+        } else {
+            try storeToken(token, forAccount: account)
+        }
+    }
+
+    // MARK: - Private
+
+    private static func keychainErrorMessage(_ status: OSStatus) -> String {
+        let message = SecCopyErrorMessageString(status, nil) ?? "unknown error" as CFString
+        return message as String
+    }
+}

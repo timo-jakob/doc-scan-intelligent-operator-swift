@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - Phase 2
 
-extension DocScanCommand {
+extension ScanCommand {
     func validateExtraction(
         _ extraction: ExtractionResult,
         documentType: DocumentType

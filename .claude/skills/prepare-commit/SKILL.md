@@ -14,7 +14,7 @@ metadata:
 1. **Never commit directly to `main`** — all changes go through a feature branch
 2. **Use `git switch`** to change branches — never `git checkout`
 3. **Format before lint, lint before staging** — always in this exact order: `make format` → `make lint` → stage → commit
-4. **Fix lint errors before staging** — warnings in `Sources/` (`line_length`, `large_tuple`, `function_body_length`, etc.) are pre-existing and acceptable; do not introduce new ones
+4. **Fix ALL lint violations before staging** — both errors and warnings (`line_length`, `type_body_length`, `function_body_length`, `file_length`, etc.) must be resolved to achieve zero violations
 5. **Never use `git add -A` or `git add .`** — always stage specific files by name to avoid accidentally including build artifacts or credentials
 6. **Always include the co-authorship footer** in every commit message
 
@@ -63,9 +63,15 @@ make format
 make lint
 ```
 
-If `make lint` reports any **errors** (not warnings), fix them before continuing. Do not introduce new warnings.
+If `make lint` reports **any violations** (errors or warnings), fix them all before continuing. The goal is **0 violations, 0 serious**.
 
-> SwiftFormat rewrites files in-place, which can occasionally shift line numbers and surface new SwiftLint violations on reformatted lines. After fixing any errors, run `make lint` a second time to confirm a clean state before staging.
+Common fixes for warnings:
+- `file_length` → split the file (e.g. extract an extension into `Foo+Bar.swift`)
+- `type_body_length` → move methods into extensions in separate files
+- `function_body_length` → extract helper methods
+- `line_length` → break long lines
+
+> SwiftFormat rewrites files in-place, which can occasionally shift line numbers and surface new SwiftLint violations on reformatted lines. After fixing any violations, run `make lint` a second time to confirm a clean state before staging.
 
 ### Step 4: Inspect the diff and propose a commit message
 
@@ -150,7 +156,7 @@ To push the branch: `git push -u origin <branch-name>` (first push) or `git push
 
 1. `git branch --show-current` — confirm not on `main`
 2. `make format`
-3. `make lint` — fix any errors
+3. `make lint` — fix all violations (errors and warnings)
 4. `git diff` — inspect all changes
 5. Propose: `fix(cli): hide progress bar for cached models` — show to user, wait for approval
 6. `git add Sources/DocScanCLI/DocScanCommand.swift`
@@ -172,7 +178,7 @@ To push the branch: `git push -u origin <branch-name>` (first push) or `git push
 
 1. Determine branch name from context: `fix/resolve-date-extraction` (user-instructed → no `claude/` prefix)
 2. `git switch -c fix/resolve-date-extraction`
-3. `make format` → `make lint` → fix any errors
+3. `make format` → `make lint` → fix any violations (errors and warnings)
 4. `git diff` — inspect changes, draft commit message
 5. Show proposed message to user, get approval
 6. Stage specific files → commit
@@ -196,9 +202,9 @@ git switch main
 git reset --hard origin/main
 ```
 
-**`make lint` reports errors in files I didn't change**
+**`make lint` reports violations in files I didn't change**
 
-Fix only errors in files you modified. Do not refactor surrounding code that was not part of the change.
+Fix violations in files you modified. If a warning appears in an unrelated file, fix it too — the goal is always 0 violations project-wide.
 
 **Merge conflict after branch creation**
 
