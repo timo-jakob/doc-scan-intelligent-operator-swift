@@ -277,9 +277,13 @@ The aggregate score is `totalPoints / (2 * documentCount)`, normalized to [0.0, 
 
 ### Benchmark Phases
 
-**Phase A** — Run the current model pair against all PDFs in the corpus. Generates ground truth `.json` sidecar files next to each PDF. You can verify and edit these sidecars before proceeding.
+**Phase A** — Run the current model pair against all PDFs in the corpus. Generates ground truth `.json` sidecar files next to each PDF.
 
-**Phase B** — Discover alternative model pairs from Hugging Face. Uses diagonal interleaving to ensure diverse VLM and text model coverage. Default: 50 pairs (option to request 100).
+**Phase A.1** — Verification pause. Lists all sidecar files and offers to open them in your default editor for review and correction.
+
+**Phase A.2** — Prompts for your Hugging Face username and API token. The token is stored securely in the macOS Keychain (keyed by username). A token enables authenticated model discovery with higher rate limits.
+
+**Phase B** — Discover alternative model pairs from Hugging Face. Uses diagonal interleaving to ensure diverse VLM and text model coverage. Default: 50 pairs (option to request 100). Gated models are detected and you can choose to remove affected pairs, open the license pages in your browser, or keep them.
 
 **Phase B.1** — Choose a per-document timeout (10s/30s/60s) for benchmark runs.
 
