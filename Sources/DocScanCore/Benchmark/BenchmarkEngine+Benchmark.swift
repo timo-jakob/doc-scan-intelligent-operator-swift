@@ -79,7 +79,10 @@ private extension BenchmarkEngine {
 
         for (docIndex, pdfPath) in pdfPaths.enumerated() {
             let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-            guard let truth = groundTruths[pdfPath] else { continue }
+            guard let truth = groundTruths[pdfPath] else {
+                print("    [\(docIndex + 1)/\(totalDocs)] \(filename) — Skipped (no ground truth)")
+                continue
+            }
 
             print("    [\(docIndex + 1)/\(totalDocs)] \(filename) — Categorizing...", terminator: "")
             fflush(stdout)
