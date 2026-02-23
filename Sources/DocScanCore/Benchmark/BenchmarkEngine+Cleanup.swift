@@ -72,7 +72,7 @@ public extension BenchmarkEngine {
         guard let enumerator = fileManager.enumerator(atPath: path) else { return 0 }
 
         var totalSize: UInt64 = 0
-        while let file = enumerator.nextObject() as? String {
+        for case let file as String in enumerator {
             let fullPath = (path as NSString).appendingPathComponent(file)
             if let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
                let fileSize = attrs[.size] as? UInt64 {
