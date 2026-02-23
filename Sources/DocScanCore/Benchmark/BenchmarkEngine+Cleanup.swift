@@ -31,9 +31,7 @@ public extension BenchmarkEngine {
         }
 
         let fileManager = FileManager.default
-        let hubCache = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cache/huggingface/hub")
-            .path
+        let hubCache = Self.huggingFaceCachePath()
 
         for modelName in toDelete.sorted() {
             // mlx-community/Qwen2-VL-2B-Instruct-4bit → models--mlx-community--Qwen2-VL-2B-Instruct-4bit
@@ -51,6 +49,21 @@ public extension BenchmarkEngine {
                 print("  Failed to delete \(modelName): \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Resolve the HuggingFace hub cache directory, respecting environment overrides.
+    /// Checks HUGGINGFACE_HUB_CACHE, then HF_HOME/hub, then the default ~/.cache/huggingface/hub.
+    internal static func huggingFaceCachePath() -> String {
+        let env = ProcessInfo.processInfo.environment
+        if let hubCache = env["HUGGINGFACE_HUB_CACHE"] {
+            return hubCache
+        }
+        if let hfHome = env["HF_HOME"] {
+            return (hfHome as NSString).appendingPathComponent("hub")
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".cache/huggingface/hub")
+            .path
     }
 
     /// Calculate total size of a directory recursively
