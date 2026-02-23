@@ -5,6 +5,14 @@ final class KeychainManagerTests: XCTestCase {
     /// Unique test account to avoid conflicts with real data
     private let testAccount = "docscan-test-\(UUID().uuidString)"
 
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try XCTSkipIf(
+            ProcessInfo.processInfo.environment["CI"] != nil,
+            "Keychain user-presence access control requires entitlements unavailable in CI"
+        )
+    }
+
     override func tearDown() {
         // Clean up any Keychain entries created during tests
         try? KeychainManager.deleteToken(forAccount: testAccount)
