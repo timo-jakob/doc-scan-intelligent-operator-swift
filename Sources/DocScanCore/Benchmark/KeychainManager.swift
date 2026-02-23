@@ -12,12 +12,23 @@ public enum KeychainManager {
             throw DocScanError.keychainError("Failed to encode token")
         }
 
+        var accessError: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            .userPresence,
+            &accessError
+        ) else {
+            let message = accessError?.takeRetainedValue().localizedDescription ?? "unknown error"
+            throw DocScanError.keychainError("Failed to create access control: \(message)")
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: account,
             kSecValueData as String: tokenData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrAccessControl as String: accessControl,
         ]
 
         let status = SecItemAdd(query as CFDictionary, nil)
