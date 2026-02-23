@@ -41,7 +41,8 @@ jobs:
       run: |
         # Run tests using xcodebuild for Metal shader support
         # Use DocScan-Package scheme which includes all test targets
-        xcodebuild test -scheme DocScan-Package -destination 'platform=macOS'
+        xcodebuild test -scheme DocScan-Package -destination 'platform=macOS' \
+          -skip-testing DocScanCoreTests/KeychainManagerTests
 
   lint:
     name: Code Quality

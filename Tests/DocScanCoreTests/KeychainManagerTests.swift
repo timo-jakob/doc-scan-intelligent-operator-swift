@@ -5,6 +5,10 @@ final class KeychainManagerTests: XCTestCase {
     /// Unique test account to avoid conflicts with real data
     private let testAccount = "docscan-test-\(UUID().uuidString)"
 
+    // NOTE: These tests are skipped in CI via -skip-testing because
+    // .userPresence access control requires entitlements unavailable
+    // on GitHub Actions runners (errSecMissingEntitlement).
+
     override func tearDown() {
         // Clean up any Keychain entries created during tests
         try? KeychainManager.deleteToken(forAccount: testAccount)

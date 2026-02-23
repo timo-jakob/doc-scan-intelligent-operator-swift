@@ -27,7 +27,8 @@ jobs:
           -scheme DocScan-Package \
           -destination 'platform=macOS' \
           -enableCodeCoverage YES \
-          -resultBundlePath TestResults.xcresult
+          -resultBundlePath TestResults.xcresult \
+          -skip-testing DocScanCoreTests/KeychainManagerTests
 
     - name: Convert Coverage to SonarQube Format
       run: |
