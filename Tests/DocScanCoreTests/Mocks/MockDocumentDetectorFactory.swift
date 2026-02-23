@@ -2,8 +2,10 @@ import AppKit
 @testable import DocScanCore
 import Foundation
 
-/// Mock DocumentDetector factory for testing BenchmarkEngine
-final class MockDocumentDetectorFactory: DocumentDetectorFactory {
+/// Mock DocumentDetector factory for testing BenchmarkEngine.
+/// @unchecked Sendable is safe here: properties are set during synchronous test setup
+/// and only read during async test execution on a single test thread.
+final class MockDocumentDetectorFactory: DocumentDetectorFactory, @unchecked Sendable {
     var mockVLMResponse: String = "YES"
     var mockDate: Date?
     var mockSecondaryField: String?

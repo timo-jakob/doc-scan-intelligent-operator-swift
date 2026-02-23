@@ -2,18 +2,19 @@ import Foundation
 import MLX
 
 /// Factory protocol for creating DocumentDetectors with different model configurations
-public protocol DocumentDetectorFactory {
+public protocol DocumentDetectorFactory: Sendable {
     func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector
 
     /// Pre-download model files to local cache so network latency is excluded from per-document timeouts
     func preloadModels(config: Configuration) async throws
 
     /// Release GPU resources held by previously loaded models
-    func releaseModels()
+    func releaseModels() async
 }
 
-/// Default factory that creates real DocumentDetectors, reusing preloaded model instances
-public class DefaultDocumentDetectorFactory: DocumentDetectorFactory {
+/// Default factory that creates real DocumentDetectors, reusing preloaded model instances.
+/// Actor isolation guarantees thread-safe access to cached model instances.
+public actor DefaultDocumentDetectorFactory: DocumentDetectorFactory {
     private var cachedVLM: ModelManager?
     private var cachedTextLLM: TextLLMManager?
 
@@ -21,7 +22,7 @@ public class DefaultDocumentDetectorFactory: DocumentDetectorFactory {
 
     public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
         if let vlm = cachedVLM, let textLLM = cachedTextLLM {
-            defer { clearCache() }
+            clearCache()
             return DocumentDetector(config: config, documentType: documentType, vlmProvider: vlm, textLLM: textLLM)
         }
         return DocumentDetector(config: config, documentType: documentType)

@@ -11,7 +11,7 @@ public extension BenchmarkEngine {
         timeoutSeconds: TimeInterval = 30
     ) async throws -> ModelPairResult {
         // Release GPU resources from previous model pair to prevent Metal resource exhaustion
-        detectorFactory.releaseModels()
+        await detectorFactory.releaseModels()
 
         if let memoryDQ = checkMemory(for: pair) {
             return memoryDQ
@@ -25,7 +25,7 @@ public extension BenchmarkEngine {
         do {
             try await detectorFactory.preloadModels(config: pairConfig)
         } catch {
-            detectorFactory.releaseModels()
+            await detectorFactory.releaseModels()
             return disqualifiedResult(
                 pair, reason: "Failed to load models: \(error.localizedDescription)"
             )
