@@ -1,6 +1,28 @@
 import Foundation
 import Yams
 
+/// Processing settings for LLM generation and PDF rendering
+public struct ProcessingSettings: Codable, Equatable {
+    /// Maximum number of tokens to generate
+    public var maxTokens: Int
+
+    /// Temperature for text generation
+    public var temperature: Double
+
+    /// DPI for PDF to image conversion
+    public var pdfDPI: Int
+
+    public init(
+        maxTokens: Int = Configuration.defaultMaxTokens,
+        temperature: Double = Configuration.defaultTemperature,
+        pdfDPI: Int = Configuration.defaultPdfDPI
+    ) {
+        self.maxTokens = maxTokens
+        self.temperature = temperature
+        self.pdfDPI = pdfDPI
+    }
+}
+
 /// Output formatting settings for invoice filenames
 public struct OutputSettings: Codable, Equatable {
     /// Date format for invoice filename (e.g., "yyyy-MM-dd")
@@ -29,14 +51,8 @@ public struct Configuration: Codable {
     /// Directory to cache downloaded models
     public var modelCacheDir: String
 
-    /// Maximum number of tokens to generate
-    public var maxTokens: Int
-
-    /// Temperature for text generation
-    public var temperature: Double
-
-    /// DPI for PDF to image conversion
-    public var pdfDPI: Int
+    /// Processing settings (generation parameters and PDF rendering)
+    public var processing: ProcessingSettings
 
     /// Whether to enable verbose logging
     public var verbose: Bool
@@ -46,6 +62,24 @@ public struct Configuration: Codable {
 
     /// Hugging Face username (for model discovery)
     public var huggingFaceUsername: String?
+
+    /// Maximum number of tokens to generate (convenience accessor)
+    public var maxTokens: Int {
+        get { processing.maxTokens }
+        set { processing.maxTokens = newValue }
+    }
+
+    /// Temperature for text generation (convenience accessor)
+    public var temperature: Double {
+        get { processing.temperature }
+        set { processing.temperature = newValue }
+    }
+
+    /// DPI for PDF to image conversion (convenience accessor)
+    public var pdfDPI: Int {
+        get { processing.pdfDPI }
+        set { processing.pdfDPI = newValue }
+    }
 
     /// Date format for invoice filename (convenience accessor)
     public var dateFormat: String {
@@ -86,9 +120,7 @@ public struct Configuration: Codable {
         modelName: String = Configuration.defaultModelName,
         textModelName: String = Configuration.defaultTextModelName,
         modelCacheDir: String? = nil,
-        maxTokens: Int = Configuration.defaultMaxTokens,
-        temperature: Double = Configuration.defaultTemperature,
-        pdfDPI: Int = Configuration.defaultPdfDPI,
+        processing: ProcessingSettings = ProcessingSettings(),
         verbose: Bool = false,
         output: OutputSettings = OutputSettings(),
         huggingFaceUsername: String? = nil
@@ -96,12 +128,17 @@ public struct Configuration: Codable {
         self.modelName = modelName
         self.textModelName = textModelName
         self.modelCacheDir = modelCacheDir ?? Self.defaultCacheDir
-        self.maxTokens = maxTokens
-        self.temperature = temperature
-        self.pdfDPI = pdfDPI
+        self.processing = processing
         self.verbose = verbose
         self.output = output
         self.huggingFaceUsername = huggingFaceUsername
+    }
+
+    /// Explicit CodingKeys to maintain flat YAML format
+    enum CodingKeys: String, CodingKey {
+        case modelName, textModelName, modelCacheDir
+        case maxTokens, temperature, pdfDPI
+        case verbose, output, huggingFaceUsername
     }
 
     public init(from decoder: Decoder) throws {
@@ -112,15 +149,30 @@ public struct Configuration: Codable {
             ?? Self.defaultTextModelName
         modelCacheDir = try container.decodeIfPresent(String.self, forKey: .modelCacheDir)
             ?? Self.defaultCacheDir
-        maxTokens = try container.decodeIfPresent(Int.self, forKey: .maxTokens)
-            ?? Self.defaultMaxTokens
-        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
-            ?? Self.defaultTemperature
-        pdfDPI = try container.decodeIfPresent(Int.self, forKey: .pdfDPI)
-            ?? Self.defaultPdfDPI
+        processing = try ProcessingSettings(
+            maxTokens: container.decodeIfPresent(Int.self, forKey: .maxTokens)
+                ?? Self.defaultMaxTokens,
+            temperature: container.decodeIfPresent(Double.self, forKey: .temperature)
+                ?? Self.defaultTemperature,
+            pdfDPI: container.decodeIfPresent(Int.self, forKey: .pdfDPI)
+                ?? Self.defaultPdfDPI
+        )
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
         huggingFaceUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(modelName, forKey: .modelName)
+        try container.encode(textModelName, forKey: .textModelName)
+        try container.encode(modelCacheDir, forKey: .modelCacheDir)
+        try container.encode(processing.maxTokens, forKey: .maxTokens)
+        try container.encode(processing.temperature, forKey: .temperature)
+        try container.encode(processing.pdfDPI, forKey: .pdfDPI)
+        try container.encode(verbose, forKey: .verbose)
+        try container.encode(output, forKey: .output)
+        try container.encodeIfPresent(huggingFaceUsername, forKey: .huggingFaceUsername)
     }
 
     /// Load configuration from YAML file

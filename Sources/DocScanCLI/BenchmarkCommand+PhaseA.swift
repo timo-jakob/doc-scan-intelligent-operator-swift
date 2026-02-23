@@ -36,7 +36,11 @@ extension BenchmarkCommand {
             print()
 
             for doc in first.documentResults {
-                let icon = doc.documentScore == 2 ? "✅" : doc.documentScore == 1 ? "⚠️" : "❌"
+                let icon = switch doc.documentScore {
+                case 2: "✅"
+                case 1: "⚠️"
+                default: "❌"
+                }
                 let match = doc.predictedIsMatch ? "match" : "no match"
                 print("  \(icon) \(doc.filename) (\(match)) [\(doc.documentScore)/2]")
             }

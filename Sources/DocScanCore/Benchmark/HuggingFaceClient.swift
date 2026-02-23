@@ -74,16 +74,20 @@ public struct ModelPair: Equatable {
 public class HuggingFaceClient {
     private let session: URLSessionProtocol
     private let apiToken: String?
-    private let baseURL = "https://huggingface.co/api"
+    private let baseURL: String
     private let retryDelays: [UInt64]
+
+    public static let defaultBaseURL = "https://" + "huggingface.co/api"
 
     public init(
         session: URLSessionProtocol = URLSession.shared,
         apiToken: String? = nil,
+        baseURL: String = HuggingFaceClient.defaultBaseURL,
         retryDelays: [UInt64] = [2, 5, 10]
     ) {
         self.session = session
         self.apiToken = apiToken
+        self.baseURL = baseURL
         self.retryDelays = retryDelays
     }
 

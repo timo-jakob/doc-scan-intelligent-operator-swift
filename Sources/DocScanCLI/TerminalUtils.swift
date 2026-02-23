@@ -184,28 +184,69 @@ enum TerminalUtils {
     }
 }
 
-/// Simplified row data for table formatting
-struct ModelPairResultRow {
-    let vlmModelName: String
-    let textModelName: String
-    let score: Double
+/// Score breakdown metrics for a benchmark result row
+struct ScoreBreakdown {
     let totalScore: Int
     let maxScore: Int
     let fullyCorrectCount: Int
     let partiallyCorrectCount: Int
     let fullyWrongCount: Int
+
+    init(
+        totalScore: Int = 0,
+        maxScore: Int = 0,
+        fullyCorrectCount: Int = 0,
+        partiallyCorrectCount: Int = 0,
+        fullyWrongCount: Int = 0
+    ) {
+        self.totalScore = totalScore
+        self.maxScore = maxScore
+        self.fullyCorrectCount = fullyCorrectCount
+        self.partiallyCorrectCount = partiallyCorrectCount
+        self.fullyWrongCount = fullyWrongCount
+    }
+}
+
+/// Simplified row data for table formatting
+struct ModelPairResultRow {
+    let vlmModelName: String
+    let textModelName: String
+    let score: Double
+    let breakdown: ScoreBreakdown
     let isDisqualified: Bool
     let disqualificationReason: String?
+
+    var totalScore: Int {
+        breakdown.totalScore
+    }
+
+    var maxScore: Int {
+        breakdown.maxScore
+    }
+
+    var fullyCorrectCount: Int {
+        breakdown.fullyCorrectCount
+    }
+
+    var partiallyCorrectCount: Int {
+        breakdown.partiallyCorrectCount
+    }
+
+    var fullyWrongCount: Int {
+        breakdown.fullyWrongCount
+    }
 
     init(from result: ModelPairResult) {
         vlmModelName = result.vlmModelName
         textModelName = result.textModelName
         score = result.metrics.score
-        totalScore = result.metrics.totalScore
-        maxScore = result.metrics.maxScore
-        fullyCorrectCount = result.metrics.fullyCorrectCount
-        partiallyCorrectCount = result.metrics.partiallyCorrectCount
-        fullyWrongCount = result.metrics.fullyWrongCount
+        breakdown = ScoreBreakdown(
+            totalScore: result.metrics.totalScore,
+            maxScore: result.metrics.maxScore,
+            fullyCorrectCount: result.metrics.fullyCorrectCount,
+            partiallyCorrectCount: result.metrics.partiallyCorrectCount,
+            fullyWrongCount: result.metrics.fullyWrongCount
+        )
         isDisqualified = result.isDisqualified
         disqualificationReason = result.disqualificationReason
     }
@@ -214,22 +255,14 @@ struct ModelPairResultRow {
         vlmModelName: String,
         textModelName: String,
         score: Double,
-        totalScore: Int = 0,
-        maxScore: Int = 0,
-        fullyCorrectCount: Int = 0,
-        partiallyCorrectCount: Int = 0,
-        fullyWrongCount: Int = 0,
+        breakdown: ScoreBreakdown = ScoreBreakdown(),
         isDisqualified: Bool = false,
         disqualificationReason: String? = nil
     ) {
         self.vlmModelName = vlmModelName
         self.textModelName = textModelName
         self.score = score
-        self.totalScore = totalScore
-        self.maxScore = maxScore
-        self.fullyCorrectCount = fullyCorrectCount
-        self.partiallyCorrectCount = partiallyCorrectCount
-        self.fullyWrongCount = fullyWrongCount
+        self.breakdown = breakdown
         self.isDisqualified = isDisqualified
         self.disqualificationReason = disqualificationReason
     }
