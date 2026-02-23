@@ -22,7 +22,8 @@ public actor DefaultDocumentDetectorFactory: DocumentDetectorFactory {
 
     public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
         if let vlm = cachedVLM, let textLLM = cachedTextLLM {
-            clearCache()
+            // Reuse preloaded instances for all documents in this pair.
+            // Cache is cleared by releaseModels() between pairs or preloadModels() before new loads.
             return DocumentDetector(config: config, documentType: documentType, vlmProvider: vlm, textLLM: textLLM)
         }
         return DocumentDetector(config: config, documentType: documentType)
