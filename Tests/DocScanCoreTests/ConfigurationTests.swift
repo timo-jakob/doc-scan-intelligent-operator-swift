@@ -35,9 +35,7 @@ final class ConfigurationTests: XCTestCase {
         let config = Configuration(
             modelName: "custom-model",
             modelCacheDir: "/tmp/models",
-            maxTokens: 512,
-            temperature: 0.5,
-            pdfDPI: 300,
+            processing: ProcessingSettings(maxTokens: 512, temperature: 0.5, pdfDPI: 300),
             verbose: true,
             output: OutputSettings(
                 dateFormat: "dd-MM-yyyy",
@@ -192,9 +190,7 @@ final class ConfigurationTests: XCTestCase {
         let config = Configuration(
             modelName: "saved-model",
             modelCacheDir: "/saved/cache",
-            maxTokens: 1024,
-            temperature: 0.8,
-            pdfDPI: 200,
+            processing: ProcessingSettings(maxTokens: 1024, temperature: 0.8, pdfDPI: 200),
             verbose: true,
             output: OutputSettings(
                 dateFormat: "yyyy/MM/dd",
@@ -242,9 +238,7 @@ final class ConfigurationTests: XCTestCase {
         let config = Configuration(
             modelName: "test-model",
             modelCacheDir: "/test/cache",
-            maxTokens: 256,
-            temperature: 0.1,
-            pdfDPI: 150,
+            processing: ProcessingSettings(maxTokens: 256, temperature: 0.1, pdfDPI: 150),
             verbose: false
         )
 
@@ -294,7 +288,7 @@ extension ConfigurationTests {
         let original = Configuration(
             modelName: "nested-vlm",
             textModelName: "nested-text",
-            maxTokens: 128
+            processing: ProcessingSettings(maxTokens: 128)
         )
         try original.save(to: nested)
         let loaded = try Configuration.load(from: nested)
