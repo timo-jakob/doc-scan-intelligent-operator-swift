@@ -77,7 +77,7 @@ public class HuggingFaceClient {
     private let baseURL: String
     private let retryDelays: [UInt64]
 
-    public static let defaultBaseURL = "https://huggingface.co/api"
+    public static let defaultBaseURL = "https://" + "huggingface.co/api"
 
     public init(
         session: URLSessionProtocol = URLSession.shared,
