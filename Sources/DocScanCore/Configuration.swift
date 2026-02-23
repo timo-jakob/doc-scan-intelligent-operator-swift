@@ -2,7 +2,7 @@ import Foundation
 import Yams
 
 /// Processing settings for LLM generation and PDF rendering
-public struct ProcessingSettings: Codable, Equatable {
+public struct ProcessingSettings: Codable, Equatable, Sendable {
     /// Maximum number of tokens to generate
     public var maxTokens: Int
 
@@ -24,7 +24,7 @@ public struct ProcessingSettings: Codable, Equatable {
 }
 
 /// Output formatting settings for invoice filenames
-public struct OutputSettings: Codable, Equatable {
+public struct OutputSettings: Codable, Equatable, Sendable {
     /// Date format for invoice filename (e.g., "yyyy-MM-dd")
     public var dateFormat: String
 
@@ -41,7 +41,7 @@ public struct OutputSettings: Codable, Equatable {
 }
 
 /// Configuration for document scanning and invoice processing
-public struct Configuration: Codable {
+public struct Configuration: Codable, Sendable {
     /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
     public var modelName: String
 

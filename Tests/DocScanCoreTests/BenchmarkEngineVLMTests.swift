@@ -38,15 +38,13 @@ actor MockVLMOnlyFactory: VLMOnlyFactory {
 /// Mock VLM provider for testing
 class BenchmarkMockVLMProvider: VLMProvider, @unchecked Sendable {
     var mockResponse: String = "Yes"
-    var callCount = 0
 
     func generateFromImage(
         _: NSImage,
         prompt _: String,
         modelName _: String?
     ) async throws -> String {
-        callCount += 1
-        return mockResponse
+        mockResponse
     }
 }
 

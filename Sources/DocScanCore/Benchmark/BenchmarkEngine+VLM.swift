@@ -116,10 +116,11 @@ public extension BenchmarkEngine {
                 predictedIsMatch: !isPositive // Wrong answer = 0 points
             )
         } catch {
+            // Error = 0 points (force incorrect prediction regardless of polarity)
             return VLMDocumentResult(
                 filename: filename,
                 isPositiveSample: isPositive,
-                predictedIsMatch: false
+                predictedIsMatch: !isPositive
             )
         }
     }
