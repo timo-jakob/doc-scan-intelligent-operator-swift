@@ -85,7 +85,7 @@ extension BenchmarkCommand {
             try newConfig.save(to: path)
             print("Configuration saved to \(path)")
         } else {
-            let defaultPath = "docscan-config.yaml"
+            let defaultPath = Configuration.defaultConfigPath
             try newConfig.save(to: defaultPath)
             print("Configuration saved to \(defaultPath)")
         }

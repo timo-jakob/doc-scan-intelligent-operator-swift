@@ -73,6 +73,15 @@ public struct Configuration: Codable {
             .path
     }
 
+    public static var defaultConfigDir: String {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".docscan").path
+    }
+
+    public static var defaultConfigPath: String {
+        (defaultConfigDir as NSString).appendingPathComponent("docscan-config.yaml")
+    }
+
     public init(
         modelName: String = Configuration.defaultModelName,
         textModelName: String = Configuration.defaultTextModelName,
@@ -128,9 +137,11 @@ public struct Configuration: Codable {
 
     /// Save configuration to YAML file
     public func save(to path: String) throws {
+        let url = URL(fileURLWithPath: path)
+        let dir = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let encoder = YAMLEncoder()
         let yaml = try encoder.encode(self)
-        let url = URL(fileURLWithPath: path)
         try yaml.write(to: url, atomically: true, encoding: .utf8)
     }
 

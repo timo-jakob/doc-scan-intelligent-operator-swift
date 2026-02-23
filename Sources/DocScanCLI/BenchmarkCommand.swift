@@ -135,6 +135,10 @@ struct BenchmarkCommand: AsyncParsableCommand {
         if let configPath = config {
             return try Configuration.load(from: configPath)
         }
+        let defaultPath = Configuration.defaultConfigPath
+        if FileManager.default.fileExists(atPath: defaultPath) {
+            return try Configuration.load(from: defaultPath)
+        }
         return Configuration.defaultConfiguration
     }
 
