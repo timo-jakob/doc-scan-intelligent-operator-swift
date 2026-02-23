@@ -14,6 +14,7 @@ final class MockDocumentDetectorFactory: DocumentDetectorFactory, @unchecked Sen
     var errorToThrow: Error = DocScanError.inferenceError("Mock error")
     var shouldThrowOnPreload: Bool = false
     var preloadError: Error = DocScanError.modelLoadFailed("Mock preload error")
+    var mockVLMDelay: TimeInterval = 0
 
     /// Count of detectors created
     private(set) var detectorsCreated = 0
@@ -39,6 +40,7 @@ final class MockDocumentDetectorFactory: DocumentDetectorFactory, @unchecked Sen
 
         let mockVLM = MockVLMProvider()
         mockVLM.mockResponse = mockVLMResponse
+        mockVLM.mockDelay = mockVLMDelay
 
         let mockText = MockTextLLMManager(config: config)
         mockText.mockDate = mockDate

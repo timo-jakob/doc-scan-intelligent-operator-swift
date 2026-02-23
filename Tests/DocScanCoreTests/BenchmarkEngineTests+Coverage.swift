@@ -278,4 +278,63 @@ extension BenchmarkEngineTests {
         let size = BenchmarkEngine.directorySize(at: "/nonexistent/path")
         XCTAssertEqual(size, 0)
     }
+
+    // MARK: - Memory Disqualification
+
+    func testCheckMemoryDisqualifiesHugeModel() async throws {
+        let pdfPath = positiveDir.appendingPathComponent("invoice.pdf")
+        createTestPDF(at: pdfPath)
+
+        let groundTruth = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01")
+
+        let factory = MockDocumentDetectorFactory()
+        let config = Configuration()
+        let engine = BenchmarkEngine(
+            configuration: config, documentType: .invoice, verbose: true, detectorFactory: factory
+        )
+
+        // Model names with 999B parameters → ~1.2 TB estimated, far exceeding any available memory
+        let pair = ModelPair(vlmModelName: "org/huge-999B-4bit", textModelName: "org/huge-999B-4bit")
+        let result = try await engine.benchmarkModelPair(
+            pair,
+            pdfPaths: [pdfPath.path],
+            groundTruths: [pdfPath.path: groundTruth],
+            timeoutSeconds: 30
+        )
+
+        XCTAssertTrue(result.isDisqualified)
+        XCTAssertTrue(result.disqualificationReason?.contains("Insufficient memory") ?? false)
+        XCTAssertEqual(result.documentResults.count, 0)
+        // No detectors created — disqualified before processing
+        XCTAssertEqual(factory.detectorsCreated, 0)
+    }
+
+    // MARK: - Timeout Disqualification
+
+    func testBenchmarkTimeoutDisqualifiesPair() async throws {
+        let pdfPath = positiveDir.appendingPathComponent("invoice.pdf")
+        createTestPDF(at: pdfPath)
+
+        let groundTruth = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01")
+
+        let factory = MockDocumentDetectorFactory()
+        factory.mockVLMResponse = "YES"
+        factory.mockVLMDelay = 2 // VLM sleeps 2 seconds
+
+        let config = Configuration()
+        let engine = BenchmarkEngine(
+            configuration: config, documentType: .invoice, detectorFactory: factory
+        )
+
+        let pair = ModelPair(vlmModelName: config.modelName, textModelName: config.textModelName)
+        let result = try await engine.benchmarkModelPair(
+            pair,
+            pdfPaths: [pdfPath.path],
+            groundTruths: [pdfPath.path: groundTruth],
+            timeoutSeconds: 0.1 // Very short timeout to trigger timeout path
+        )
+
+        XCTAssertTrue(result.isDisqualified)
+        XCTAssertTrue(result.disqualificationReason?.contains("timeout") ?? false)
+    }
 }
