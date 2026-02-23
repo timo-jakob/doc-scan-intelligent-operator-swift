@@ -8,12 +8,19 @@ public protocol DocumentDetectorFactory {
     func preloadModels(config: Configuration) async throws
 }
 
-/// Default factory that creates real DocumentDetectors
-public struct DefaultDocumentDetectorFactory: DocumentDetectorFactory {
+/// Default factory that creates real DocumentDetectors, reusing preloaded model instances
+public class DefaultDocumentDetectorFactory: DocumentDetectorFactory {
+    private var cachedVLM: ModelManager?
+    private var cachedTextLLM: TextLLMManager?
+
     public init() {}
 
     public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
-        DocumentDetector(config: config, documentType: documentType)
+        if let vlm = cachedVLM, let textLLM = cachedTextLLM {
+            defer { clearCache() }
+            return DocumentDetector(config: config, documentType: documentType, vlmProvider: vlm, textLLM: textLLM)
+        }
+        return DocumentDetector(config: config, documentType: documentType)
     }
 
     public func preloadModels(config: Configuration) async throws {
@@ -33,6 +40,14 @@ public struct DefaultDocumentDetectorFactory: DocumentDetectorFactory {
             fflush(stdout)
         }
         print(" Ready")
+
+        cachedVLM = vlm
+        cachedTextLLM = textLLM
+    }
+
+    private func clearCache() {
+        cachedVLM = nil
+        cachedTextLLM = nil
     }
 }
 
