@@ -34,21 +34,10 @@ public extension BenchmarkEngine {
         return value
     }
 
-    /// Get available system memory in MB
+    /// Get available system memory in MB.
+    /// On Apple Silicon with unified memory, MLX can use most of the physical RAM,
+    /// so we report total physical memory rather than just free/inactive pages.
     static func availableMemoryMB() -> UInt64 {
-        var stats = vm_statistics64()
-        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &stats) { ptr in
-            ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, intPtr, &count)
-            }
-        }
-        guard result == KERN_SUCCESS else {
-            return 0
-        }
-        let pageSize = UInt64(vm_kernel_page_size)
-        let free = UInt64(stats.free_count) * pageSize
-        let inactive = UInt64(stats.inactive_count) * pageSize
-        return (free + inactive) / 1_000_000
+        UInt64(ProcessInfo.processInfo.physicalMemory / 1_000_000)
     }
 }
