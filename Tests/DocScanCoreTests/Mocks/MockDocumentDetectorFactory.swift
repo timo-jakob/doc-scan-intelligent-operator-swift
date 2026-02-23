@@ -18,6 +18,10 @@ final class MockDocumentDetectorFactory: DocumentDetectorFactory {
         // No-op for tests — no real models to download
     }
 
+    func releaseModels() {
+        // No-op for tests — no GPU resources to release
+    }
+
     func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
         detectorsCreated += 1
 

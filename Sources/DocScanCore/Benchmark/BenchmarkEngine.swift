@@ -1,4 +1,5 @@
 import Foundation
+import MLX
 
 /// Factory protocol for creating DocumentDetectors with different model configurations
 public protocol DocumentDetectorFactory {
@@ -6,6 +7,9 @@ public protocol DocumentDetectorFactory {
 
     /// Pre-download model files to local cache so network latency is excluded from per-document timeouts
     func preloadModels(config: Configuration) async throws
+
+    /// Release GPU resources held by previously loaded models
+    func releaseModels()
 }
 
 /// Default factory that creates real DocumentDetectors, reusing preloaded model instances
@@ -24,6 +28,9 @@ public class DefaultDocumentDetectorFactory: DocumentDetectorFactory {
     }
 
     public func preloadModels(config: Configuration) async throws {
+        // Release previous model instances before loading new ones
+        clearCache()
+
         print("    Preloading VLM...", terminator: "")
         fflush(stdout)
         let vlm = ModelManager(config: config)
@@ -43,6 +50,11 @@ public class DefaultDocumentDetectorFactory: DocumentDetectorFactory {
 
         cachedVLM = vlm
         cachedTextLLM = textLLM
+    }
+
+    public func releaseModels() {
+        clearCache()
+        Memory.clearCache()
     }
 
     private func clearCache() {

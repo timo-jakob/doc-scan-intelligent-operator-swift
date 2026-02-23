@@ -10,6 +10,9 @@ public extension BenchmarkEngine {
         groundTruths: [String: GroundTruth],
         timeoutSeconds: TimeInterval = 30
     ) async throws -> ModelPairResult {
+        // Release GPU resources from previous model pair to prevent Metal resource exhaustion
+        detectorFactory.releaseModels()
+
         if let memoryDQ = checkMemory(for: pair) {
             return memoryDQ
         }
@@ -18,11 +21,14 @@ public extension BenchmarkEngine {
         pairConfig.modelName = pair.vlmModelName
         pairConfig.textModelName = pair.textModelName
 
-        // Pre-download models so network latency is excluded from per-document timeouts
+        // Pre-download and load models; catch resource limit errors gracefully
         do {
             try await detectorFactory.preloadModels(config: pairConfig)
         } catch {
-            return disqualifiedResult(pair, reason: "Failed to load models: \(error.localizedDescription)")
+            detectorFactory.releaseModels()
+            return disqualifiedResult(
+                pair, reason: "Failed to load models: \(error.localizedDescription)"
+            )
         }
 
         return try await benchmarkDocuments(
