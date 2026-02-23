@@ -12,16 +12,22 @@ final class MockDocumentDetectorFactory: DocumentDetectorFactory, @unchecked Sen
     var mockPatientName: String?
     var shouldThrowError: Bool = false
     var errorToThrow: Error = DocScanError.inferenceError("Mock error")
+    var shouldThrowOnPreload: Bool = false
+    var preloadError: Error = DocScanError.modelLoadFailed("Mock preload error")
 
     /// Count of detectors created
     private(set) var detectorsCreated = 0
+    /// Count of releaseModels calls
+    private(set) var releaseModelsCalled = 0
 
     func preloadModels(config _: Configuration) async throws {
-        // No-op for tests — no real models to download
+        if shouldThrowOnPreload {
+            throw preloadError
+        }
     }
 
     func releaseModels() {
-        // No-op for tests — no GPU resources to release
+        releaseModelsCalled += 1
     }
 
     func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {

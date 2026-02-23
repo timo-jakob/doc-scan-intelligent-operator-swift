@@ -18,7 +18,9 @@ public actor DefaultDocumentDetectorFactory: DocumentDetectorFactory {
     private var cachedVLM: ModelManager?
     private var cachedTextLLM: TextLLMManager?
 
-    public init() {}
+    public init() {
+        // Model instances are lazily cached on first preloadModels() call
+    }
 
     public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
         if let vlm = cachedVLM, let textLLM = cachedTextLLM {
