@@ -77,61 +77,6 @@ final class HuggingFaceClientTests: XCTestCase {
         XCTAssertEqual(results[0].modelId, "org/text-7b")
     }
 
-    // MARK: - Pair Assembly
-
-    func testDiscoverModelPairsIncludesCurrentPairFirst() async throws {
-        let models = [MockURLSession.makeModel(id: "org/other-model")]
-        try mockSession.setMockModels(models)
-
-        let client = HuggingFaceClient(session: mockSession)
-        let pairs = try await client.discoverModelPairs(
-            currentVLM: "current/vlm",
-            currentTextLLM: "current/text",
-            count: 3
-        )
-
-        XCTAssertFalse(pairs.isEmpty)
-        XCTAssertEqual(pairs[0].vlmModelName, "current/vlm")
-        XCTAssertEqual(pairs[0].textModelName, "current/text")
-    }
-
-    func testDiscoverModelPairsRespectsCount() async throws {
-        let models = (1 ... 10).map { MockURLSession.makeModel(id: "org/model-\($0)") }
-        try mockSession.setMockModels(models)
-
-        let client = HuggingFaceClient(session: mockSession)
-        let pairs = try await client.discoverModelPairs(
-            currentVLM: "current/vlm",
-            currentTextLLM: "current/text",
-            count: 3
-        )
-
-        XCTAssertLessThanOrEqual(pairs.count, 3)
-    }
-
-    func testDiscoverModelPairsInterleavesVLMs() async throws {
-        // Provide enough distinct models so both VLM and text searches return several.
-        // The mock returns the same models for both searches, but discoverModelPairs
-        // prepends the current models and deduplicates, giving us:
-        //   VLMs:  [current/vlm, org/m-1, org/m-2, org/m-3, …]
-        //   Texts: [current/text, org/m-1, org/m-2, org/m-3, …]
-        let models = (1 ... 6).map { MockURLSession.makeModel(id: "org/m-\($0)") }
-        try mockSession.setMockModels(models)
-
-        let client = HuggingFaceClient(session: mockSession)
-        let pairs = try await client.discoverModelPairs(
-            currentVLM: "current/vlm",
-            currentTextLLM: "current/text",
-            count: 10
-        )
-
-        // With diagonal interleaving, the first 10 pairs should include
-        // at least 3 distinct VLMs (not just the current one).
-        let uniqueVLMs = Set(pairs.map(\.vlmModelName))
-        XCTAssertGreaterThanOrEqual(uniqueVLMs.count, 3,
-                                    "Expected at least 3 distinct VLMs in first 10 pairs, got \(uniqueVLMs)")
-    }
-
     // MARK: - Gated Model Detection
 
     func testGatedModelDetectionBoolTrue() async throws {

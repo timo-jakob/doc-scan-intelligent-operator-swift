@@ -59,17 +59,6 @@ public enum HFGated: Codable, Equatable {
     }
 }
 
-/// A pair of VLM + TextLLM models for benchmarking
-public struct ModelPair: Equatable {
-    public let vlmModelName: String
-    public let textModelName: String
-
-    public init(vlmModelName: String, textModelName: String) {
-        self.vlmModelName = vlmModelName
-        self.textModelName = textModelName
-    }
-}
-
 /// Client for querying the Hugging Face API
 public class HuggingFaceClient {
     private let session: URLSessionProtocol
@@ -101,46 +90,6 @@ public class HuggingFaceClient {
     public func searchTextModels(limit: Int = 10) async throws -> [HFModel] {
         let query = "mlx instruct 4bit"
         return try await searchModels(query: query, limit: limit)
-    }
-
-    /// Discover model pairs for benchmarking
-    /// Generates the cross-product of VLM × text model combinations using diagonal
-    /// interleaving so that any prefix covers diverse VLMs and text models equally.
-    public func discoverModelPairs(
-        currentVLM: String,
-        currentTextLLM: String,
-        count: Int = 50
-    ) async throws -> [ModelPair] {
-        let vlmModels = try await searchVLMModels(limit: count)
-        let textModels = try await searchTextModels(limit: count)
-
-        // Build unique VLM and text model lists, current models first
-        var allVLMs = [currentVLM]
-        for model in vlmModels where model.modelId != currentVLM {
-            allVLMs.append(model.modelId)
-        }
-
-        var allTexts = [currentTextLLM]
-        for model in textModels where model.modelId != currentTextLLM {
-            allTexts.append(model.modelId)
-        }
-
-        // Diagonal interleaving: iterate by index sum so that small prefixes
-        // cover diverse VLMs and text models instead of exhausting one dimension first.
-        // sum=0 → (v0,t0), sum=1 → (v0,t1),(v1,t0), sum=2 → (v0,t2),(v1,t1),(v2,t0), …
-        var pairs: [ModelPair] = []
-        let maxSum = allVLMs.count + allTexts.count - 2
-        for sum in 0 ... maxSum {
-            let vlmStart = max(0, sum - allTexts.count + 1)
-            let vlmEnd = min(sum, allVLMs.count - 1)
-            for vlmIdx in vlmStart ... vlmEnd {
-                let textIdx = sum - vlmIdx
-                pairs.append(ModelPair(vlmModelName: allVLMs[vlmIdx], textModelName: allTexts[textIdx]))
-            }
-            if pairs.count >= count { break }
-        }
-
-        return Array(pairs.prefix(count))
     }
 
     /// Check if a model is gated

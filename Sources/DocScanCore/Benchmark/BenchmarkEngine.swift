@@ -1,68 +1,94 @@
 import Foundation
 import MLX
 
-/// Factory protocol for creating DocumentDetectors with different model configurations
-public protocol DocumentDetectorFactory: Sendable {
-    func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector
+/// Factory protocol for creating VLM providers for benchmarking
+public protocol VLMOnlyFactory: Sendable {
+    /// Pre-download and load a VLM model
+    func preloadVLM(modelName: String, config: Configuration) async throws
 
-    /// Pre-download model files to local cache so network latency is excluded from per-document timeouts
-    func preloadModels(config: Configuration) async throws
+    /// Get the currently loaded VLM provider
+    func makeVLMProvider() async -> VLMProvider?
 
-    /// Release GPU resources held by previously loaded models
-    func releaseModels() async
+    /// Release GPU resources held by the VLM
+    func releaseVLM() async
 }
 
-/// Default factory that creates real DocumentDetectors, reusing preloaded model instances.
-/// Actor isolation guarantees thread-safe access to cached model instances.
-public actor DefaultDocumentDetectorFactory: DocumentDetectorFactory {
+/// Factory protocol for creating TextLLM managers for benchmarking
+public protocol TextLLMOnlyFactory: Sendable {
+    /// Pre-download and load a TextLLM model
+    func preloadTextLLM(modelName: String, config: Configuration) async throws
+
+    /// Get the currently loaded TextLLM manager
+    func makeTextLLMManager() async -> TextLLMManager?
+
+    /// Release GPU resources held by the TextLLM
+    func releaseTextLLM() async
+}
+
+/// Default VLM factory that caches a single ModelManager
+public actor DefaultVLMOnlyFactory: VLMOnlyFactory {
     private var cachedVLM: ModelManager?
-    private var cachedTextLLM: TextLLMManager?
 
-    public init() {
-        // Model instances are lazily cached on first preloadModels() call
-    }
+    public init() {}
 
-    public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
-        if let vlm = cachedVLM, let textLLM = cachedTextLLM {
-            // Reuse preloaded instances for all documents in this pair.
-            // Cache is cleared by releaseModels() between pairs or preloadModels() before new loads.
-            return DocumentDetector(config: config, documentType: documentType, vlmProvider: vlm, textLLM: textLLM)
-        }
-        return DocumentDetector(config: config, documentType: documentType)
-    }
+    public func preloadVLM(modelName: String, config: Configuration) async throws {
+        releaseCache()
 
-    public func preloadModels(config: Configuration) async throws {
-        // Release previous model instances before loading new ones
-        clearCache()
-
-        print("    Preloading VLM...", terminator: "")
-        fflush(stdout)
-        let vlm = ModelManager(config: config)
-        try await vlm.preload(modelName: config.modelName) { progress in
+        var vlmConfig = config
+        vlmConfig.modelName = modelName
+        let vlm = ModelManager(config: vlmConfig)
+        try await vlm.preload(modelName: modelName) { progress in
             print("\r    Preloading VLM (\(Int(progress * 100))%)...", terminator: "")
             fflush(stdout)
         }
-
-        print(" Preloading TextLLM...", terminator: "")
-        fflush(stdout)
-        let textLLM = TextLLMManager(config: config)
-        try await textLLM.preload { progress in
-            print("\r    Preloading VLM... Preloading TextLLM (\(Int(progress * 100))%)...", terminator: "")
-            fflush(stdout)
-        }
         print(" Ready")
-
         cachedVLM = vlm
-        cachedTextLLM = textLLM
     }
 
-    public func releaseModels() {
-        clearCache()
+    public func makeVLMProvider() -> VLMProvider? {
+        cachedVLM
+    }
+
+    public func releaseVLM() {
+        releaseCache()
         Memory.clearCache()
     }
 
-    private func clearCache() {
+    private func releaseCache() {
         cachedVLM = nil
+    }
+}
+
+/// Default TextLLM factory that caches a single TextLLMManager
+public actor DefaultTextLLMOnlyFactory: TextLLMOnlyFactory {
+    private var cachedTextLLM: TextLLMManager?
+
+    public init() {}
+
+    public func preloadTextLLM(modelName: String, config: Configuration) async throws {
+        releaseCache()
+
+        var textConfig = config
+        textConfig.textModelName = modelName
+        let textLLM = TextLLMManager(config: textConfig)
+        try await textLLM.preload { progress in
+            print("\r    Preloading TextLLM (\(Int(progress * 100))%)...", terminator: "")
+            fflush(stdout)
+        }
+        print(" Ready")
+        cachedTextLLM = textLLM
+    }
+
+    public func makeTextLLMManager() -> TextLLMManager? {
+        cachedTextLLM
+    }
+
+    public func releaseTextLLM() {
+        releaseCache()
+        Memory.clearCache()
+    }
+
+    private func releaseCache() {
         cachedTextLLM = nil
     }
 }
@@ -72,18 +98,15 @@ public class BenchmarkEngine {
     let configuration: Configuration
     let documentType: DocumentType
     let verbose: Bool
-    let detectorFactory: DocumentDetectorFactory
 
     public init(
         configuration: Configuration,
         documentType: DocumentType,
-        verbose: Bool = false,
-        detectorFactory: DocumentDetectorFactory = DefaultDocumentDetectorFactory()
+        verbose: Bool = false
     ) {
         self.configuration = configuration
         self.documentType = documentType
         self.verbose = verbose
-        self.detectorFactory = detectorFactory
     }
 
     // MARK: - PDF Enumeration
@@ -143,130 +166,139 @@ public class BenchmarkEngine {
         return groundTruths
     }
 
-    // MARK: - Initial Benchmark Run
+    // MARK: - OCR Pre-extraction
 
-    /// Run the initial benchmark to generate ground truth sidecar files
-    /// - Parameter skipPaths: PDF paths to skip processing for; existing sidecars are reused instead
-    public func runInitialBenchmark(
-        positiveDir: String,
-        negativeDir: String?,
-        skipPaths: Set<String> = []
-    ) async throws -> [ModelPairResult] {
-        let positivePDFs = try enumeratePDFs(in: positiveDir)
-        var allPDFs = positivePDFs.map { ($0, true) } // (path, isPositive)
+    /// Pre-extract OCR text from all PDFs (shared across all TextLLM models)
+    public func preExtractOCRTexts(positivePDFs: [String], negativePDFs: [String]) async -> [String: String] {
+        var ocrTexts: [String: String] = [:]
+        let allPDFs = positivePDFs + negativePDFs
 
-        if let negDir = negativeDir {
-            let negativePDFs = try enumeratePDFs(in: negDir)
-            allPDFs += negativePDFs.map { ($0, false) }
-        }
-
-        let totalCount = allPDFs.count
-        print("  Found \(totalCount) document(s) to process\n")
-
-        var documentResults: [DocumentResult] = []
-        for (index, (pdfPath, isPositive)) in allPDFs.enumerated() {
-            let docNumber = index + 1
+        for pdfPath in allPDFs {
             let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-            if skipPaths.contains(pdfPath) {
-                let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
-                let truth = try GroundTruth.load(from: sidecarPath)
-                print("  [\(docNumber)/\(totalCount)] \(filename) — reusing existing sidecar")
-                documentResults.append(DocumentResult(
-                    filename: filename,
-                    isPositiveSample: isPositive,
-                    predictedIsMatch: truth.isMatch,
-                    documentScore: 2
-                ))
-            } else {
-                let result = await processInitialDocument(
-                    pdfPath: pdfPath, isPositive: isPositive,
-                    index: docNumber, total: totalCount
+
+            // Try direct text extraction first (faster, more accurate for searchable PDFs)
+            if let directText = PDFUtils.extractText(from: pdfPath, verbose: verbose),
+               directText.count >= PDFUtils.minimumTextLength {
+                ocrTexts[pdfPath] = directText
+                if verbose {
+                    print("  \(filename): direct text (\(directText.count) chars)")
+                }
+                continue
+            }
+
+            // Fall back to Vision OCR
+            do {
+                let image = try PDFUtils.pdfToImage(
+                    at: pdfPath,
+                    dpi: configuration.pdfDPI
                 )
-                documentResults.append(result)
+                let ocrEngine = OCREngine(config: configuration)
+                let text = try await ocrEngine.extractText(from: image)
+                ocrTexts[pdfPath] = text
+                if verbose {
+                    print("  \(filename): OCR text (\(text.count) chars)")
+                }
+            } catch {
+                print("  \(filename): OCR failed - \(error.localizedDescription)")
             }
         }
 
-        let metrics = BenchmarkMetrics.compute(from: documentResults)
-        return [ModelPairResult(
-            vlmModelName: configuration.modelName,
-            textModelName: configuration.textModelName,
-            metrics: metrics,
-            documentResults: documentResults
-        )]
+        return ocrTexts
     }
 
-    private func processInitialDocument(
-        pdfPath: String, isPositive: Bool,
-        index: Int, total: Int
-    ) async -> DocumentResult {
+    // MARK: - Ground Truth Generation
+
+    /// Generate ground truth sidecar files for all documents
+    public func generateGroundTruths(
+        positivePDFs: [String],
+        negativePDFs: [String],
+        ocrTexts: [String: String]
+    ) async throws -> [String: GroundTruth] {
+        var groundTruths: [String: GroundTruth] = [:]
+        let textLLM = TextLLMManager(config: configuration)
+        try await textLLM.preload { progress in
+            print("\r  Loading TextLLM for ground truth generation (\(Int(progress * 100))%)...", terminator: "")
+            fflush(stdout)
+        }
+        print(" Ready")
+
+        for pdfPath in positivePDFs {
+            let groundTruth = try await generatePositiveGroundTruth(
+                pdfPath: pdfPath, ocrTexts: ocrTexts, textLLM: textLLM
+            )
+            groundTruths[pdfPath] = groundTruth
+        }
+
+        for pdfPath in negativePDFs {
+            let groundTruth = try generateNegativeGroundTruth(pdfPath: pdfPath)
+            groundTruths[pdfPath] = groundTruth
+        }
+
+        return groundTruths
+    }
+
+    private func generatePositiveGroundTruth(
+        pdfPath: String,
+        ocrTexts: [String: String],
+        textLLM: TextLLMManager
+    ) async throws -> GroundTruth {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-        print("  [\(index)/\(total)] \(filename) — Categorizing...", terminator: "")
+        print("  \(filename) — Extracting...", terminator: "")
         fflush(stdout)
 
-        do {
-            let detector = try await detectorFactory.makeDetector(
-                config: configuration, documentType: documentType
-            )
-            let categorization = try await detector.categorize(pdfPath: pdfPath)
-            let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
-
-            if isMatch {
-                print(" Extracting...", terminator: "")
-                fflush(stdout)
-            }
-            let sidecar = try await buildGroundTruth(
-                detector: detector, isMatch: isMatch, isPositive: isPositive
-            )
-            let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
-            try sidecar.save(to: sidecarPath)
-
-            print(isMatch ? " Done" : " No match")
-
-            return DocumentResult(
-                filename: filename,
-                isPositiveSample: isPositive,
-                predictedIsMatch: isMatch,
-                documentScore: (isPositive == isMatch) ? 2 : 0
-            )
-        } catch {
-            print(" Error: \(error.localizedDescription)")
-            return DocumentResult(
-                filename: filename,
-                isPositiveSample: isPositive,
-                predictedIsMatch: false,
-                documentScore: 0
-            )
-        }
-    }
-
-    private func buildGroundTruth(
-        detector: DocumentDetector, isMatch: Bool, isPositive: Bool
-    ) async throws -> GroundTruth {
         var date: String?
         var secondaryField: String?
         var patientName: String?
 
-        if isMatch {
-            let extraction = try await detector.extractData()
-            if let extractedDate = extraction.date {
-                date = DateUtils.formatDate(extractedDate)
+        if let ocrText = ocrTexts[pdfPath] {
+            do {
+                let extraction = try await textLLM.extractData(for: documentType, from: ocrText)
+                if let extractedDate = extraction.date {
+                    date = DateUtils.formatDate(extractedDate)
+                }
+                secondaryField = extraction.secondaryField
+                patientName = extraction.patientName
+            } catch {
+                print(" Error: \(error.localizedDescription)")
             }
-            secondaryField = extraction.secondaryField
-            patientName = extraction.patientName
         }
 
-        return GroundTruth(
-            isMatch: isPositive,
+        let groundTruth = GroundTruth(
+            isMatch: true,
             documentType: documentType,
             date: date,
             secondaryField: secondaryField,
             patientName: patientName,
-            metadata: GroundTruthMetadata(
-                vlmModel: configuration.modelName,
-                textModel: configuration.textModelName,
-                generatedAt: Date(),
-                verified: false
-            )
+            metadata: makeGroundTruthMetadata()
+        )
+
+        let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+        try groundTruth.save(to: sidecarPath)
+        print(" Done")
+        return groundTruth
+    }
+
+    private func generateNegativeGroundTruth(pdfPath: String) throws -> GroundTruth {
+        let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+        print("  \(filename) — Negative sample")
+
+        let groundTruth = GroundTruth(
+            isMatch: false,
+            documentType: documentType,
+            metadata: makeGroundTruthMetadata()
+        )
+
+        let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+        try groundTruth.save(to: sidecarPath)
+        return groundTruth
+    }
+
+    private func makeGroundTruthMetadata() -> GroundTruthMetadata {
+        GroundTruthMetadata(
+            vlmModel: configuration.modelName,
+            textModel: configuration.textModelName,
+            generatedAt: Date(),
+            verified: false
         )
     }
 }

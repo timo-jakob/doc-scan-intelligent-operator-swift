@@ -3,26 +3,17 @@ import Foundation
 // MARK: - Model Cache Cleanup
 
 public extension BenchmarkEngine {
-    /// Remove cached models that were downloaded during benchmarking but are not the final selected pair.
+    /// Remove cached models that were downloaded during benchmarking but are not the final selected model.
     /// - Parameters:
-    ///   - benchmarkedPairs: All model pairs that were benchmarked
-    ///   - keepVLM: VLM model name to keep (final selected)
-    ///   - keepText: TextLLM model name to keep (final selected)
+    ///   - modelNames: All model names that were benchmarked
+    ///   - keepModel: Model name to keep (final selected); nil to delete all
     func cleanupBenchmarkedModels(
-        benchmarkedPairs: [ModelPair],
-        keepVLM: String,
-        keepText: String
+        modelNames: [String],
+        keepModel: String?
     ) {
-        let keepModels: Set<String> = [keepVLM, keepText]
+        let keepModels: Set<String> = keepModel.map { [$0] } ?? []
 
-        // Collect all unique model names from benchmarked pairs
-        var benchmarkedModels: Set<String> = []
-        for pair in benchmarkedPairs {
-            benchmarkedModels.insert(pair.vlmModelName)
-            benchmarkedModels.insert(pair.textModelName)
-        }
-
-        // Only delete models that were benchmarked and are NOT in the keep set
+        let benchmarkedModels = Set(modelNames)
         let toDelete = benchmarkedModels.subtracting(keepModels)
 
         guard !toDelete.isEmpty else {
