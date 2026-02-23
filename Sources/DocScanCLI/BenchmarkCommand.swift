@@ -104,7 +104,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
             configPath: config
         )
 
-        printBenchmarkPhaseHeader("Cleanup", title: "Model Cache Cleanup")
+        printBenchmarkPhaseHeader("E", title: "Model Cache Cleanup")
         engine.cleanupBenchmarkedModels(
             benchmarkedPairs: pairs,
             keepVLM: finalPair.vlm,
