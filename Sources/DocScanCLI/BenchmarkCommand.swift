@@ -1,6 +1,7 @@
 import ArgumentParser
 import DocScanCore
 import Foundation
+import MLX
 
 struct BenchmarkCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -24,6 +25,11 @@ struct BenchmarkCommand: AsyncParsableCommand {
     var verbose: Bool = false
 
     func run() async throws {
+        // Cap MLX memory at 80% of physical RAM to leave headroom for the OS.
+        // Prevents jetsam kills after a previous crash left GPU resources unreleased.
+        let memoryBudget = Int(Double(ProcessInfo.processInfo.physicalMemory) * 0.8)
+        Memory.memoryLimit = memoryBudget
+
         let documentType = try parseDocumentType()
         var configuration = try loadConfiguration()
         configuration.verbose = verbose
@@ -87,11 +93,28 @@ struct BenchmarkCommand: AsyncParsableCommand {
         }
         let allResults = results + uniqueInitial
 
-        // Phase D: Leaderboards and config update
-        try runPhaseD(
+        // Phase D + Cleanup
+        try runPhaseDAndCleanup(
+            engine: engine, allResults: allResults,
+            configuration: configuration, pairs: pairs
+        )
+    }
+
+    private func runPhaseDAndCleanup(
+        engine: BenchmarkEngine, allResults: [ModelPairResult],
+        configuration: Configuration, pairs: [ModelPair]
+    ) throws {
+        let finalPair = try runPhaseD(
             results: allResults,
             configuration: configuration,
             configPath: config
+        )
+
+        printBenchmarkPhaseHeader("E", title: "Model Cache Cleanup")
+        engine.cleanupBenchmarkedModels(
+            benchmarkedPairs: pairs,
+            keepVLM: finalPair.vlm,
+            keepText: finalPair.text
         )
     }
 

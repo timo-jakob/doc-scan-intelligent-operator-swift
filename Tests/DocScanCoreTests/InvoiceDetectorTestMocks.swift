@@ -11,6 +11,7 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
     var mockResponse: String = "YES"
     var shouldThrowError: Bool = false
     var errorToThrow: Error = DocScanError.modelLoadFailed("Mock error")
+    var mockDelay: TimeInterval = 0
 
     /// Track calls for verification
     private(set) var generateFromImageCallCount = 0
@@ -25,6 +26,10 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
         generateFromImageCallCount += 1
         lastPrompt = prompt
         lastImage = image
+
+        if mockDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(mockDelay * 1_000_000_000))
+        }
 
         if shouldThrowError {
             throw errorToThrow

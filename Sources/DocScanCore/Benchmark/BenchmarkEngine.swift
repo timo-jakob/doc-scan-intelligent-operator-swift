@@ -1,25 +1,78 @@
 import Foundation
+import MLX
 
 /// Factory protocol for creating DocumentDetectors with different model configurations
-public protocol DocumentDetectorFactory {
+public protocol DocumentDetectorFactory: Sendable {
     func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector
+
+    /// Pre-download model files to local cache so network latency is excluded from per-document timeouts
+    func preloadModels(config: Configuration) async throws
+
+    /// Release GPU resources held by previously loaded models
+    func releaseModels() async
 }
 
-/// Default factory that creates real DocumentDetectors
-public struct DefaultDocumentDetectorFactory: DocumentDetectorFactory {
-    public init() {}
+/// Default factory that creates real DocumentDetectors, reusing preloaded model instances.
+/// Actor isolation guarantees thread-safe access to cached model instances.
+public actor DefaultDocumentDetectorFactory: DocumentDetectorFactory {
+    private var cachedVLM: ModelManager?
+    private var cachedTextLLM: TextLLMManager?
+
+    public init() {
+        // Model instances are lazily cached on first preloadModels() call
+    }
 
     public func makeDetector(config: Configuration, documentType: DocumentType) async throws -> DocumentDetector {
-        DocumentDetector(config: config, documentType: documentType)
+        if let vlm = cachedVLM, let textLLM = cachedTextLLM {
+            // Reuse preloaded instances for all documents in this pair.
+            // Cache is cleared by releaseModels() between pairs or preloadModels() before new loads.
+            return DocumentDetector(config: config, documentType: documentType, vlmProvider: vlm, textLLM: textLLM)
+        }
+        return DocumentDetector(config: config, documentType: documentType)
+    }
+
+    public func preloadModels(config: Configuration) async throws {
+        // Release previous model instances before loading new ones
+        clearCache()
+
+        print("    Preloading VLM...", terminator: "")
+        fflush(stdout)
+        let vlm = ModelManager(config: config)
+        try await vlm.preload(modelName: config.modelName) { progress in
+            print("\r    Preloading VLM (\(Int(progress * 100))%)...", terminator: "")
+            fflush(stdout)
+        }
+
+        print(" Preloading TextLLM...", terminator: "")
+        fflush(stdout)
+        let textLLM = TextLLMManager(config: config)
+        try await textLLM.preload { progress in
+            print("\r    Preloading VLM... Preloading TextLLM (\(Int(progress * 100))%)...", terminator: "")
+            fflush(stdout)
+        }
+        print(" Ready")
+
+        cachedVLM = vlm
+        cachedTextLLM = textLLM
+    }
+
+    public func releaseModels() {
+        clearCache()
+        Memory.clearCache()
+    }
+
+    private func clearCache() {
+        cachedVLM = nil
+        cachedTextLLM = nil
     }
 }
 
 /// Core benchmark orchestration engine
 public class BenchmarkEngine {
-    private let configuration: Configuration
-    private let documentType: DocumentType
-    private let verbose: Bool
-    private let detectorFactory: DocumentDetectorFactory
+    let configuration: Configuration
+    let documentType: DocumentType
+    let verbose: Bool
+    let detectorFactory: DocumentDetectorFactory
 
     public init(
         configuration: Configuration,
@@ -107,15 +160,17 @@ public class BenchmarkEngine {
             allPDFs += negativePDFs.map { ($0, false) }
         }
 
+        let totalCount = allPDFs.count
+        print("  Found \(totalCount) document(s) to process\n")
+
         var documentResults: [DocumentResult] = []
-        for (pdfPath, isPositive) in allPDFs {
+        for (index, (pdfPath, isPositive)) in allPDFs.enumerated() {
+            let docNumber = index + 1
+            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
             if skipPaths.contains(pdfPath) {
                 let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
                 let truth = try GroundTruth.load(from: sidecarPath)
-                let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-                if verbose {
-                    print("Reusing existing sidecar: \(filename).json")
-                }
+                print("  [\(docNumber)/\(totalCount)] \(filename) — reusing existing sidecar")
                 documentResults.append(DocumentResult(
                     filename: filename,
                     isPositiveSample: isPositive,
@@ -123,7 +178,10 @@ public class BenchmarkEngine {
                     documentScore: 2
                 ))
             } else {
-                let result = await processInitialDocument(pdfPath: pdfPath, isPositive: isPositive)
+                let result = await processInitialDocument(
+                    pdfPath: pdfPath, isPositive: isPositive,
+                    index: docNumber, total: totalCount
+                )
                 documentResults.append(result)
             }
         }
@@ -137,11 +195,13 @@ public class BenchmarkEngine {
         )]
     }
 
-    private func processInitialDocument(pdfPath: String, isPositive: Bool) async -> DocumentResult {
+    private func processInitialDocument(
+        pdfPath: String, isPositive: Bool,
+        index: Int, total: Int
+    ) async -> DocumentResult {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-        if verbose {
-            print("Processing: \(filename)")
-        }
+        print("  [\(index)/\(total)] \(filename) — Categorizing...", terminator: "")
+        fflush(stdout)
 
         do {
             let detector = try await detectorFactory.makeDetector(
@@ -150,11 +210,17 @@ public class BenchmarkEngine {
             let categorization = try await detector.categorize(pdfPath: pdfPath)
             let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
 
+            if isMatch {
+                print(" Extracting...", terminator: "")
+                fflush(stdout)
+            }
             let sidecar = try await buildGroundTruth(
                 detector: detector, isMatch: isMatch, isPositive: isPositive
             )
             let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
             try sidecar.save(to: sidecarPath)
+
+            print(isMatch ? " Done" : " No match")
 
             return DocumentResult(
                 filename: filename,
@@ -163,9 +229,7 @@ public class BenchmarkEngine {
                 documentScore: (isPositive == isMatch) ? 2 : 0
             )
         } catch {
-            if verbose {
-                print("Error processing \(filename): \(error.localizedDescription)")
-            }
+            print(" Error: \(error.localizedDescription)")
             return DocumentResult(
                 filename: filename,
                 isPositiveSample: isPositive,
@@ -203,135 +267,6 @@ public class BenchmarkEngine {
                 generatedAt: Date(),
                 verified: false
             )
-        )
-    }
-
-    // MARK: - Benchmark a Model Pair
-
-    /// Benchmark a specific model pair against verified ground truths
-    public func benchmarkModelPair(
-        _ pair: ModelPair,
-        pdfPaths: [String],
-        groundTruths: [String: GroundTruth],
-        timeoutSeconds: TimeInterval = 30
-    ) async throws -> ModelPairResult {
-        if let memoryDQ = checkMemory(for: pair) {
-            return memoryDQ
-        }
-
-        var pairConfig = configuration
-        pairConfig.modelName = pair.vlmModelName
-        pairConfig.textModelName = pair.textModelName
-
-        var documentResults: [DocumentResult] = []
-
-        for pdfPath in pdfPaths {
-            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-            guard let truth = groundTruths[pdfPath] else { continue }
-
-            do {
-                let result = try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
-                    try await self.processSingleDocument(
-                        pdfPath: pdfPath,
-                        config: pairConfig,
-                        groundTruth: truth
-                    )
-                }
-                documentResults.append(result)
-            } catch is TimeoutError {
-                return ModelPairResult(
-                    vlmModelName: pair.vlmModelName,
-                    textModelName: pair.textModelName,
-                    metrics: BenchmarkMetrics.compute(from: documentResults),
-                    documentResults: documentResults,
-                    isDisqualified: true,
-                    disqualificationReason: "Exceeded \(Int(timeoutSeconds))s timeout on \(filename)"
-                )
-            } catch {
-                if verbose {
-                    print("Error on \(filename): \(error.localizedDescription)")
-                }
-                documentResults.append(DocumentResult(
-                    filename: filename,
-                    isPositiveSample: truth.isMatch,
-                    predictedIsMatch: false,
-                    documentScore: 0
-                ))
-            }
-        }
-
-        let metrics = BenchmarkMetrics.compute(from: documentResults)
-        return ModelPairResult(
-            vlmModelName: pair.vlmModelName,
-            textModelName: pair.textModelName,
-            metrics: metrics,
-            documentResults: documentResults
-        )
-    }
-}
-
-// MARK: - Private Helpers
-
-private extension BenchmarkEngine {
-    /// Pre-flight memory check — returns a disqualified result if the pair would exhaust memory
-    func checkMemory(for pair: ModelPair) -> ModelPairResult? {
-        let estimatedMB = Self.estimateMemoryMB(vlm: pair.vlmModelName, text: pair.textModelName)
-        let availableMB = Self.availableMemoryMB()
-        guard estimatedMB > 0, availableMB > 0, estimatedMB > availableMB else {
-            return nil
-        }
-        if verbose {
-            print("Skipping \(pair.vlmModelName) + \(pair.textModelName): "
-                + "needs ~\(estimatedMB) MB, only \(availableMB) MB available")
-        }
-        return ModelPairResult(
-            vlmModelName: pair.vlmModelName,
-            textModelName: pair.textModelName,
-            metrics: BenchmarkMetrics.compute(from: []),
-            documentResults: [],
-            isDisqualified: true,
-            disqualificationReason: "Insufficient memory (~\(estimatedMB) MB needed, \(availableMB) MB available)"
-        )
-    }
-
-    func processSingleDocument(
-        pdfPath: String,
-        config: Configuration,
-        groundTruth: GroundTruth
-    ) async throws -> DocumentResult {
-        let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
-        let detector = try await detectorFactory.makeDetector(
-            config: config, documentType: documentType
-        )
-        let categorization = try await detector.categorize(pdfPath: pdfPath)
-        let isMatch = categorization.agreedIsMatch ?? categorization.vlmResult.isMatch
-
-        var actualDate: String?
-        var actualSecondaryField: String?
-        var actualPatientName: String?
-
-        if isMatch {
-            let extraction = try await detector.extractData()
-            if let extractedDate = extraction.date {
-                actualDate = DateUtils.formatDate(extractedDate)
-            }
-            actualSecondaryField = extraction.secondaryField
-            actualPatientName = extraction.patientName
-        }
-
-        let scoring = FuzzyMatcher.scoreDocument(
-            expected: groundTruth,
-            actualIsMatch: isMatch,
-            actualDate: actualDate,
-            actualSecondaryField: actualSecondaryField,
-            actualPatientName: actualPatientName
-        )
-
-        return DocumentResult(
-            filename: filename,
-            isPositiveSample: groundTruth.isMatch,
-            predictedIsMatch: isMatch,
-            documentScore: scoring.score
         )
     }
 }
