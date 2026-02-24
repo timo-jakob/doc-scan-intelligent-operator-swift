@@ -31,18 +31,21 @@ struct BenchmarkCommand: AsyncParsableCommand {
         printBenchmarkHeader(configuration, documentType: documentType)
 
         let engine = prepareEngine(configuration: configuration, documentType: documentType)
-        let (positivePDFs, negativePDFs) = try enumerateAndValidate(engine: engine)
+        let pdfSet = try enumerateAndValidate(engine: engine)
 
         let timeout = promptTimeoutSelection()
         _ = try promptHuggingFaceCredentials(configuration: configuration)
 
+        let runner = SubprocessRunner()
+        defer { runner.cleanup() }
+
         let vlmResults = try await runPhaseA(
-            engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
+            runner: runner, engine: engine, pdfSet: pdfSet,
             configuration: configuration, timeoutSeconds: timeout
         )
 
         let textLLMResults = try await runPhaseB(
-            engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
+            runner: runner, engine: engine, pdfSet: pdfSet,
             configuration: configuration, timeoutSeconds: timeout
         )
 
@@ -65,9 +68,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         )
     }
 
-    private func enumerateAndValidate(
-        engine: BenchmarkEngine
-    ) throws -> (positive: [String], negative: [String]) {
+    private func enumerateAndValidate(engine: BenchmarkEngine) throws -> BenchmarkPDFSet {
         let resolvedPositiveDir = PathUtils.resolvePath(positiveDir)
         let resolvedNegativeDir = PathUtils.resolvePath(negativeDir)
         let positivePDFs = try engine.enumeratePDFs(in: resolvedPositiveDir)
@@ -84,7 +85,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
 
         print("Found \(positivePDFs.count) positive and \(negativePDFs.count) negative documents")
         print()
-        return (positivePDFs, negativePDFs)
+        return BenchmarkPDFSet(positivePDFs: positivePDFs, negativePDFs: negativePDFs)
     }
 
     private func cleanupModelCaches(

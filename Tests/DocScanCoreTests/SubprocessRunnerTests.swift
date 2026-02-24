@@ -133,6 +133,7 @@ final class SubprocessRunnerTests: XCTestCase {
     /// and temp file cleanup.
     func testRunReturnsNonZeroExitForUnknownSubcommand() async throws {
         let runner = SubprocessRunner()
+        defer { runner.cleanup() }
         let input = BenchmarkWorkerInput(
             phase: .vlm,
             modelName: "test/model",

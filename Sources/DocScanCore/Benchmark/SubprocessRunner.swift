@@ -14,14 +14,42 @@ public enum SubprocessResult: Equatable, Sendable {
 
 /// Spawns `docscan benchmark-worker` subprocesses to isolate MLX model crashes
 public struct SubprocessRunner: Sendable {
+    /// Dedicated temp directory for all worker handover files.
+    /// Created on init, removed by ``cleanup()``.
+    let workDir: URL
+
     public init() {
-        // Intentionally empty — stateless runner
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("docscan-benchmark-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        workDir = dir
+    }
+
+    /// Remove the dedicated temp directory and all handover files inside it.
+    public func cleanup() {
+        try? FileManager.default.removeItem(at: workDir)
     }
 
     /// Resolve the absolute path to the currently running executable.
     /// This ensures the worker uses the same binary as the parent.
+    ///
+    /// Uses the **actual** current working directory (not `DOCSCAN_ORIGINAL_PWD`)
+    /// because `argv[0]` is relative to the real CWD set by the wrapper script,
+    /// not the user's original directory.
     public static func resolveExecutablePath() -> String {
-        PathUtils.resolvePath(CommandLine.arguments[0])
+        let arg0 = CommandLine.arguments[0]
+
+        if arg0.hasPrefix("/") {
+            return URL(fileURLWithPath: arg0).standardized.resolvingSymlinksInPath().path
+        }
+
+        // Resolve relative to the real CWD (ignoring DOCSCAN_ORIGINAL_PWD)
+        let realCwd = FileManager.default.currentDirectoryPath
+        return URL(fileURLWithPath: realCwd)
+            .appendingPathComponent(arg0)
+            .standardized
+            .resolvingSymlinksInPath()
+            .path
     }
 
     /// Buffer time (seconds) added on top of per-document timeouts to account for model downloading
@@ -43,18 +71,13 @@ public struct SubprocessRunner: Sendable {
     /// - Parameter input: The worker input describing what to benchmark.
     /// - Returns: A ``SubprocessResult`` indicating success, crash, or decoding failure.
     public func run(input: BenchmarkWorkerInput) async throws -> SubprocessResult {
-        let tempDir = FileManager.default.temporaryDirectory
-        let inputURL = tempDir.appendingPathComponent("bw-input-\(UUID().uuidString).json")
-        let outputURL = tempDir.appendingPathComponent("bw-output-\(UUID().uuidString).json")
+        let id = UUID().uuidString
+        let inputURL = workDir.appendingPathComponent("bw-input-\(id).json")
+        let outputURL = workDir.appendingPathComponent("bw-output-\(id).json")
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(input).write(to: inputURL)
-
-        defer {
-            try? FileManager.default.removeItem(at: inputURL)
-            try? FileManager.default.removeItem(at: outputURL)
-        }
 
         let process = makeWorkerProcess(inputPath: inputURL.path, outputPath: outputURL.path)
         let timeout = Self.overallTimeout(for: input)
