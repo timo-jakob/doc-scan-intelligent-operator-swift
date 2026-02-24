@@ -91,7 +91,8 @@ public enum DateUtils {
         try? NSRegularExpression(pattern: pattern)
     }
 
-    /// Cached year regex for German month/year parsing
+    /// Cached year regex for German month/year parsing.
+    /// NSRegularExpression is used instead of Swift Regex because Regex is not Sendable in Swift 6.
     private static let yearRegex: NSRegularExpression = // swiftlint:disable:next force_try
         try! NSRegularExpression(pattern: "\\b(20\\d{2})\\b")
 
@@ -201,6 +202,8 @@ public enum DateUtils {
             if let cached = state.customFormatters[format] {
                 return cached.string(from: date)
             }
+            // Cap cache size to prevent unbounded growth
+            if state.customFormatters.count > 20 { state.customFormatters.removeAll() }
             let formatter = DateFormatter()
             formatter.dateFormat = format
             formatter.locale = Locale(identifier: "en_US_POSIX")

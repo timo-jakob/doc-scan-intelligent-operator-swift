@@ -171,8 +171,8 @@ public actor ModelManager: VLMProvider {
         currentModelName = modelName
     }
 
-    /// Clear model cache
-    public nonisolated func clearCache() throws {
+    /// Clear model cache. Must not be called while model loading is in progress.
+    public func clearCache() throws {
         if FileManager.default.fileExists(atPath: config.modelCacheDir) {
             try FileManager.default.removeItem(atPath: config.modelCacheDir)
         }

@@ -237,6 +237,7 @@ public struct BenchmarkEngine: Sendable {
 
         // Lazy-load TextLLM only when a positive document actually needs extraction.
         // This avoids a costly model preload when skipExisting covers all positives.
+        // Sequential processing is intentional — the single TextLLM model must be serialized.
         var textLLM: (any TextLLMProviding)?
 
         for pdfPath in positivePDFs {

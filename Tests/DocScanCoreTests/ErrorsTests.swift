@@ -63,7 +63,7 @@ final class ErrorsTests: XCTestCase {
 
     func testExtractionFailedErrorDescription() {
         let error = DocScanError.extractionFailed("could not find date")
-        XCTAssertEqual(error.errorDescription, "Failed to extract invoice data: could not find date")
+        XCTAssertEqual(error.errorDescription, "Failed to extract document data: could not find date")
     }
 
     func testInsufficientDiskSpaceErrorDescription() {

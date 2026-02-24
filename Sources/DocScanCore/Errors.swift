@@ -6,7 +6,12 @@ public struct TimeoutError: Error, LocalizedError {
         "Operation timed out"
     }
 
-    /// Execute an async operation with a timeout
+    /// Execute an async operation with a timeout.
+    ///
+    /// If the operation does not cooperatively check `Task.isCancelled`,
+    /// this function will wait for the operation to complete even after timeout.
+    /// For truly non-cancellable operations (e.g. MLX inference), consider
+    /// subprocess-level isolation instead.
     public static func withTimeout<T: Sendable>(
         seconds: TimeInterval,
         operation: @Sendable @escaping () async throws -> T
@@ -72,7 +77,7 @@ public enum DocScanError: LocalizedError {
         case let .documentTypeMismatch(typeName):
             return "Document does not match type: \(typeName)"
         case let .extractionFailed(message):
-            return "Failed to extract invoice data: \(message)"
+            return "Failed to extract document data: \(message)"
         case let .insufficientDiskSpace(required, available):
             let requiredGB = Double(required) / 1_000_000_000
             let availableGB = Double(available) / 1_000_000_000

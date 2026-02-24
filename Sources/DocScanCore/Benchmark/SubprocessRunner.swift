@@ -101,6 +101,9 @@ public struct SubprocessRunner: Sendable {
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
 
+            // Ordering guarantee: the watchdog calls process.terminate(), which
+            // triggers the terminationHandler. Since terminate() on an already-
+            // terminated process is a no-op, at most one path resumes the continuation.
             process.terminationHandler = { proc in
                 watchdog.cancel()
                 continuation.resume(

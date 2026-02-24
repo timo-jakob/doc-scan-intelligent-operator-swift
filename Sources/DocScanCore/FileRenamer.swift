@@ -18,6 +18,14 @@ public struct FileRenamer: Sendable {
         let sourceDirectory = sourceURL.deletingLastPathComponent()
         let targetURL = sourceDirectory.appendingPathComponent(targetFilename)
 
+        // Validate target stays within source directory (prevent path traversal)
+        let resolvedTarget = targetURL.standardized
+        guard resolvedTarget.path.hasPrefix(sourceDirectory.standardized.path) else {
+            throw DocScanError.fileOperationFailed(
+                "Target filename would escape source directory: \(targetFilename)"
+            )
+        }
+
         // Check if source exists
         guard FileManager.default.fileExists(atPath: sourcePath) else {
             throw DocScanError.fileNotFound(sourcePath)
@@ -31,10 +39,8 @@ public struct FileRenamer: Sendable {
             return sourcePath
         }
 
-        // Handle collision
-        let finalURL = try handleCollision(targetURL: targetURL)
-
         if dryRun {
+            let finalURL = try findAvailableName(for: targetURL)
             if verbose {
                 print("DRY RUN: Would rename:")
                 print("  From: \(sourcePath)")
@@ -43,56 +49,73 @@ public struct FileRenamer: Sendable {
             return finalURL.path
         }
 
-        // Perform rename
-        do {
-            try FileManager.default.moveItem(at: sourceURL, to: finalURL)
-            if verbose {
-                print("Renamed:")
-                print("  From: \(sourcePath)")
-                print("  To:   \(finalURL.path)")
-            }
-            return finalURL.path
-        } catch {
-            throw DocScanError.fileOperationFailed("Failed to rename file: \(error.localizedDescription)")
+        // Perform atomic rename with retry-based collision handling
+        let finalURL = try moveWithRetry(from: sourceURL, to: targetURL)
+        if verbose {
+            print("Renamed:")
+            print("  From: \(sourcePath)")
+            print("  To:   \(finalURL.path)")
         }
+        return finalURL.path
     }
 
-    /// Handle filename collision by adding a counter
-    private func handleCollision(targetURL: URL) throws -> URL {
-        var finalURL = targetURL
-        var counter = 1
-
-        // If target doesn't exist, use it as-is
+    /// Find an available filename by checking for collisions (used for dry-run)
+    private func findAvailableName(for targetURL: URL) throws -> URL {
         if !FileManager.default.fileExists(atPath: targetURL.path) {
             return targetURL
         }
 
-        // Add counter until we find a non-existing filename
         let directory = targetURL.deletingLastPathComponent()
         let filename = targetURL.deletingPathExtension().lastPathComponent
         let ext = targetURL.pathExtension
 
-        while FileManager.default.fileExists(atPath: finalURL.path) {
-            let newFilename = if ext.isEmpty {
-                "\(filename)_\(counter)"
-            } else {
-                "\(filename)_\(counter).\(ext)"
-            }
-
-            finalURL = directory.appendingPathComponent(newFilename)
-            counter += 1
-
-            // Safety check to prevent infinite loop
-            if counter > 1000 {
-                throw DocScanError.fileOperationFailed("Too many file collisions")
+        for counter in 1 ... 1000 {
+            let newFilename = ext.isEmpty
+                ? "\(filename)_\(counter)"
+                : "\(filename)_\(counter).\(ext)"
+            let candidateURL = directory.appendingPathComponent(newFilename)
+            if !FileManager.default.fileExists(atPath: candidateURL.path) {
+                return candidateURL
             }
         }
+        throw DocScanError.fileOperationFailed("Too many file collisions")
+    }
 
-        if verbose {
-            print("Collision detected, using: \(finalURL.lastPathComponent)")
+    /// Atomically rename a file, retrying with incremented counters on collision.
+    /// Eliminates the TOCTOU race between existence check and rename.
+    private func moveWithRetry(from sourceURL: URL, to targetURL: URL) throws -> URL {
+        // Try the target directly first
+        do {
+            try FileManager.default.moveItem(at: sourceURL, to: targetURL)
+            return targetURL
+        } catch let error as CocoaError where error.code == .fileWriteFileExists {
+            // Fall through to collision handling
+        } catch {
+            throw DocScanError.fileOperationFailed("Failed to rename file: \(error.localizedDescription)")
         }
 
-        return finalURL
+        let directory = targetURL.deletingLastPathComponent()
+        let filename = targetURL.deletingPathExtension().lastPathComponent
+        let ext = targetURL.pathExtension
+
+        for counter in 1 ... 1000 {
+            let newFilename = ext.isEmpty
+                ? "\(filename)_\(counter)"
+                : "\(filename)_\(counter).\(ext)"
+            let candidateURL = directory.appendingPathComponent(newFilename)
+            do {
+                try FileManager.default.moveItem(at: sourceURL, to: candidateURL)
+                if verbose {
+                    print("Collision detected, using: \(candidateURL.lastPathComponent)")
+                }
+                return candidateURL
+            } catch let error as CocoaError where error.code == .fileWriteFileExists {
+                continue
+            } catch {
+                throw DocScanError.fileOperationFailed("Failed to rename file: \(error.localizedDescription)")
+            }
+        }
+        throw DocScanError.fileOperationFailed("Too many file collisions")
     }
 
     /// Rename file to a different directory
@@ -121,10 +144,8 @@ public struct FileRenamer: Sendable {
             throw DocScanError.fileNotFound(sourcePath)
         }
 
-        // Handle collision
-        let finalURL = try handleCollision(targetURL: targetURL)
-
         if dryRun {
+            let finalURL = try findAvailableName(for: targetURL)
             if verbose {
                 print("DRY RUN: Would move:")
                 print("  From: \(sourcePath)")
@@ -133,17 +154,13 @@ public struct FileRenamer: Sendable {
             return finalURL.path
         }
 
-        // Perform move
-        do {
-            try FileManager.default.moveItem(at: sourceURL, to: finalURL)
-            if verbose {
-                print("Moved:")
-                print("  From: \(sourcePath)")
-                print("  To:   \(finalURL.path)")
-            }
-            return finalURL.path
-        } catch {
-            throw DocScanError.fileOperationFailed("Failed to move file: \(error.localizedDescription)")
+        // Perform atomic move with retry-based collision handling
+        let finalURL = try moveWithRetry(from: sourceURL, to: targetURL)
+        if verbose {
+            print("Moved:")
+            print("  From: \(sourcePath)")
+            print("  To:   \(finalURL.path)")
         }
+        return finalURL.path
     }
 }

@@ -98,9 +98,14 @@ public final class HuggingFaceClient: Sendable {
         return model.isGated
     }
 
-    /// Get the Hugging Face URL for a model
+    /// Get the Hugging Face URL for a model.
+    /// Uses URLComponents for safe construction; returns fallback string if encoding fails.
     public static func modelURL(for modelId: String) -> String {
-        "https://huggingface.co/\(modelId)"
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "huggingface.co"
+        components.path = "/\(modelId)"
+        return components.url?.absoluteString ?? "https://huggingface.co/\(modelId)"
     }
 
     // MARK: - Private

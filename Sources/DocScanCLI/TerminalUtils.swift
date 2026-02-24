@@ -14,20 +14,18 @@ enum TerminalUtils {
     static func promptMasked(_ message: String) -> String? {
         print(message, terminator: " ")
 
-        // Disable echo
         var oldTermios = termios()
         tcgetattr(STDIN_FILENO, &oldTermios)
+        defer {
+            tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
+            print() // newline after masked input
+        }
+
         var newTermios = oldTermios
         newTermios.c_lflag &= ~UInt(ECHO)
         tcsetattr(STDIN_FILENO, TCSANOW, &newTermios)
 
-        let input = readLine()
-
-        // Restore echo
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
-        print() // newline after masked input
-
-        return input?.trimmingCharacters(in: .whitespaces)
+        return readLine()?.trimmingCharacters(in: .whitespaces)
     }
 
     /// Present a numbered menu and return the selected index (0-based)

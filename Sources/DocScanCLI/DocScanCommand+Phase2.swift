@@ -15,6 +15,7 @@ extension ScanCommand {
             print("   Date: ❌ Not found")
             throw ExitCode.failure
         }
+        // Company is required for invoice filenames; doctor is optional for prescriptions
         if documentType == .invoice, extraction.secondaryField == nil {
             print("⚠️  Could not extract company from invoice")
             print("   Date: \(formatDate(date))")

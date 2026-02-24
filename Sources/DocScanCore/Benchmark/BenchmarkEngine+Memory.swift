@@ -17,10 +17,9 @@ public extension BenchmarkEngine {
         return UInt64(totalBytes / 1_000_000)
     }
 
-    // swiftlint:disable:next force_try
-    private static let paramBillionsRegex = try! NSRegularExpression(
-        pattern: #"(\d+\.?\d*)\s*[Bb](?:\b|-)"#
-    )
+    /// NSRegularExpression is used instead of Swift Regex because Regex is not Sendable in Swift 6.
+    private static let paramBillionsRegex: NSRegularExpression = // swiftlint:disable:next force_try
+        try! NSRegularExpression(pattern: #"(\d+\.?\d*)\s*[Bb](?:\b|-)"#)
 
     /// Extract parameter count in billions from a model ID string.
     /// Matches patterns like "7B", "2B", "0.5B", "72B" (case-insensitive).
