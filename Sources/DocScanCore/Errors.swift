@@ -38,7 +38,7 @@ public enum DocScanError: LocalizedError {
     case fileNotFound(String)
     case fileOperationFailed(String)
     case configurationError(String)
-    case notAnInvoice
+    case documentTypeMismatch(String)
     case extractionFailed(String)
     case insufficientDiskSpace(required: UInt64, available: UInt64)
     case invalidInput(String)
@@ -66,8 +66,8 @@ public enum DocScanError: LocalizedError {
             return "File operation failed: \(message)"
         case let .configurationError(message):
             return "Configuration error: \(message)"
-        case .notAnInvoice:
-            return "Document is not an invoice"
+        case let .documentTypeMismatch(typeName):
+            return "Document does not match type: \(typeName)"
         case let .extractionFailed(message):
             return "Failed to extract invoice data: \(message)"
         case let .insufficientDiskSpace(required, available):

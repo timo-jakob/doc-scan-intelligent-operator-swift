@@ -11,9 +11,7 @@ extension DocumentDetector {
             return nil
         }
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = config.dateFormat
-        let dateString = dateFormatter.string(from: date)
+        let dateString = DateUtils.formatDate(date, format: config.dateFormat)
 
         // Use document type's default pattern
         var pattern = documentType.defaultFilenamePattern

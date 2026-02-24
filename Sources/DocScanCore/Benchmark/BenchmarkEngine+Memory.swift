@@ -17,17 +17,20 @@ public extension BenchmarkEngine {
         return UInt64(totalBytes / 1_000_000)
     }
 
+    // swiftlint:disable:next force_try
+    private static let paramBillionsRegex = try! NSRegularExpression(
+        pattern: #"(\d+\.?\d*)\s*[Bb](?:\b|-)"#
+    )
+
     /// Extract parameter count in billions from a model ID string.
     /// Matches patterns like "7B", "2B", "0.5B", "72B" (case-insensitive).
     internal static func parseParamBillions(from modelId: String) -> Double {
-        let pattern = #"(\d+\.?\d*)\s*[Bb](?:\b|-)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(
-                  in: modelId,
-                  range: NSRange(modelId.startIndex ..< modelId.endIndex, in: modelId)
-              ),
-              let range = Range(match.range(at: 1), in: modelId),
-              let value = Double(modelId[range])
+        guard let match = paramBillionsRegex.firstMatch(
+            in: modelId,
+            range: NSRange(modelId.startIndex ..< modelId.endIndex, in: modelId)
+        ),
+            let range = Range(match.range(at: 1), in: modelId),
+            let value = Double(modelId[range])
         else {
             return 0
         }

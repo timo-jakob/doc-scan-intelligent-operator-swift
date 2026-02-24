@@ -79,6 +79,15 @@ public enum DateUtils {
     private static let yearRegex: NSRegularExpression = // swiftlint:disable:next force_try
         try! NSRegularExpression(pattern: "\\b(20\\d{2})\\b")
 
+    /// Cached word-boundary regexes for German month name matching (one per month name)
+    private static let germanMonthRegexes: [(String, NSRegularExpression)] = germanMonthNames.compactMap { month in
+        let pattern = "\\b\(NSRegularExpression.escapedPattern(for: month))\\b"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return nil
+        }
+        return (month, regex)
+    }
+
     /// Parse a date string using multiple format attempts
     /// - Parameter dateString: The string to parse
     /// - Parameter validate: Whether to validate the date is reasonable (default: true)
@@ -226,17 +235,12 @@ public enum DateUtils {
     public static func extractGermanMonthFromText(_ text: String) -> Date? {
         let lowercased = text.lowercased()
 
-        for month in germanMonthNames {
-            // Use word boundary regex to avoid false positives
-            let monthPattern = "\\b\(NSRegularExpression.escapedPattern(for: month))\\b"
-            let options: NSRegularExpression.Options = .caseInsensitive
+        for (month, monthRegex) in germanMonthRegexes {
+            // Use cached word boundary regex to avoid false positives
             let searchRange = NSRange(lowercased.startIndex..., in: lowercased)
-            guard let monthRegex = try? NSRegularExpression(
-                pattern: monthPattern, options: options
+            guard let monthMatch = monthRegex.firstMatch(
+                in: lowercased, range: searchRange
             ),
-                let monthMatch = monthRegex.firstMatch(
-                    in: lowercased, range: searchRange
-                ),
                 let monthRange = Range(monthMatch.range, in: lowercased)
             else {
                 continue

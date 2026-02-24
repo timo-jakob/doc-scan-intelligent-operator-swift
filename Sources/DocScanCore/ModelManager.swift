@@ -1,4 +1,4 @@
-@preconcurrency import AppKit
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated
 import Foundation
 import MLX
 import MLXLLM
@@ -72,9 +72,12 @@ public actor ModelManager: VLMProvider {
             print("VLM: Sending prompt with image...")
         }
 
-        // Use ChatSession.respond with image parameter.
-        // ChatSession is not Sendable-annotated yet, so we use nonisolated(unsafe)
-        // to allow sending it to the nonisolated respond method.
+        // SAFETY: ChatSession is not yet Sendable-annotated in mlx-swift-lm.
+        // This is safe because:
+        // 1. We create a fresh session per generateFromImage call (resetSession: true above)
+        // 2. Only one call is active at a time within this actor's isolation
+        // 3. The session is never shared outside this actor
+        // TODO: Remove nonisolated(unsafe) when mlx-swift-lm adopts Sendable
         nonisolated(unsafe) let sendableSession = session
         let response = try await sendableSession.respond(
             to: prompt,

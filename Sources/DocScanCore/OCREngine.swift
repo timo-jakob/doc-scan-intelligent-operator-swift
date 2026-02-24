@@ -16,7 +16,7 @@ public struct KeywordResult: Sendable {
 }
 
 /// OCR engine using Apple's Vision framework for text recognition
-public class OCREngine {
+public struct OCREngine: Sendable {
     private let config: Configuration
 
     public init(config: Configuration) {

@@ -2,6 +2,7 @@ import ArgumentParser
 import Darwin
 import DocScanCore
 import Foundation
+import os
 
 struct ScanCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -252,20 +253,21 @@ extension ScanCommand {
         load: (@escaping @Sendable (Double) -> Void) async throws -> Void
     ) async throws {
         if tty { writeStdout("\(emoji) \(label)\(modelName)") }
-        nonisolated(unsafe) var downloading = false
+        let downloading = OSAllocatedUnfairLock(initialState: false)
         try await load { fraction in
-            if fraction < 0.999 { downloading = true }
-            guard downloading, tty else { return }
+            if fraction < 0.999 { downloading.withLock { $0 = true } }
+            guard downloading.withLock({ $0 }), tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
             FileHandle.standardOutput.write(
                 Data("\r\(emoji) \(label)\(modelName)  ⬇️  \(bar) \(pct)%".utf8)
             )
         }
+        let wasDownloading = downloading.withLock { $0 }
         if tty {
-            writeStdout(downloading ? "\r\(emoji) \(label)\(modelName)  ✅ ready\n" : "\n")
+            writeStdout(wasDownloading ? "\r\(emoji) \(label)\(modelName)  ✅ ready\n" : "\n")
         } else {
-            let suffix = downloading ? "  ✅ ready" : ""
+            let suffix = wasDownloading ? "  ✅ ready" : ""
             writeStdout("\(emoji) \(label)\(modelName)\(suffix)\n")
         }
     }

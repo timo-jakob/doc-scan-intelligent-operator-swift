@@ -1,4 +1,4 @@
-@preconcurrency import AppKit
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated
 import Foundation
 
 // MARK: - Categorization Results (Phase 1: VLM + OCR in parallel)

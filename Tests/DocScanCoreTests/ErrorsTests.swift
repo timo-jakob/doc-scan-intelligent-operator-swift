@@ -56,9 +56,9 @@ final class ErrorsTests: XCTestCase {
         XCTAssertEqual(error.errorDescription, "Configuration error: invalid YAML")
     }
 
-    func testNotAnInvoiceErrorDescription() {
-        let error = DocScanError.notAnInvoice
-        XCTAssertEqual(error.errorDescription, "Document is not an invoice")
+    func testDocumentTypeMismatchErrorDescription() {
+        let error = DocScanError.documentTypeMismatch("Invoice")
+        XCTAssertEqual(error.errorDescription, "Document does not match type: Invoice")
     }
 
     func testExtractionFailedErrorDescription() {
@@ -119,7 +119,7 @@ final class ErrorsTests: XCTestCase {
             .fileNotFound("test"),
             .fileOperationFailed("test"),
             .configurationError("test"),
-            .notAnInvoice,
+            .documentTypeMismatch("Invoice"),
             .extractionFailed("test"),
             .insufficientDiskSpace(required: 1, available: 0),
             .invalidInput("test"),
