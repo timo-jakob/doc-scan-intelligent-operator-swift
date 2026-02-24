@@ -23,7 +23,7 @@ public struct ProcessingSettings: Codable, Equatable, Sendable {
     }
 
     /// Validate that all processing settings are within acceptable ranges
-    public func validate() throws {
+    public func validate() throws(DocScanError) {
         guard maxTokens > 0 else {
             throw DocScanError.configurationError("maxTokens must be > 0")
         }

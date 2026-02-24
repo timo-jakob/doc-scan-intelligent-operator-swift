@@ -35,8 +35,7 @@ public struct SubprocessRunner: Sendable {
     ///
     /// Formula: `(inferenceTimeout × documentCount) + modelLoadingBuffer`
     static func overallTimeout(for input: BenchmarkWorkerInput) -> TimeInterval {
-        let documentCount = input.positivePDFs.count + input.negativePDFs.count
-        return input.timeoutSeconds * Double(documentCount) + modelLoadingBufferSeconds
+        input.timeoutSeconds * Double(input.pdfSet.count) + modelLoadingBufferSeconds
     }
 
     /// Run a single benchmark worker in a subprocess.
@@ -66,6 +65,17 @@ public struct SubprocessRunner: Sendable {
 
     // MARK: - Private Helpers
 
+    /// Escalate to SIGKILL if SIGTERM doesn't stop the process
+    /// (e.g. MLX C++ stuck in a tight loop ignoring signals).
+    private static func escalateToKill(_ process: Process) {
+        let pid = process.processIdentifier
+        DispatchQueue.global().asyncAfter(
+            deadline: .now() + killEscalationSeconds
+        ) {
+            if process.isRunning { kill(pid, SIGKILL) }
+        }
+    }
+
     private func makeWorkerProcess(inputPath: String, outputPath: String) -> Process {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: Self.resolveExecutablePath())
@@ -90,14 +100,7 @@ public struct SubprocessRunner: Sendable {
             let watchdog = DispatchWorkItem { [process] in
                 guard process.isRunning else { return }
                 process.terminate()
-                // Escalate to SIGKILL if SIGTERM doesn't stop the process
-                // (e.g. MLX C++ stuck in a tight loop ignoring signals)
-                let pid = process.processIdentifier
-                DispatchQueue.global().asyncAfter(
-                    deadline: .now() + SubprocessRunner.killEscalationSeconds
-                ) {
-                    if process.isRunning { kill(pid, SIGKILL) }
-                }
+                Self.escalateToKill(process)
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
 

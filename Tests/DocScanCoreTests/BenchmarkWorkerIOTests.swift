@@ -5,15 +5,18 @@ final class BenchmarkWorkerIOTests: XCTestCase {
     // MARK: - BenchmarkWorkerInput Round-Trip (VLM)
 
     func testVLMInputCodableRoundTrip() throws {
+        var config = Configuration.defaultConfiguration
+        config.verbose = true
         let input = BenchmarkWorkerInput(
             phase: .vlm,
             modelName: "mlx-community/Qwen2-VL-2B-Instruct-4bit",
-            positivePDFs: ["/path/to/invoice1.pdf", "/path/to/invoice2.pdf"],
-            negativePDFs: ["/path/to/not_invoice.pdf"],
+            pdfSet: BenchmarkPDFSet(
+                positivePDFs: ["/path/to/invoice1.pdf", "/path/to/invoice2.pdf"],
+                negativePDFs: ["/path/to/not_invoice.pdf"]
+            ),
             timeoutSeconds: 30.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration,
-            verbose: true
+            configuration: config
         )
 
         let data = try JSONEncoder().encode(input)
@@ -21,13 +24,12 @@ final class BenchmarkWorkerIOTests: XCTestCase {
 
         XCTAssertEqual(decoded.phase, .vlm)
         XCTAssertEqual(decoded.modelName, input.modelName)
-        XCTAssertEqual(decoded.positivePDFs, input.positivePDFs)
-        XCTAssertEqual(decoded.negativePDFs, input.negativePDFs)
+        XCTAssertEqual(decoded.pdfSet.positivePDFs, input.pdfSet.positivePDFs)
+        XCTAssertEqual(decoded.pdfSet.negativePDFs, input.pdfSet.negativePDFs)
         XCTAssertEqual(decoded.timeoutSeconds, input.timeoutSeconds)
         XCTAssertEqual(decoded.documentType, .invoice)
-        XCTAssertEqual(decoded.verbose, true)
-        XCTAssertNil(decoded.ocrTexts)
-        XCTAssertNil(decoded.groundTruths)
+        XCTAssertEqual(decoded.configuration.verbose, true)
+        XCTAssertNil(decoded.textLLMData)
     }
 
     // MARK: - BenchmarkWorkerInput Round-Trip (TextLLM)
@@ -43,14 +45,17 @@ final class BenchmarkWorkerIOTests: XCTestCase {
         let input = BenchmarkWorkerInput(
             phase: .textLLM,
             modelName: "mlx-community/Qwen2.5-7B-Instruct-4bit",
-            positivePDFs: ["/path/to/invoice.pdf"],
-            negativePDFs: ["/path/to/other.pdf"],
+            pdfSet: BenchmarkPDFSet(
+                positivePDFs: ["/path/to/invoice.pdf"],
+                negativePDFs: ["/path/to/other.pdf"]
+            ),
             timeoutSeconds: 60.0,
             documentType: .invoice,
             configuration: Configuration.defaultConfiguration,
-            verbose: false,
-            ocrTexts: ["/path/to/invoice.pdf": "Rechnung Nr. 12345"],
-            groundTruths: ["/path/to/invoice.pdf": groundTruth]
+            textLLMData: TextLLMInputData(
+                ocrTexts: ["/path/to/invoice.pdf": "Rechnung Nr. 12345"],
+                groundTruths: ["/path/to/invoice.pdf": groundTruth]
+            )
         )
 
         let data = try JSONEncoder().encode(input)
@@ -58,9 +63,9 @@ final class BenchmarkWorkerIOTests: XCTestCase {
 
         XCTAssertEqual(decoded.phase, .textLLM)
         XCTAssertEqual(decoded.modelName, input.modelName)
-        XCTAssertEqual(decoded.ocrTexts?["/path/to/invoice.pdf"], "Rechnung Nr. 12345")
-        XCTAssertEqual(decoded.groundTruths?["/path/to/invoice.pdf"]?.date, "2025-01-15")
-        XCTAssertEqual(decoded.groundTruths?["/path/to/invoice.pdf"]?.secondaryField, "Test_Company")
+        XCTAssertEqual(decoded.textLLMData?.ocrTexts["/path/to/invoice.pdf"], "Rechnung Nr. 12345")
+        XCTAssertEqual(decoded.textLLMData?.groundTruths["/path/to/invoice.pdf"]?.date, "2025-01-15")
+        XCTAssertEqual(decoded.textLLMData?.groundTruths["/path/to/invoice.pdf"]?.secondaryField, "Test_Company")
     }
 
     // MARK: - BenchmarkWorkerOutput Round-Trip (VLM)
@@ -144,12 +149,10 @@ final class BenchmarkWorkerIOTests: XCTestCase {
         let input = BenchmarkWorkerInput(
             phase: .vlm,
             modelName: "test/model",
-            positivePDFs: ["/rx.pdf"],
-            negativePDFs: [],
+            pdfSet: BenchmarkPDFSet(positivePDFs: ["/rx.pdf"], negativePDFs: []),
             timeoutSeconds: 10.0,
             documentType: .prescription,
-            configuration: Configuration.defaultConfiguration,
-            verbose: false
+            configuration: Configuration.defaultConfiguration
         )
 
         let data = try JSONEncoder().encode(input)
