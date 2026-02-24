@@ -7,9 +7,9 @@ extension BenchmarkCommand {
     /// Phase A: Run each VLM model against all documents for categorization scoring.
     /// Each model runs in a subprocess so that MLX fatal errors are contained.
     func runPhaseA(
+        runner: SubprocessRunner,
         engine: BenchmarkEngine,
-        positivePDFs: [String],
-        negativePDFs: [String],
+        pdfSet: BenchmarkPDFSet,
         configuration: Configuration,
         timeoutSeconds: TimeInterval
     ) async throws -> [VLMBenchmarkResult] {
@@ -17,11 +17,9 @@ extension BenchmarkCommand {
 
         let vlmModels = configuration.benchmark.vlmModels ?? DefaultModelLists.vlmModels
         print("Evaluating \(vlmModels.count) VLM model(s)")
-        print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
+        print("Documents: \(pdfSet.positivePDFs.count) positive, \(pdfSet.negativePDFs.count) negative")
         print("Timeout: \(Int(timeoutSeconds))s per inference")
         print()
-
-        let runner = SubprocessRunner()
         var results: [VLMBenchmarkResult] = []
 
         for (index, modelName) in vlmModels.enumerated() {
@@ -32,7 +30,7 @@ extension BenchmarkCommand {
             let input = BenchmarkWorkerInput(
                 phase: .vlm,
                 modelName: modelName,
-                pdfSet: BenchmarkPDFSet(positivePDFs: positivePDFs, negativePDFs: negativePDFs),
+                pdfSet: pdfSet,
                 timeoutSeconds: timeoutSeconds,
                 documentType: engine.documentType,
                 configuration: workerConfig
