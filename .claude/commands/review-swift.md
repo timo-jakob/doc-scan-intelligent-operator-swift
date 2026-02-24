@@ -22,5 +22,6 @@ If an argument is provided, scope the review to that file or directory only.
 
 3. After the review completes, summarize the findings and:
    - **Automatically fix** all 🔴 Critical issues
+   - **Automatically fix** all 🟡 Warning issues
    - **Automatically fix** all auto-fixable linting/formatting issues (`swiftlint --fix`, `swift-format format`)
-   - **List** remaining 🟡 Warnings and 🟢 Suggestions for the developer to decide on
+   - **List** remaining 🟢 Suggestions for the developer to decide on
