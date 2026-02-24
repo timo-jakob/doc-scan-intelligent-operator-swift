@@ -18,7 +18,7 @@ extension ConfigurationTests {
         let customModel = "mlx-community/Qwen2.5-3B-Instruct-4bit"
         let config = Configuration(textModelName: customModel)
         XCTAssertEqual(config.textModelName, customModel)
-        XCTAssertEqual(config.modelName, "mlx-community/Qwen2-VL-2B-Instruct-4bit")
+        XCTAssertEqual(config.modelName, "mlx-community/Qwen2-VL-7B-Instruct-4bit")
     }
 
     func testDefaultHuggingFaceUsernameIsNil() {

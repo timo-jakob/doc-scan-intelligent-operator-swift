@@ -22,7 +22,7 @@ final class ConfigurationTests: XCTestCase {
     func testDefaultConfiguration() {
         let config = Configuration.defaultConfiguration
 
-        XCTAssertEqual(config.modelName, "mlx-community/Qwen2-VL-2B-Instruct-4bit")
+        XCTAssertEqual(config.modelName, "mlx-community/Qwen2-VL-7B-Instruct-4bit")
         XCTAssertEqual(config.maxTokens, 256)
         XCTAssertEqual(config.temperature, 0.1)
         XCTAssertEqual(config.pdfDPI, 150)

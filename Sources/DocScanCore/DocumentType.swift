@@ -29,11 +29,33 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var vlmPrompt: String {
         switch self {
         case .invoice:
-            "Is this document an INVOICE (Rechnung)? " +
-                "Look for billing information, amounts, invoice numbers. Answer only YES or NO."
+            """
+            Classify this document. Is it an INVOICE (Rechnung)?
+
+            An invoice typically shows:
+            - A company letterhead or logo
+            - An invoice number (Rechnungsnummer)
+            - Line items with prices and a total amount due
+            - Payment terms or bank details (IBAN)
+
+            This is NOT an invoice if it is a receipt, delivery note, bank statement, letter, or prescription.
+
+            Answer with exactly one word: YES or NO
+            """
         case .prescription:
-            "Is this document a DOCTOR'S PRESCRIPTION (Arzt-Rezept)? " +
-                "Look for medication names, doctor information, patient details. Answer only YES or NO."
+            """
+            Classify this document. Is it a DOCTOR'S PRESCRIPTION (Arzt-Rezept)?
+
+            A prescription typically shows:
+            - A doctor's name and practice address (Praxis)
+            - Patient name and insurance details
+            - Medication names with dosage instructions
+            - A PZN (Pharmazentralnummer) or Rp. marking
+
+            This is NOT a prescription if it is an invoice, lab report, referral letter, or insurance form.
+
+            Answer with exactly one word: YES or NO
+            """
         }
     }
 
@@ -41,11 +63,32 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
     public var textCategorizationPrompt: String {
         switch self {
         case .invoice:
-            "Based on the following document text, is this an INVOICE (Rechnung)? " +
-                "Look for billing information, amounts, invoice numbers. Answer only YES or NO."
+            """
+            Based on the following document text, classify it. Is it an INVOICE (Rechnung)?
+
+            An invoice typically contains:
+            - An invoice number (Rechnungsnummer)
+            - Line items with prices and a total amount due
+            - Payment terms or bank details (IBAN)
+
+            This is NOT an invoice if it is a receipt, delivery note, bank statement, letter, or prescription.
+
+            Answer with exactly one word: YES or NO
+            """
         case .prescription:
-            "Based on the following document text, is this a DOCTOR'S PRESCRIPTION (Arzt-Rezept)? " +
-                "Look for medication names, doctor information, patient details. Answer only YES or NO."
+            """
+            Based on the following document text, classify it. Is it a DOCTOR'S PRESCRIPTION (Arzt-Rezept)?
+
+            A prescription typically contains:
+            - A doctor's name and practice address
+            - Patient name and insurance details
+            - Medication names with dosage instructions
+            - A PZN (Pharmazentralnummer)
+
+            This is NOT a prescription if it is an invoice, lab report, referral letter, or insurance form.
+
+            Answer with exactly one word: YES or NO
+            """
         }
     }
 
