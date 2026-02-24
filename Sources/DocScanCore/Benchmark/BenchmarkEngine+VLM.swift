@@ -66,26 +66,29 @@ public extension BenchmarkEngine {
         var results: [VLMDocumentResult] = []
 
         print("    ✓ ", terminator: "")
+        fflush(stdout)
         for pdfPath in positivePDFs {
             let result = await benchmarkVLMDocument(
                 pdfPath: pdfPath, isPositive: true,
                 timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory
             )
             print(result.correct ? "." : "f", terminator: "")
+            fflush(stdout)
             results.append(result)
         }
 
         print("  ✗ ", terminator: "")
+        fflush(stdout)
         for pdfPath in negativePDFs {
             let result = await benchmarkVLMDocument(
                 pdfPath: pdfPath, isPositive: false,
                 timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory
             )
             print(result.correct ? "." : "f", terminator: "")
+            fflush(stdout)
             results.append(result)
         }
         print("")
-        fflush(stdout)
 
         return results
     }
