@@ -40,11 +40,8 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
     ) async throws -> BenchmarkWorkerOutput {
         BenchmarkEngine.configureMLXMemoryBudget()
 
-        var workerConfig = workerInput.configuration
-        workerConfig.verbose = workerInput.verbose
-
         let engine = BenchmarkEngine(
-            configuration: workerConfig,
+            configuration: workerInput.configuration,
             documentType: workerInput.documentType
         )
 
@@ -70,8 +67,8 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
         let vlmFactory = DefaultVLMOnlyFactory()
         let result = await engine.benchmarkVLM(
             modelName: workerInput.modelName,
-            positivePDFs: workerInput.positivePDFs,
-            negativePDFs: workerInput.negativePDFs,
+            positivePDFs: workerInput.pdfSet.positivePDFs,
+            negativePDFs: workerInput.pdfSet.negativePDFs,
             timeoutSeconds: workerInput.timeoutSeconds,
             vlmFactory: vlmFactory
         )
@@ -82,20 +79,18 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
         engine: BenchmarkEngine,
         input workerInput: BenchmarkWorkerInput
     ) async -> BenchmarkWorkerOutput {
-        let ocrTexts = workerInput.ocrTexts ?? [:]
-        let groundTruths = workerInput.groundTruths ?? [:]
-
+        let textLLMData = workerInput.textLLMData
         let context = TextLLMBenchmarkContext(
-            ocrTexts: ocrTexts,
-            groundTruths: groundTruths,
+            ocrTexts: textLLMData?.ocrTexts ?? [:],
+            groundTruths: textLLMData?.groundTruths ?? [:],
             timeoutSeconds: workerInput.timeoutSeconds,
             textLLMFactory: DefaultTextLLMOnlyFactory()
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: workerInput.modelName,
-            positivePDFs: workerInput.positivePDFs,
-            negativePDFs: workerInput.negativePDFs,
+            positivePDFs: workerInput.pdfSet.positivePDFs,
+            negativePDFs: workerInput.pdfSet.negativePDFs,
             context: context
         )
         return .textLLM(result)

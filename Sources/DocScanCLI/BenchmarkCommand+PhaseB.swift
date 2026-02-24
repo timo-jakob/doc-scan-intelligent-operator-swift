@@ -33,17 +33,16 @@ extension BenchmarkCommand {
         for (index, modelName) in textLLMModels.enumerated() {
             print("[\(index + 1)/\(textLLMModels.count)] \(modelName)")
 
+            var workerConfig = configuration
+            workerConfig.verbose = verbose
             let input = BenchmarkWorkerInput(
                 phase: .textLLM,
                 modelName: modelName,
-                positivePDFs: positivePDFs,
-                negativePDFs: negativePDFs,
+                pdfSet: BenchmarkPDFSet(positivePDFs: positivePDFs, negativePDFs: negativePDFs),
                 timeoutSeconds: timeoutSeconds,
                 documentType: engine.documentType,
-                configuration: configuration,
-                verbose: verbose,
-                ocrTexts: ocrTexts,
-                groundTruths: groundTruths
+                configuration: workerConfig,
+                textLLMData: TextLLMInputData(ocrTexts: ocrTexts, groundTruths: groundTruths)
             )
 
             let result: TextLLMBenchmarkResult = await runWorker(

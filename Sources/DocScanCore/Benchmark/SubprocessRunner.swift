@@ -35,8 +35,7 @@ public struct SubprocessRunner: Sendable {
     ///
     /// Formula: `(inferenceTimeout × documentCount) + modelLoadingBuffer`
     static func overallTimeout(for input: BenchmarkWorkerInput) -> TimeInterval {
-        let documentCount = input.positivePDFs.count + input.negativePDFs.count
-        return input.timeoutSeconds * Double(documentCount) + modelLoadingBufferSeconds
+        input.timeoutSeconds * Double(input.pdfSet.count) + modelLoadingBufferSeconds
     }
 
     /// Run a single benchmark worker in a subprocess.

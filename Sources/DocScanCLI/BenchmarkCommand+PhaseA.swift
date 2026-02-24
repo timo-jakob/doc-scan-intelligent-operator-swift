@@ -27,15 +27,15 @@ extension BenchmarkCommand {
         for (index, modelName) in vlmModels.enumerated() {
             print("[\(index + 1)/\(vlmModels.count)] \(modelName)")
 
+            var workerConfig = configuration
+            workerConfig.verbose = verbose
             let input = BenchmarkWorkerInput(
                 phase: .vlm,
                 modelName: modelName,
-                positivePDFs: positivePDFs,
-                negativePDFs: negativePDFs,
+                pdfSet: BenchmarkPDFSet(positivePDFs: positivePDFs, negativePDFs: negativePDFs),
                 timeoutSeconds: timeoutSeconds,
                 documentType: engine.documentType,
-                configuration: configuration,
-                verbose: verbose
+                configuration: workerConfig
             )
 
             let result: VLMBenchmarkResult = await runWorker(
