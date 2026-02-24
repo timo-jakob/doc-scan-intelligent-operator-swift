@@ -2,7 +2,9 @@ import Foundation
 
 /// Which benchmark phase the worker should execute
 public enum BenchmarkWorkerPhase: String, Codable, Sendable {
+    /// Vision-Language Model categorization benchmark
     case vlm
+    /// Text LLM extraction and categorization benchmark
     case textLLM
 }
 

@@ -1,13 +1,17 @@
-import AppKit
 import Foundation
 
 // MARK: - TextLLM Benchmark Context
 
-/// Groups the shared parameters for a TextLLM benchmark run
+/// Groups the shared parameters for a TextLLM benchmark run, including
+/// pre-extracted OCR texts, ground truths, and the factory to create TextLLM instances.
 public struct TextLLMBenchmarkContext: Sendable {
+    /// Pre-extracted OCR texts keyed by PDF path
     public let ocrTexts: [String: String]
+    /// Expected ground truth values keyed by PDF path
     public let groundTruths: [String: GroundTruth]
+    /// Timeout in seconds for each individual inference call
     public let timeoutSeconds: TimeInterval
+    /// Factory for creating TextLLM instances per model
     public let textLLMFactory: TextLLMOnlyFactory
 
     public init(
@@ -157,11 +161,12 @@ private extension BenchmarkEngine {
         textLLM: any TextLLMProviding,
         timeoutSeconds: TimeInterval
     ) async -> Bool? {
+        let prompt = documentType.textCategorizationPrompt
         do {
             let response = try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
                 try await textLLM.generate(
                     systemPrompt: "You are a document classification assistant. Answer only YES or NO.",
-                    userPrompt: self.documentType.textCategorizationPrompt + "\n\nDocument text:\n" + ocrText,
+                    userPrompt: prompt + "\n\nDocument text:\n" + ocrText,
                     maxTokens: 10
                 )
             }
@@ -182,9 +187,10 @@ private extension BenchmarkEngine {
             return false
         }
 
+        let docType = documentType
         do {
             let extraction = try await TimeoutError.withTimeout(seconds: context.timeoutSeconds) {
-                try await textLLM.extractData(for: self.documentType, from: ocrText)
+                try await textLLM.extractData(for: docType, from: ocrText)
             }
 
             var actualDate: String?

@@ -149,7 +149,7 @@ public final class HuggingFaceClient: Sendable {
 
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 429,
                attempt < retryDelays.count {
-                try await Task.sleep(nanoseconds: retryDelays[attempt] * 1_000_000_000)
+                try await Task.sleep(for: .seconds(retryDelays[attempt]))
                 continue
             }
 

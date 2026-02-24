@@ -23,9 +23,9 @@ extension InvoiceDetectorAsyncTests {
 
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
-        _ = try await detector.categorize(pdfPath: pdfPath)
+        let (_, context) = try await detector.categorize(pdfPath: pdfPath)
 
-        let result = try await detector.extractData()
+        let result = try await detector.extractData(context: context)
 
         XCTAssertEqual(result.secondaryField, "Test_Corp")
         XCTAssertNotNil(result.date)
@@ -49,9 +49,9 @@ extension InvoiceDetectorAsyncTests {
 
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
-        _ = try await detector.categorize(pdfPath: pdfPath)
+        let (_, context) = try await detector.categorize(pdfPath: pdfPath)
 
-        let result = try await detector.extractData()
+        let result = try await detector.extractData(context: context)
 
         XCTAssertEqual(result.secondaryField, "DB_Fernverkehr_AG")
     }
@@ -75,9 +75,9 @@ extension InvoiceDetectorAsyncTests {
 
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
-        _ = try await detector.categorize(pdfPath: pdfPath)
+        let (_, context) = try await detector.categorize(pdfPath: pdfPath)
 
-        let result = try await detector.extractData()
+        let result = try await detector.extractData(context: context)
 
         XCTAssertEqual(result.secondaryField, "Dr_Mueller")
         XCTAssertEqual(result.patientName, "Anna")
@@ -97,9 +97,9 @@ extension InvoiceDetectorAsyncTests {
 
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
-        _ = try await detector.categorize(pdfPath: pdfPath)
+        let (_, context) = try await detector.categorize(pdfPath: pdfPath)
 
-        let result = try await detector.extractData()
+        let result = try await detector.extractData(context: context)
 
         XCTAssertNil(result.date)
         XCTAssertNil(result.secondaryField)

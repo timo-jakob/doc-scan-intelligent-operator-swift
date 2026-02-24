@@ -98,7 +98,7 @@ public actor DefaultTextLLMOnlyFactory: TextLLMOnlyFactory {
 }
 
 /// Core benchmark orchestration engine
-public final class BenchmarkEngine: Sendable {
+public struct BenchmarkEngine: Sendable {
     public let configuration: Configuration
     public let documentType: DocumentType
 
@@ -203,7 +203,7 @@ public final class BenchmarkEngine: Sendable {
                             at: pdfPath,
                             dpi: config.pdfDPI
                         )
-                        let text = try ocrEngine.extractText(from: image)
+                        let text = try await ocrEngine.extractText(from: image)
                         if isVerbose {
                             print("  \(filename): OCR text (\(text.count) chars)")
                         }

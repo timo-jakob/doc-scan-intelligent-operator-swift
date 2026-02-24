@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Shared date parsing utilities for consistent date handling across the codebase
 public enum DateUtils {
@@ -54,21 +55,36 @@ public enum DateUtils {
 
     // MARK: - Cached Formatters & Regex
 
-    /// Cached DateFormatter instances (one per format string), thread-safe as static lets
-    private static let cachedFormatters: [DateFormatter] = dateFormats.map { format in
-        let formatter = DateFormatter()
-        formatter.dateFormat = format
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
+    /// Thread-safe DateFormatter cache. DateFormatter is not thread-safe, so all
+    /// parse/format operations are performed under the lock.
+    private static let formatterStore = OSAllocatedUnfairLock(
+        initialState: FormatterState()
+    )
+
+    /// Internal state for the formatter cache
+    private struct FormatterState {
+        /// Formatters for the standard date formats (used in parseDate)
+        let standardFormatters: [DateFormatter] = dateFormats.map { format in
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            return formatter
+        }
+
+        /// ISO formatter for formatDate fast-path
+        let isoFormatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            return formatter
+        }()
+
+        /// Custom formatters keyed by format string
+        var customFormatters: [String: DateFormatter] = [:]
     }
 
-    /// Cached ISO formatter for `formatDate`
-    private static let isoFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
+    /// Cached gregorian calendar to avoid repeated `Calendar.current` lookups
+    private static let calendar = Calendar(identifier: .gregorian)
 
     /// Cached NSRegularExpression instances (one per date pattern), compiled once
     private static let cachedDateRegexes: [NSRegularExpression] = datePatterns.compactMap { pattern in
@@ -95,14 +111,20 @@ public enum DateUtils {
     public static func parseDate(_ dateString: String, validate: Bool = true) -> Date? {
         let trimmed = dateString.trimmingCharacters(in: .whitespaces)
 
-        // Try standard formats first (using cached formatters)
-        for formatter in cachedFormatters {
-            if let date = formatter.date(from: trimmed) {
-                if validate, !isValidDate(date) {
-                    continue // Try other formats
+        // Try standard formats first (locked for DateFormatter thread safety)
+        let standardResult: Date? = formatterStore.withLock { state in
+            for formatter in state.standardFormatters {
+                if let date = formatter.date(from: trimmed) {
+                    if validate, !isValidDate(date) {
+                        continue
+                    }
+                    return date
                 }
-                return date
             }
+            return nil
+        }
+        if let date = standardResult {
+            return date
         }
 
         // Try German month name format: "September 2022" or "Sep 2022"
@@ -137,7 +159,7 @@ public enum DateUtils {
             components.month = monthNumber
             components.day = 1
 
-            return Calendar.current.date(from: components)
+            return calendar.date(from: components)
         }
 
         return nil
@@ -147,7 +169,6 @@ public enum DateUtils {
     /// - Rejects dates before 2000
     /// - Rejects dates more than 2 years in the future
     public static func isValidDate(_ date: Date) -> Bool {
-        let calendar = Calendar.current
         let now = Date()
 
         // Get year components
@@ -167,36 +188,25 @@ public enum DateUtils {
         return true
     }
 
-    /// Cache for non-default date formatters, keyed by format string
-    private static let formatterCache = FormatterCache()
-
-    /// Thread-safe cache for DateFormatter instances
-    private final class FormatterCache: Sendable {
-        private let lock = NSLock()
-        private nonisolated(unsafe) var cache: [String: DateFormatter] = [:]
-
-        func formatter(for format: String) -> DateFormatter {
-            lock.lock()
-            defer { lock.unlock() }
-            if let existing = cache[format] { return existing }
-            let formatter = DateFormatter()
-            formatter.dateFormat = format
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            cache[format] = formatter
-            return formatter
-        }
-    }
-
     /// Format a date to the standard invoice filename format
     /// - Parameters:
     ///   - date: The date to format
     ///   - format: The desired format string (default: yyyy-MM-dd)
     /// - Returns: The formatted date string
     public static func formatDate(_ date: Date, format: String = "yyyy-MM-dd") -> String {
-        if format == "yyyy-MM-dd" {
-            return isoFormatter.string(from: date)
+        formatterStore.withLock { state in
+            if format == "yyyy-MM-dd" {
+                return state.isoFormatter.string(from: date)
+            }
+            if let cached = state.customFormatters[format] {
+                return cached.string(from: date)
+            }
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            state.customFormatters[format] = formatter
+            return formatter.string(from: date)
         }
-        return formatterCache.formatter(for: format).string(from: date)
     }
 
     // MARK: - Text Extraction Functions

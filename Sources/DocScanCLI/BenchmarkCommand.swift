@@ -14,8 +14,8 @@ struct BenchmarkCommand: AsyncParsableCommand {
     @Argument(help: "Directory containing negative sample PDFs (documents that do NOT match the type)")
     var negativeDir: String
 
-    @Option(name: .shortAndLong, help: "Document type to benchmark: 'invoice' (default) or 'prescription'")
-    var type: String = "invoice"
+    @Option(name: .shortAndLong, help: "Document type to benchmark")
+    var type: DocumentType = .invoice
 
     @Option(name: .shortAndLong, help: "Path to configuration file")
     var config: String?
@@ -24,7 +24,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
     var verbose: Bool = false
 
     func run() async throws {
-        let documentType = try parseDocumentType()
+        let documentType = type
         var configuration = try loadConfiguration()
         configuration.verbose = verbose
 
@@ -101,10 +101,6 @@ struct BenchmarkCommand: AsyncParsableCommand {
     }
 
     // MARK: - Helpers
-
-    private func parseDocumentType() throws -> DocumentType {
-        try CLIHelpers.parseDocumentType(type)
-    }
 
     private func loadConfiguration() throws -> Configuration {
         try CLIHelpers.loadConfiguration(configPath: config)

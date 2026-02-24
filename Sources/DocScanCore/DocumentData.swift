@@ -28,7 +28,7 @@ public struct ExtractionResult: Equatable, Sendable {
 // MARK: - Final Document Data
 
 /// Final result combining categorization and extraction
-public struct DocumentData: Sendable {
+public struct DocumentData: Equatable, Sendable {
     public let documentType: DocumentType
     public let isMatch: Bool // Whether document matches the target type
     public let date: Date?

@@ -16,8 +16,8 @@ struct ScanCommand: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to configuration file")
     var config: String?
 
-    @Option(name: .shortAndLong, help: "Document type to detect: 'invoice' (default) or 'prescription'")
-    var type: String = "invoice"
+    @Option(name: .shortAndLong, help: "Document type to detect")
+    var type: DocumentType = .invoice
 
     @Option(name: .shortAndLong, help: "VLM model for categorization")
     var model: String?
@@ -44,7 +44,7 @@ struct ScanCommand: AsyncParsableCommand {
     var autoResolve: String?
 
     func run() async throws {
-        let documentType = try parseDocumentType()
+        let documentType = type
         var configuration = try loadConfiguration()
         applyCliOverrides(to: &configuration)
 
@@ -55,8 +55,13 @@ struct ScanCommand: AsyncParsableCommand {
             configuration: configuration, documentType: documentType
         )
 
-        let (categorization, isMatch) = try await executePhase1(
-            detector: detector, pdfPath: finalPdfPath, documentType: documentType
+        if verbose {
+            printPhaseHeader(number: 1, title: "Categorization (VLM + OCR in parallel)")
+        }
+
+        let (categorization, context) = try await detector.categorize(pdfPath: finalPdfPath)
+        let isMatch = try executePhase1Display(
+            categorization: categorization, documentType: documentType
         )
 
         guard isMatch else {
@@ -69,6 +74,7 @@ struct ScanCommand: AsyncParsableCommand {
 
         try await executePhase2(
             detector: detector,
+            context: context,
             pdfPath: finalPdfPath,
             documentType: documentType,
             categorization: categorization
@@ -95,36 +101,23 @@ struct ScanCommand: AsyncParsableCommand {
         )
     }
 
-    private func executePhase1(
-        detector: DocumentDetector,
-        pdfPath: String,
+    private func executePhase1Display(
+        categorization: CategorizationVerification,
         documentType: DocumentType
-    ) async throws -> (CategorizationVerification, Bool) {
-        if verbose {
-            print("Analyzing: \(pdfPath)")
-            print("Document type: \(documentType.displayName)")
-            print()
-            printPhaseHeader(
-                number: 1,
-                title: "Categorization (VLM + OCR in parallel)"
-            )
-        }
-
-        let categorization = try await detector.categorize(pdfPath: pdfPath)
-
-        let isMatch: Bool
+    ) throws -> Bool {
         if verbose {
             displayCategorizationResults(categorization, documentType: documentType)
-            isMatch = try determineIsMatchVerbose(categorization, documentType: documentType)
+            let isMatch = try determineIsMatchVerbose(categorization, documentType: documentType)
             print()
+            return isMatch
         } else {
-            isMatch = try determineIsMatchCompact(categorization, documentType: documentType)
+            return try determineIsMatchCompact(categorization, documentType: documentType)
         }
-        return (categorization, isMatch)
     }
 
     private func executePhase2(
         detector: DocumentDetector,
+        context: CategorizationContext,
         pdfPath: String,
         documentType: DocumentType,
         categorization: CategorizationVerification
@@ -133,7 +126,7 @@ struct ScanCommand: AsyncParsableCommand {
             printPhaseHeader(number: 2, title: "Data Extraction (OCR + TextLLM)")
         }
 
-        let extraction = try await detector.extractData()
+        let extraction = try await detector.extractData(context: context)
         let date = try validateExtraction(extraction, documentType: documentType)
 
         if verbose {
@@ -178,10 +171,6 @@ struct ScanCommand: AsyncParsableCommand {
 // MARK: - Setup Helpers
 
 extension ScanCommand {
-    private func parseDocumentType() throws -> DocumentType {
-        try CLIHelpers.parseDocumentType(type)
-    }
-
     private func loadConfiguration() throws -> Configuration {
         try CLIHelpers.loadConfiguration(configPath: config)
     }

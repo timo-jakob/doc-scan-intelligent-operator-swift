@@ -1,8 +1,10 @@
 import Foundation
 
-/// Per-document scoring breakdown
+/// Per-document scoring breakdown for benchmark evaluation
 public struct DocumentScoring: Equatable, Sendable {
+    /// Whether the model correctly categorized the document type
     public let categorizationCorrect: Bool
+    /// Whether the model correctly extracted date and secondary field
     public let extractionCorrect: Bool
     public var score: Int {
         (categorizationCorrect ? 1 : 0) + (extractionCorrect ? 1 : 0)

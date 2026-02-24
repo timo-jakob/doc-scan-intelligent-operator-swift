@@ -5,11 +5,17 @@ import Foundation
 
 /// The method used for document categorization
 public enum CategorizationMethod: Equatable, Sendable {
+    /// Vision-Language Model analysis completed successfully
     case vlm
+    /// VLM analysis timed out before completing
     case vlmTimeout
+    /// VLM analysis failed with an error
     case vlmError
+    /// Vision OCR text recognition (for scanned documents)
     case ocr
+    /// OCR analysis timed out before completing
     case ocrTimeout
+    /// Direct PDF text extraction (for searchable PDFs)
     case pdf
 }
 
@@ -79,6 +85,15 @@ public struct CategorizationVerification: Equatable, Sendable {
     }
 }
 
+/// Context produced by Phase 1 (categorization) and consumed by Phase 2 (extraction).
+/// Replaces mutable actor state with an explicit, Sendable data flow.
+public struct CategorizationContext: Sendable {
+    /// The OCR text extracted during categorization (cached for Phase 2)
+    public let ocrText: String
+    /// The PDF file path being processed
+    public let pdfPath: String
+}
+
 /// Detects documents of a specific type and extracts key information using two-phase approach:
 /// Phase 1: Categorization (VLM + OCR in parallel) - Does this match the document type?
 /// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and secondary field
@@ -88,12 +103,6 @@ public actor DocumentDetector {
     private let textLLM: any TextLLMProviding
     nonisolated let config: Configuration
     public nonisolated let documentType: DocumentType
-
-    // Cache the image and OCR text between phases
-    private var cachedImage: NSImage?
-    private var cachedOCRText: String?
-    private var cachedPDFPath: String?
-    private var usedDirectExtraction: Bool = false
 
     /// Initialize with optional dependency injection for VLM and TextLLM providers.
     /// Defaults are created automatically when not supplied.
@@ -117,20 +126,18 @@ extension DocumentDetector {
 
     // MARK: - Phase 1: Categorization (VLM + OCR in parallel)
 
-    /// Categorize a PDF - determine if it's an invoice using VLM + OCR in parallel
-    public func categorize(pdfPath: String) async throws -> CategorizationVerification {
+    /// Categorize a PDF — determine if it matches the document type using VLM + OCR in parallel.
+    /// Returns both the verification result and a context that must be passed to `extractData`.
+    public func categorize(pdfPath: String) async throws -> (CategorizationVerification, CategorizationContext) {
         // Validate PDF and prepare image
         try PDFUtils.validatePDF(at: pdfPath)
-        cachedPDFPath = pdfPath
-        usedDirectExtraction = false
 
-        let directText = tryDirectTextExtraction(from: pdfPath)
+        let directText = Self.tryDirectTextExtraction(from: pdfPath, config: config)
 
         if config.verbose { print("Converting PDF to image...") }
         let image = try PDFUtils.pdfToImage(
             at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose
         )
-        cachedImage = image
 
         if config.verbose {
             print("Running categorization (VLM + OCR in parallel)...")
@@ -154,26 +161,27 @@ extension DocumentDetector {
         let vlm = await vlmResult
         let (ocr, ocrText) = try await ocrResult
 
-        // Cache OCR text from parallel task for Phase 2
-        if let ocrText, cachedOCRText == nil {
-            cachedOCRText = ocrText
-        }
+        // Build context for Phase 2 — prefer direct text, fall back to OCR text
+        let finalOCRText = directText ?? ocrText ?? ""
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
         logVerificationResult(verification)
-        return verification
+
+        let context = CategorizationContext(ocrText: finalOCRText, pdfPath: pdfPath)
+        return (verification, context)
     }
 
     /// Try direct PDF text extraction (faster for searchable PDFs)
-    private func tryDirectTextExtraction(from pdfPath: String) -> String? {
+    private nonisolated static func tryDirectTextExtraction(
+        from pdfPath: String,
+        config: Configuration
+    ) -> String? {
         if config.verbose { print("Checking for extractable text in PDF...") }
 
         guard let text = PDFUtils.extractText(from: pdfPath, verbose: config.verbose),
               text.count >= PDFUtils.minimumTextLength
         else { return nil }
 
-        cachedOCRText = text
-        usedDirectExtraction = true
         if config.verbose {
             print("✅ Using direct PDF text extraction (\(text.count) chars)")
         }
@@ -257,7 +265,7 @@ extension DocumentDetector {
                     ), nil)
                 } else {
                     if config.verbose { print("OCR: Starting Vision OCR (scanned document)...") }
-                    let text = try ocrEngine.extractText(from: image)
+                    let text = try await ocrEngine.extractText(from: image)
                     if config.verbose {
                         print("OCR: Extracted \(text.count) characters")
                     }
@@ -300,18 +308,19 @@ extension DocumentDetector {
 
     // MARK: - Phase 2: Data Extraction (OCR+TextLLM only)
 
-    /// Extract document data using OCR+TextLLM only (call after categorization confirms document type)
-    public func extractData() async throws -> ExtractionResult {
-        guard let ocrText = cachedOCRText else {
-            throw DocScanError.extractionFailed("No OCR text available. Call categorize() first.")
+    /// Extract document data using OCR+TextLLM only.
+    /// Requires the `CategorizationContext` returned by `categorize()`.
+    public func extractData(context: CategorizationContext) async throws -> ExtractionResult {
+        guard !context.ocrText.isEmpty else {
+            throw DocScanError.extractionFailed("No OCR text available in categorization context.")
         }
 
         if config.verbose {
             print("Extracting \(documentType.displayName.lowercased()) data (OCR+TextLLM)...")
         }
 
-        // Use TextLLM to extract date and secondary field from cached OCR text
-        let result = try await textLLM.extractData(for: documentType, from: ocrText)
+        // Use TextLLM to extract date and secondary field from OCR text
+        let result = try await textLLM.extractData(for: documentType, from: context.ocrText)
 
         if config.verbose {
             let fieldName = documentType == .invoice ? "Company" : "Doctor"

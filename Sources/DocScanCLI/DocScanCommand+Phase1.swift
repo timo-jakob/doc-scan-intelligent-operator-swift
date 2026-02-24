@@ -113,12 +113,13 @@ extension ScanCommand {
         categorization: CategorizationVerification,
         documentType: DocumentType
     ) throws -> Bool {
-        guard ["vlm", "ocr"].contains(mode.lowercased()) else {
+        let normalizedMode = mode.lowercased()
+        guard ["vlm", "ocr"].contains(normalizedMode) else {
             print("❌ Invalid --auto-resolve option: '\(mode)'")
             print("   Valid options: vlm, ocr")
             throw ExitCode.failure
         }
-        let useVLM = mode.lowercased() == "vlm"
+        let useVLM = normalizedMode == "vlm"
         let chosen = useVLM ? categorization.vlmResult : categorization.ocrResult
         let result = chosen.isMatch
         let typeName = documentType.displayName.lowercased()
@@ -211,15 +212,16 @@ extension ScanCommand {
         let prompt = "📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? "
 
         if let mode = autoResolve {
-            guard ["vlm", "ocr"].contains(mode.lowercased()) else {
+            let normalizedMode = mode.lowercased()
+            guard ["vlm", "ocr"].contains(normalizedMode) else {
                 print("❌ Invalid --auto-resolve option: '\(mode)'")
                 throw ExitCode.failure
             }
-            let useVLM = mode.lowercased() == "vlm"
+            let useVLM = normalizedMode == "vlm"
             let result = useVLM ? categorization.vlmResult.isMatch : categorization.ocrResult.isMatch
             let typeName = documentType.displayName.lowercased()
             let matchStr = result ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  ⚠️  \(matchStr)  \(conflictInfo)  [auto:\(mode.lowercased())]\n")
+            writeStdout("📋 Phase 1  ⚠️  \(matchStr)  \(conflictInfo)  [auto:\(normalizedMode)]\n")
             return result
         }
 

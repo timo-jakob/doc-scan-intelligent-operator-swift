@@ -23,9 +23,11 @@ public struct OCREngine: Sendable {
         self.config = config
     }
 
-    /// Extract text from an image using Vision OCR
-    /// For very tall images (aspect ratio > 4:1), tiles the image to ensure full text extraction
-    public func extractText(from image: NSImage) throws -> String {
+    /// Extract text from an image using Vision OCR.
+    /// Runs blocking Vision operations on a background queue to avoid
+    /// blocking the cooperative thread pool.
+    /// For very tall images (aspect ratio > 4:1), tiles the image to ensure full text extraction.
+    public func extractText(from image: NSImage) async throws -> String {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw DocScanError.pdfConversionFailed("Unable to convert NSImage to CGImage")
         }
@@ -40,10 +42,24 @@ public struct OCREngine: Sendable {
                 let ratio = String(format: "%.1f", aspectRatio)
                 print("OCR: Tall image detected (aspect ratio \(ratio):1), using tiled OCR")
             }
-            return try extractTextTiled(from: cgImage)
+            return try await runOnBackgroundQueue { try extractTextTiled(from: cgImage) }
         }
 
-        return try extractTextSingle(from: cgImage)
+        return try await runOnBackgroundQueue { try extractTextSingle(from: cgImage) }
+    }
+
+    /// Run a blocking operation on a background queue to avoid blocking the cooperative thread pool.
+    private func runOnBackgroundQueue<T: Sendable>(_ work: @Sendable @escaping () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let result = try work()
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     /// Extract text from a single image (standard OCR)
@@ -72,7 +88,7 @@ public struct OCREngine: Sendable {
         let width = cgImage.width
         let height = cgImage.height
         let tileHeight = 800 // Tile height in pixels
-        var allText = ""
+        var tileTexts: [String] = []
 
         for tileY in stride(from: 0, to: height, by: tileHeight) {
             let cropHeight = min(tileHeight, height - tileY)
@@ -84,7 +100,7 @@ public struct OCREngine: Sendable {
 
             do {
                 let tileText = try extractTextSingle(from: croppedImage)
-                allText += tileText + "\n"
+                tileTexts.append(tileText)
             } catch {
                 // Continue with other tiles even if one fails
                 if config.verbose {
@@ -93,11 +109,11 @@ public struct OCREngine: Sendable {
             }
         }
 
-        if allText.isEmpty {
+        guard !tileTexts.isEmpty else {
             throw DocScanError.extractionFailed("No text recognized from any tile")
         }
 
-        return allText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return tileTexts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Extract text strings from Vision observations

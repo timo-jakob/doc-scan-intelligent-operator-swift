@@ -14,8 +14,7 @@ public struct TimeoutError: Error, LocalizedError {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask { try await operation() }
             group.addTask {
-                let nanoseconds = UInt64(seconds * 1_000_000_000)
-                try await Task.sleep(nanoseconds: nanoseconds)
+                try await Task.sleep(for: .seconds(seconds))
                 throw TimeoutError()
             }
             guard let result = try await group.next() else {
@@ -23,6 +22,10 @@ public struct TimeoutError: Error, LocalizedError {
                 throw TimeoutError()
             }
             group.cancelAll()
+            // Drain remaining tasks to ensure cleanup completes
+            while !group.isEmpty {
+                _ = try? await group.next()
+            }
             return result
         }
     }

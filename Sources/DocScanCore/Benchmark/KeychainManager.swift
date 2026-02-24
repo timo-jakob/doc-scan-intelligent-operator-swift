@@ -111,13 +111,14 @@ public enum KeychainManager {
         }
     }
 
-    /// Save (upsert) a token — stores if new, updates if existing
+    /// Save (upsert) a token — stores if new, updates if existing.
+    /// Uses try-store/fallback-update to avoid TOCTOU race conditions.
     public static func saveToken(_ token: String, forAccount account: String) throws {
-        let existing = try retrieveToken(forAccount: account)
-        if existing != nil {
-            try updateToken(token, forAccount: account)
-        } else {
+        do {
             try storeToken(token, forAccount: account)
+        } catch {
+            // Store failed (likely duplicate) — fall back to update
+            try updateToken(token, forAccount: account)
         }
     }
 

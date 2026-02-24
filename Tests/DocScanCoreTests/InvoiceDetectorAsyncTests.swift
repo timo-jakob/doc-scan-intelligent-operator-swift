@@ -98,7 +98,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
 
-        let result = try await detector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM should have been called
         XCTAssertEqual(mockVLM.generateFromImageCallCount, 1)
@@ -120,7 +120,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "NO"
 
-        let result = try await detector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM says no, OCR says yes (PDF contains "Rechnung")
         XCTAssertFalse(result.vlmResult.isMatch)
@@ -156,7 +156,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         mockVLM.shouldThrowError = true
         mockVLM.errorToThrow = DocScanError.inferenceError("Mock VLM error")
 
-        let result = try await detector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM should return error result
         XCTAssertFalse(result.vlmResult.isMatch)
@@ -178,7 +178,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
 
-        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await verboseDetector.categorize(pdfPath: pdfPath)
 
         // Should complete successfully with verbose output
         XCTAssertTrue(result.vlmResult.isMatch)
@@ -211,7 +211,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         mockVLM.shouldThrowError = true
         mockVLM.errorToThrow = TimeoutError()
 
-        let result = try await detector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await detector.categorize(pdfPath: pdfPath)
 
         // VLM should return timeout result
         XCTAssertFalse(result.vlmResult.isMatch)
@@ -228,7 +228,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "YES"
 
-        let result = try await detector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await detector.categorize(pdfPath: pdfPath)
 
         // OCR result should indicate PDF method (direct extraction)
         XCTAssertEqual(result.ocrResult.method, .pdf)
@@ -258,10 +258,11 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
 // MARK: - Extract Data Tests (Sync)
 
 extension InvoiceDetectorAsyncTests {
-    func testExtractDataWithoutCategorization() async {
-        // extractData should fail if categorize wasn't called first
+    func testExtractDataWithEmptyContext() async {
+        // extractData should fail when context has no OCR text
+        let emptyContext = CategorizationContext(ocrText: "", pdfPath: "/fake/path")
         do {
-            _ = try await detector.extractData()
+            _ = try await detector.extractData(context: emptyContext)
             XCTFail("Should have thrown an error")
         } catch let error as DocScanError {
             if case let .extractionFailed(message) = error {
@@ -284,7 +285,7 @@ extension InvoiceDetectorAsyncTests {
         mockVLM.shouldThrowError = true
         mockVLM.errorToThrow = TimeoutError()
 
-        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await verboseDetector.categorize(pdfPath: pdfPath)
 
         XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertTrue(result.vlmResult.isTimedOut)
@@ -299,7 +300,7 @@ extension InvoiceDetectorAsyncTests {
         mockVLM.shouldThrowError = true
         mockVLM.errorToThrow = DocScanError.inferenceError("Mock VLM error")
 
-        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await verboseDetector.categorize(pdfPath: pdfPath)
 
         XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertTrue(result.vlmResult.method == .vlmError)
@@ -313,7 +314,7 @@ extension InvoiceDetectorAsyncTests {
         let pdfPath = try createSearchablePDF()
         mockVLM.mockResponse = "NO"
 
-        let result = try await verboseDetector.categorize(pdfPath: pdfPath)
+        let (result, _) = try await verboseDetector.categorize(pdfPath: pdfPath)
 
         XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertTrue(result.ocrResult.isMatch)
