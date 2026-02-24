@@ -3,8 +3,13 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
-/// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm
-open class TextLLMManager {
+/// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm.
+///
+/// Marked `@unchecked Sendable` because the mutable `modelContainer` is only written once
+/// during `preload()` and then read during sequential `generate()` calls. The benchmark
+/// engine serialises all access (one model at a time, documents processed sequentially),
+/// so no concurrent mutation is possible.
+open class TextLLMManager: @unchecked Sendable {
     private let config: Configuration
 
     /// Model container (lazy loaded)
