@@ -16,7 +16,7 @@ extension BenchmarkCommand {
     ) async throws -> [TextLLMBenchmarkResult] {
         printBenchmarkPhaseHeader("B", title: "TextLLM Categorization + Extraction Benchmark")
 
-        let groundTruths = try await manageGroundTruths(
+        let (groundTruths, cachedOCRTexts) = try await manageGroundTruths(
             engine: engine,
             positivePDFs: positivePDFs,
             negativePDFs: negativePDFs,
@@ -24,11 +24,17 @@ extension BenchmarkCommand {
             negativeDir: PathUtils.resolvePath(negativeDir)
         )
 
-        print("Pre-extracting OCR text from all documents...")
-        let ocrTexts = await engine.preExtractOCRTexts(
-            positivePDFs: positivePDFs, negativePDFs: negativePDFs
-        )
-        print("  Extracted text from \(ocrTexts.count) document(s)")
+        let ocrTexts: [String: String]
+        if let cachedOCRTexts {
+            ocrTexts = cachedOCRTexts
+            print("Reusing OCR text extracted during ground truth generation (\(ocrTexts.count) document(s))")
+        } else {
+            print("Pre-extracting OCR text from all documents...")
+            ocrTexts = await engine.preExtractOCRTexts(
+                positivePDFs: positivePDFs, negativePDFs: negativePDFs
+            )
+            print("  Extracted text from \(ocrTexts.count) document(s)")
+        }
         print()
 
         let textLLMModels = configuration.benchmarkTextLLMModels ?? DefaultModelLists.textLLMModels
@@ -77,28 +83,31 @@ extension BenchmarkCommand {
 // MARK: - Ground Truth Management
 
 private extension BenchmarkCommand {
-    /// Manage ground truth JSON files — check for existing, prompt to reuse/regenerate, review
+    /// Manage ground truth JSON files — check for existing, prompt to reuse/regenerate, review.
+    /// Returns ground truths and, when generation occurred, the OCR texts extracted during that pass.
     func manageGroundTruths(
         engine: BenchmarkEngine,
         positivePDFs: [String],
         negativePDFs: [String],
         positiveDir: String,
         negativeDir: String
-    ) async throws -> [String: GroundTruth] {
+    ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]?) {
         let needsGeneration = try promptGroundTruthStrategy(
             engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
             positiveDir: positiveDir, negativeDir: negativeDir
         )
 
+        var ocrTexts: [String: String]?
         if needsGeneration {
-            try await generateAndReviewGroundTruths(
+            ocrTexts = try await generateAndReviewGroundTruths(
                 engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
                 positiveDir: positiveDir, negativeDir: negativeDir
             )
         }
 
         let allPDFs = positivePDFs + negativePDFs
-        return try engine.loadGroundTruths(pdfPaths: allPDFs)
+        let groundTruths = try engine.loadGroundTruths(pdfPaths: allPDFs)
+        return (groundTruths, ocrTexts)
     }
 
     /// Check existing sidecars and prompt the user for reuse/regeneration strategy
@@ -141,14 +150,15 @@ private extension BenchmarkCommand {
         return true
     }
 
-    /// Generate ground truths and pause for user review
+    /// Generate ground truths and pause for user review. Returns the OCR texts for reuse.
+    @discardableResult
     func generateAndReviewGroundTruths(
         engine: BenchmarkEngine,
         positivePDFs: [String],
         negativePDFs: [String],
         positiveDir: String,
         negativeDir: String
-    ) async throws {
+    ) async throws -> [String: String] {
         print("Generating ground truth files...")
         let ocrTexts = await engine.preExtractOCRTexts(
             positivePDFs: positivePDFs, negativePDFs: negativePDFs
@@ -166,6 +176,8 @@ private extension BenchmarkCommand {
         print()
         print("After reviewing, press Enter to continue...")
         _ = readLine()
+
+        return ocrTexts
     }
 
     /// Print sidecar locations and offer to open them in the default editor
