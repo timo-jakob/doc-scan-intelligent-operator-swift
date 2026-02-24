@@ -27,7 +27,7 @@ extension ConfigurationTests {
     }
 
     func testCustomHuggingFaceUsername() {
-        let config = Configuration(huggingFaceUsername: "my-hf-user")
+        let config = Configuration(benchmark: BenchmarkSettings(huggingFaceUsername: "my-hf-user"))
         XCTAssertEqual(config.huggingFaceUsername, "my-hf-user")
     }
 
@@ -82,7 +82,7 @@ extension ConfigurationTests {
             modelName: "vlm-model",
             textModelName: "text-model",
             modelCacheDir: "/test/cache",
-            huggingFaceUsername: "testuser"
+            benchmark: BenchmarkSettings(huggingFaceUsername: "testuser")
         )
 
         let savePath = tempDirectory.appendingPathComponent("new_fields.yaml").path
@@ -101,7 +101,7 @@ extension ConfigurationTests {
     }
 
     func testDescriptionIncludesHuggingFaceUsername() {
-        let config = Configuration(huggingFaceUsername: "hf-user")
+        let config = Configuration(benchmark: BenchmarkSettings(huggingFaceUsername: "hf-user"))
         XCTAssertTrue(config.description.contains("hf-user"))
         XCTAssertTrue(config.description.contains("HuggingFace User:"))
     }
@@ -123,8 +123,7 @@ extension ConfigurationTests {
         let vlmModels = ["model/vlm-a", "model/vlm-b"]
         let textModels = ["model/text-a", "model/text-b"]
         let config = Configuration(
-            benchmarkVLMModels: vlmModels,
-            benchmarkTextLLMModels: textModels
+            benchmark: BenchmarkSettings(vlmModels: vlmModels, textLLMModels: textModels)
         )
         XCTAssertEqual(config.benchmarkVLMModels, vlmModels)
         XCTAssertEqual(config.benchmarkTextLLMModels, textModels)
@@ -154,8 +153,7 @@ extension ConfigurationTests {
 
     func testYAMLRoundTripWithBenchmarkModels() throws {
         let config = Configuration(
-            benchmarkVLMModels: ["vlm/a", "vlm/b"],
-            benchmarkTextLLMModels: ["text/a"]
+            benchmark: BenchmarkSettings(vlmModels: ["vlm/a", "vlm/b"], textLLMModels: ["text/a"])
         )
 
         let savePath = tempDirectory.appendingPathComponent("benchmark_models.yaml").path

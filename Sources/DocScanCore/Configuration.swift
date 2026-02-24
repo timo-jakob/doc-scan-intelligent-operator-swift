@@ -40,6 +40,28 @@ public struct OutputSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// Benchmark-related settings for model evaluation
+public struct BenchmarkSettings: Codable, Equatable, Sendable {
+    /// Hugging Face username (for model discovery)
+    public var huggingFaceUsername: String?
+
+    /// Override VLM model list for benchmarking (nil = use DefaultModelLists.vlmModels)
+    public var vlmModels: [String]?
+
+    /// Override TextLLM model list for benchmarking (nil = use DefaultModelLists.textLLMModels)
+    public var textLLMModels: [String]?
+
+    public init(
+        huggingFaceUsername: String? = nil,
+        vlmModels: [String]? = nil,
+        textLLMModels: [String]? = nil
+    ) {
+        self.huggingFaceUsername = huggingFaceUsername
+        self.vlmModels = vlmModels
+        self.textLLMModels = textLLMModels
+    }
+}
+
 /// Configuration for document scanning and invoice processing
 public struct Configuration: Codable, Sendable {
     /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
@@ -60,14 +82,26 @@ public struct Configuration: Codable, Sendable {
     /// Output formatting settings
     public var output: OutputSettings
 
-    /// Hugging Face username (for model discovery)
-    public var huggingFaceUsername: String?
+    /// Benchmark-related settings
+    public var benchmark: BenchmarkSettings
 
-    /// Override VLM model list for benchmarking (nil = use DefaultModelLists.vlmModels)
-    public var benchmarkVLMModels: [String]?
+    /// Hugging Face username (convenience accessor)
+    public var huggingFaceUsername: String? {
+        get { benchmark.huggingFaceUsername }
+        set { benchmark.huggingFaceUsername = newValue }
+    }
 
-    /// Override TextLLM model list for benchmarking (nil = use DefaultModelLists.textLLMModels)
-    public var benchmarkTextLLMModels: [String]?
+    /// Override VLM model list for benchmarking (convenience accessor)
+    public var benchmarkVLMModels: [String]? {
+        get { benchmark.vlmModels }
+        set { benchmark.vlmModels = newValue }
+    }
+
+    /// Override TextLLM model list for benchmarking (convenience accessor)
+    public var benchmarkTextLLMModels: [String]? {
+        get { benchmark.textLLMModels }
+        set { benchmark.textLLMModels = newValue }
+    }
 
     /// Maximum number of tokens to generate (convenience accessor)
     public var maxTokens: Int {
@@ -129,9 +163,7 @@ public struct Configuration: Codable, Sendable {
         processing: ProcessingSettings = ProcessingSettings(),
         verbose: Bool = false,
         output: OutputSettings = OutputSettings(),
-        huggingFaceUsername: String? = nil,
-        benchmarkVLMModels: [String]? = nil,
-        benchmarkTextLLMModels: [String]? = nil
+        benchmark: BenchmarkSettings = BenchmarkSettings()
     ) {
         self.modelName = modelName
         self.textModelName = textModelName
@@ -139,9 +171,7 @@ public struct Configuration: Codable, Sendable {
         self.processing = processing
         self.verbose = verbose
         self.output = output
-        self.huggingFaceUsername = huggingFaceUsername
-        self.benchmarkVLMModels = benchmarkVLMModels
-        self.benchmarkTextLLMModels = benchmarkTextLLMModels
+        self.benchmark = benchmark
     }
 
     /// Explicit CodingKeys to maintain flat YAML format
@@ -170,9 +200,11 @@ public struct Configuration: Codable, Sendable {
         )
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
-        huggingFaceUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
-        benchmarkVLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkVLMModels)
-        benchmarkTextLLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
+        benchmark = try BenchmarkSettings(
+            huggingFaceUsername: container.decodeIfPresent(String.self, forKey: .huggingFaceUsername),
+            vlmModels: container.decodeIfPresent([String].self, forKey: .benchmarkVLMModels),
+            textLLMModels: container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
+        )
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -185,9 +217,9 @@ public struct Configuration: Codable, Sendable {
         try container.encode(processing.pdfDPI, forKey: .pdfDPI)
         try container.encode(verbose, forKey: .verbose)
         try container.encode(output, forKey: .output)
-        try container.encodeIfPresent(huggingFaceUsername, forKey: .huggingFaceUsername)
-        try container.encodeIfPresent(benchmarkVLMModels, forKey: .benchmarkVLMModels)
-        try container.encodeIfPresent(benchmarkTextLLMModels, forKey: .benchmarkTextLLMModels)
+        try container.encodeIfPresent(benchmark.huggingFaceUsername, forKey: .huggingFaceUsername)
+        try container.encodeIfPresent(benchmark.vlmModels, forKey: .benchmarkVLMModels)
+        try container.encodeIfPresent(benchmark.textLLMModels, forKey: .benchmarkTextLLMModels)
     }
 
     /// Load configuration from YAML file
@@ -234,7 +266,7 @@ extension Configuration: CustomStringConvertible {
           Date Format: \(dateFormat)
           Filename Pattern: \(filenamePattern)
         """
-        if let hfUser = huggingFaceUsername {
+        if let hfUser = benchmark.huggingFaceUsername {
             desc += "\n  HuggingFace User: \(hfUser)"
         }
         return desc
