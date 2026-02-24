@@ -161,7 +161,7 @@ private extension BenchmarkCommand {
         print("Ground truth JSON files have been generated next to each PDF.")
         print("Please review them before continuing.")
         print()
-        printAndOfferSidecars(positiveDir: positiveDir, negativeDir: negativeDir)
+        await printAndOfferSidecars(positiveDir: positiveDir, negativeDir: negativeDir)
 
         print()
         print("After reviewing, press Enter to continue...")
@@ -169,7 +169,7 @@ private extension BenchmarkCommand {
     }
 
     /// Print sidecar locations and offer to open them in the default editor
-    func printAndOfferSidecars(positiveDir: String, negativeDir: String) {
+    func printAndOfferSidecars(positiveDir: String, negativeDir: String) async {
         let fileManager = FileManager.default
         let posSidecars = sidecarPaths(in: positiveDir, fileManager: fileManager)
         let negSidecars = sidecarPaths(in: negativeDir, fileManager: fileManager)
@@ -181,8 +181,11 @@ private extension BenchmarkCommand {
         print()
 
         if TerminalUtils.confirm("Open sidecar files in default editor?") {
-            for path in posSidecars + negSidecars {
-                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            let allPaths = posSidecars + negSidecars
+            await MainActor.run {
+                for path in allPaths {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
+                }
             }
         }
     }

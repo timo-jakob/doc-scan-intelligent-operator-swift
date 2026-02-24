@@ -2,10 +2,10 @@ import Foundation
 
 /// Default model lists for independent benchmarking.
 /// Curated from Hugging Face, filtered by MLX compatibility, popularity, and document-processing relevance.
-public enum DefaultModelLists {
+package enum DefaultModelLists {
     /// Curated VLM models (true Vision-Language Models with image input support).
     /// Sourced from mlx-community, sorted roughly by popularity/relevance.
-    public static let vlmModels: [String] = [
+    package static let vlmModels: [String] = [
         // Qwen2-VL series (strong document understanding)
         "mlx-community/Qwen2-VL-2B-Instruct-4bit",
         "mlx-community/Qwen2-VL-2B-Instruct-8bit",
@@ -47,7 +47,7 @@ public enum DefaultModelLists {
 
     /// Curated TextLLM models (purely text-based, no multimodal models).
     /// Sourced from mlx-community, sorted roughly by popularity/relevance.
-    public static let textLLMModels: [String] = [
+    package static let textLLMModels: [String] = [
         // Qwen2.5 series (strong instruction following)
         "mlx-community/Qwen2.5-7B-Instruct-4bit",
         "mlx-community/Qwen2.5-7B-Instruct-8bit",

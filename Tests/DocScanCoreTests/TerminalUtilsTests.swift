@@ -11,16 +11,11 @@ final class TerminalUtilsTests: XCTestCase {
             makeVLMResult(model: "mid/vlm", score: 0.75, elapsed: 15),
         ]
 
-        let sorted = results
-            .filter { !$0.isDisqualified }
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.elapsedSeconds < rhs.elapsedSeconds
-            }
+        let ranked = results.rankedByScore()
 
-        XCTAssertEqual(sorted[0].modelName, "high/vlm")
-        XCTAssertEqual(sorted[1].modelName, "mid/vlm")
-        XCTAssertEqual(sorted[2].modelName, "low/vlm")
+        XCTAssertEqual(ranked[0].modelName, "high/vlm")
+        XCTAssertEqual(ranked[1].modelName, "mid/vlm")
+        XCTAssertEqual(ranked[2].modelName, "low/vlm")
     }
 
     func testVLMResultsSortBreaksTiesByTime() {
@@ -29,14 +24,10 @@ final class TerminalUtilsTests: XCTestCase {
             makeVLMResult(model: "fast/vlm", score: 0.8, elapsed: 10),
         ]
 
-        let sorted = results
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.elapsedSeconds < rhs.elapsedSeconds
-            }
+        let ranked = results.rankedByScore()
 
-        XCTAssertEqual(sorted[0].modelName, "fast/vlm")
-        XCTAssertEqual(sorted[1].modelName, "slow/vlm")
+        XCTAssertEqual(ranked[0].modelName, "fast/vlm")
+        XCTAssertEqual(ranked[1].modelName, "slow/vlm")
     }
 
     func testVLMDisqualifiedExcludedFromRanking() {
@@ -45,9 +36,9 @@ final class TerminalUtilsTests: XCTestCase {
             VLMBenchmarkResult.disqualified(modelName: "bad/vlm", reason: "Out of memory"),
         ]
 
-        let qualifying = results.filter { !$0.isDisqualified }
-        XCTAssertEqual(qualifying.count, 1)
-        XCTAssertEqual(qualifying[0].modelName, "good/vlm")
+        let ranked = results.rankedByScore()
+        XCTAssertEqual(ranked.count, 1)
+        XCTAssertEqual(ranked[0].modelName, "good/vlm")
     }
 
     // MARK: - TextLLM Leaderboard Sorting
@@ -58,15 +49,10 @@ final class TerminalUtilsTests: XCTestCase {
             makeTextLLMResult(model: "high/text", score: 0.9, elapsed: 20),
         ]
 
-        let sorted = results
-            .filter { !$0.isDisqualified }
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.elapsedSeconds < rhs.elapsedSeconds
-            }
+        let ranked = results.rankedByScore()
 
-        XCTAssertEqual(sorted[0].modelName, "high/text")
-        XCTAssertEqual(sorted[1].modelName, "low/text")
+        XCTAssertEqual(ranked[0].modelName, "high/text")
+        XCTAssertEqual(ranked[1].modelName, "low/text")
     }
 
     func testTextLLMDisqualifiedExcludedFromRanking() {
@@ -75,9 +61,9 @@ final class TerminalUtilsTests: XCTestCase {
             TextLLMBenchmarkResult.disqualified(modelName: "bad/text", reason: "Timeout"),
         ]
 
-        let qualifying = results.filter { !$0.isDisqualified }
-        XCTAssertEqual(qualifying.count, 1)
-        XCTAssertEqual(qualifying[0].modelName, "good/text")
+        let ranked = results.rankedByScore()
+        XCTAssertEqual(ranked.count, 1)
+        XCTAssertEqual(ranked[0].modelName, "good/text")
     }
 
     // MARK: - VLM Result Properties

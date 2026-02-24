@@ -3,17 +3,36 @@ import Foundation
 // MARK: - Shared Protocol
 
 /// Common properties for benchmark results, used for generic sorting and display
-public protocol BenchmarkResultProtocol {
+public protocol BenchmarkResultProtocol: Sendable {
     var modelName: String { get }
+    var totalScore: Int { get }
+    var maxScore: Int { get }
     var score: Double { get }
     var elapsedSeconds: TimeInterval { get }
     var isDisqualified: Bool { get }
+    var disqualificationReason: String? { get }
+}
+
+public extension Sequence where Element: BenchmarkResultProtocol {
+    /// Return qualifying (non-disqualified) results ranked by score descending, then elapsed time ascending.
+    /// Uses cross-multiplication for score comparison to avoid floating-point imprecision.
+    func rankedByScore() -> [Element] {
+        filter { !$0.isDisqualified }
+            .sorted { lhs, rhs in
+                // Cross-multiply to compare totalScore/maxScore without floating point:
+                // lhs.score > rhs.score  ⟺  lhs.totalScore * rhs.maxScore > rhs.totalScore * lhs.maxScore
+                let lhsCross = lhs.totalScore * rhs.maxScore
+                let rhsCross = rhs.totalScore * lhs.maxScore
+                if lhsCross != rhsCross { return lhsCross > rhsCross }
+                return lhs.elapsedSeconds < rhs.elapsedSeconds
+            }
+    }
 }
 
 // MARK: - VLM Benchmark Results
 
 /// Result for a single document in a VLM categorization benchmark
-public struct VLMDocumentResult: Equatable {
+public struct VLMDocumentResult: Equatable, Sendable {
     /// Filename of the document
     public let filename: String
 
@@ -45,7 +64,7 @@ public struct VLMDocumentResult: Equatable {
 }
 
 /// Aggregated result for a single VLM model benchmark
-public struct VLMBenchmarkResult: Equatable, BenchmarkResultProtocol {
+public struct VLMBenchmarkResult: Equatable, Sendable, BenchmarkResultProtocol {
     /// Model name
     public let modelName: String
 
@@ -146,7 +165,7 @@ public struct VLMBenchmarkResult: Equatable, BenchmarkResultProtocol {
 // MARK: - TextLLM Benchmark Results
 
 /// Result for a single document in a TextLLM benchmark
-public struct TextLLMDocumentResult: Equatable {
+public struct TextLLMDocumentResult: Equatable, Sendable {
     /// Filename of the document
     public let filename: String
 
@@ -178,7 +197,7 @@ public struct TextLLMDocumentResult: Equatable {
 }
 
 /// Aggregated result for a single TextLLM model benchmark
-public struct TextLLMBenchmarkResult: Equatable, BenchmarkResultProtocol {
+public struct TextLLMBenchmarkResult: Equatable, Sendable, BenchmarkResultProtocol {
     /// Model name
     public let modelName: String
 

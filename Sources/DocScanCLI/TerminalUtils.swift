@@ -54,42 +54,46 @@ enum TerminalUtils {
         return ["y", "yes"].contains(input.lowercased())
     }
 
-    // MARK: - VLM Leaderboard
+    // MARK: - Generic Leaderboard
 
-    /// Format a VLM leaderboard sorted by score (desc), then by time (asc) for ties
-    static func formatVLMLeaderboard(results: [VLMBenchmarkResult]) -> String {
+    /// Format a leaderboard from benchmark results, ranked by score descending then time ascending.
+    /// - Parameters:
+    ///   - title: Leaderboard title
+    ///   - results: All results (qualifying and disqualified)
+    ///   - headerSuffix: Column headers after the common "Score%  Points" columns
+    ///   - rowFormatter: Closure that formats the type-specific columns for a qualifying result
+    static func formatLeaderboard<T: BenchmarkResultProtocol>(
+        title: String,
+        results: [T],
+        headerSuffix: String,
+        rowFormatter: (T) -> String
+    ) -> String {
         var lines: [String] = []
-        lines.append("VLM Leaderboard: Categorization")
-        lines.append(String(repeating: "═", count: 31))
+        lines.append(title)
+        lines.append(String(repeating: "═", count: title.count))
 
-        let qualifying = results
-            .filter { !$0.isDisqualified }
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.elapsedSeconds < rhs.elapsedSeconds
-            }
+        let qualifying = results.rankedByScore()
 
         if qualifying.isEmpty {
             lines.append("  No qualifying results.")
         } else {
-            // Header
             let modelWidth = max(12, qualifying.map(\.modelName.count).max() ?? 12)
             let header = "  #  \("Model".padding(toLength: modelWidth, withPad: " ", startingAt: 0))"
-                + "  Score%  Points  TP  TN  FP  FN   Time  Status"
+                + "  Score%  Points  \(headerSuffix)   Time  Status"
             lines.append(header)
             lines.append("  " + String(repeating: "─", count: header.count - 2))
 
             for (index, result) in qualifying.enumerated() {
-                let row = formatVLMRow(
-                    rank: index + 1,
-                    result: result,
-                    modelWidth: modelWidth
-                )
-                lines.append(row)
+                let rankStr = String(index + 1).leftPadded(toLength: 3)
+                let model = result.modelName.padding(toLength: modelWidth, withPad: " ", startingAt: 0)
+                let score = formatPercent(result.score)
+                let points = "\(result.totalScore)/\(result.maxScore)".leftPadded(toLength: 6)
+                let extra = rowFormatter(result)
+                let time = formatTime(result.elapsedSeconds)
+                lines.append("  \(rankStr)  \(model)  \(score)  \(points)  \(extra)  \(time)  OK")
             }
         }
 
-        // Add disqualified entries
         let disqualified = results.filter(\.isDisqualified)
         if !disqualified.isEmpty {
             lines.append("")
@@ -102,85 +106,37 @@ enum TerminalUtils {
         return lines.joined(separator: "\n")
     }
 
-    private static func formatVLMRow(
-        rank: Int,
-        result: VLMBenchmarkResult,
-        modelWidth: Int
-    ) -> String {
-        let rankStr = String(rank).leftPadded(toLength: 3)
-        let model = result.modelName.padding(toLength: modelWidth, withPad: " ", startingAt: 0)
-        let score = formatPercent(result.score)
-        let points = "\(result.totalScore)/\(result.maxScore)".leftPadded(toLength: 6)
-        let truePos = String(result.truePositives).leftPadded(toLength: 3)
-        let trueNeg = String(result.trueNegatives).leftPadded(toLength: 3)
-        let falsePos = String(result.falsePositives).leftPadded(toLength: 3)
-        let falseNeg = String(result.falseNegatives).leftPadded(toLength: 3)
-        let time = formatTime(result.elapsedSeconds)
-        return "  \(rankStr)  \(model)  \(score)  \(points)  \(truePos) \(trueNeg) \(falsePos) \(falseNeg)  \(time)  OK"
+    // MARK: - VLM Leaderboard
+
+    /// Format a VLM leaderboard sorted by score (desc), then by time (asc) for ties
+    static func formatVLMLeaderboard(results: [VLMBenchmarkResult]) -> String {
+        formatLeaderboard(
+            title: "VLM Leaderboard: Categorization",
+            results: results,
+            headerSuffix: "TP  TN  FP  FN"
+        ) { result in
+            let truePos = String(result.truePositives).leftPadded(toLength: 3)
+            let trueNeg = String(result.trueNegatives).leftPadded(toLength: 3)
+            let falsePos = String(result.falsePositives).leftPadded(toLength: 3)
+            let falseNeg = String(result.falseNegatives).leftPadded(toLength: 3)
+            return "\(truePos) \(trueNeg) \(falsePos) \(falseNeg)"
+        }
     }
 
     // MARK: - TextLLM Leaderboard
 
     /// Format a TextLLM leaderboard sorted by score (desc), then by time (asc) for ties
     static func formatTextLLMLeaderboard(results: [TextLLMBenchmarkResult]) -> String {
-        var lines: [String] = []
-        lines.append("TextLLM Leaderboard: Categorization + Extraction")
-        lines.append(String(repeating: "═", count: 49))
-
-        let qualifying = results
-            .filter { !$0.isDisqualified }
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.elapsedSeconds < rhs.elapsedSeconds
-            }
-
-        if qualifying.isEmpty {
-            lines.append("  No qualifying results.")
-        } else {
-            // Header
-            let modelWidth = max(12, qualifying.map(\.modelName.count).max() ?? 12)
-            let header = "  #  \("Model".padding(toLength: modelWidth, withPad: " ", startingAt: 0))"
-                + "  Score%  Points  2s  1s  0s   Time  Status"
-            lines.append(header)
-            lines.append("  " + String(repeating: "─", count: header.count - 2))
-
-            for (index, result) in qualifying.enumerated() {
-                let row = formatTextLLMRow(
-                    rank: index + 1,
-                    result: result,
-                    modelWidth: modelWidth
-                )
-                lines.append(row)
-            }
+        formatLeaderboard(
+            title: "TextLLM Leaderboard: Categorization + Extraction",
+            results: results,
+            headerSuffix: "2s  1s  0s"
+        ) { result in
+            let twos = String(result.fullyCorrectCount).leftPadded(toLength: 3)
+            let ones = String(result.partiallyCorrectCount).leftPadded(toLength: 3)
+            let zeros = String(result.fullyWrongCount).leftPadded(toLength: 3)
+            return "\(twos) \(ones) \(zeros)"
         }
-
-        // Add disqualified entries
-        let disqualified = results.filter(\.isDisqualified)
-        if !disqualified.isEmpty {
-            lines.append("")
-            for result in disqualified {
-                let reason = result.disqualificationReason ?? "Unknown"
-                lines.append("  DQ  \(result.modelName)  (\(reason))")
-            }
-        }
-
-        return lines.joined(separator: "\n")
-    }
-
-    private static func formatTextLLMRow(
-        rank: Int,
-        result: TextLLMBenchmarkResult,
-        modelWidth: Int
-    ) -> String {
-        let rankStr = String(rank).leftPadded(toLength: 3)
-        let model = result.modelName.padding(toLength: modelWidth, withPad: " ", startingAt: 0)
-        let score = formatPercent(result.score)
-        let points = "\(result.totalScore)/\(result.maxScore)".leftPadded(toLength: 6)
-        let twos = String(result.fullyCorrectCount).leftPadded(toLength: 3)
-        let ones = String(result.partiallyCorrectCount).leftPadded(toLength: 3)
-        let zeros = String(result.fullyWrongCount).leftPadded(toLength: 3)
-        let time = formatTime(result.elapsedSeconds)
-        return "  \(rankStr)  \(model)  \(score)  \(points)  \(twos) \(ones) \(zeros)  \(time)  OK"
     }
 
     // MARK: - Private Helpers

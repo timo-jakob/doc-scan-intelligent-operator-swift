@@ -38,8 +38,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         let (positivePDFs, negativePDFs) = try enumerateAndValidate(engine: engine)
 
         let timeout = promptTimeoutSelection()
-        let apiToken = try promptHuggingFaceCredentials(configuration: &configuration)
-        _ = apiToken
+        _ = try promptHuggingFaceCredentials(configuration: &configuration)
 
         let vlmResults = try await runPhaseA(
             engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
@@ -98,10 +97,8 @@ struct BenchmarkCommand: AsyncParsableCommand {
         textLLMResults: [TextLLMBenchmarkResult]
     ) {
         printBenchmarkPhaseHeader("Cleanup", title: "Model Cache Cleanup")
-        let bestVLM = vlmResults.filter { !$0.isDisqualified }
-            .sorted { $0.score > $1.score }.first?.modelName
-        let bestTextLLM = textLLMResults.filter { !$0.isDisqualified }
-            .sorted { $0.score > $1.score }.first?.modelName
+        let bestVLM = vlmResults.rankedByScore().first?.modelName
+        let bestTextLLM = textLLMResults.rankedByScore().first?.modelName
 
         engine.cleanupBenchmarkedModels(modelNames: vlmResults.map(\.modelName), keepModel: bestVLM)
         engine.cleanupBenchmarkedModels(modelNames: textLLMResults.map(\.modelName), keepModel: bestTextLLM)
@@ -110,14 +107,13 @@ struct BenchmarkCommand: AsyncParsableCommand {
     // MARK: - Helpers
 
     private func parseDocumentType() throws -> DocumentType {
-        switch type.lowercased() {
-        case "invoice": return .invoice
-        case "prescription": return .prescription
-        default:
+        guard let documentType = DocumentType(rawValue: type.lowercased()) else {
+            let validTypes = DocumentType.allCases.map(\.rawValue).joined(separator: ", ")
             print("Invalid document type: '\(type)'")
-            print("Valid types: invoice, prescription")
+            print("Valid types: \(validTypes)")
             throw ExitCode.failure
         }
+        return documentType
     }
 
     private func loadConfiguration() throws -> Configuration {
@@ -211,11 +207,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
     }
 
     private func bestQualifyingResult<T: BenchmarkResultProtocol>(from results: [T]) -> T? {
-        results.filter { !$0.isDisqualified }
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.elapsedSeconds < rhs.elapsedSeconds
-            }.first
+        results.rankedByScore().first
     }
 
     private func printBestModel(label: String, result: (some BenchmarkResultProtocol)?) {

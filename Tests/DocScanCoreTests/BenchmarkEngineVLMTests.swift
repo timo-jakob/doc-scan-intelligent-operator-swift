@@ -155,6 +155,39 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         XCTAssertEqual(result.disqualificationReason, "Out of memory")
     }
 
+    // MARK: - VLM Benchmark Happy Path
+
+    func testBenchmarkVLMHappyPath() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BenchmarkVLMTest-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Create a minimal valid PDF
+        let positivePDF = tempDir.appendingPathComponent("invoice.pdf")
+        let negativePDF = tempDir.appendingPathComponent("letter.pdf")
+        for pdfURL in [positivePDF, negativePDF] {
+            try createMinimalPDF(at: pdfURL)
+        }
+
+        let factory = MockVLMOnlyFactory()
+        let result = await engine.benchmarkVLM(
+            modelName: "test/mock-vlm",
+            positivePDFs: [positivePDF.path],
+            negativePDFs: [negativePDF.path],
+            timeoutSeconds: 10,
+            vlmFactory: factory
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.modelName, "test/mock-vlm")
+        XCTAssertEqual(result.documentResults.count, 2)
+        XCTAssertGreaterThanOrEqual(result.elapsedSeconds, 0)
+        // Mock responds "Yes" by default → positive=TP, negative=FP
+        XCTAssertEqual(result.truePositives, 1)
+        XCTAssertEqual(result.falsePositives, 1)
+    }
+
     // MARK: - Memory Estimation
 
     func testMemoryEstimateForVLMOnly() {
@@ -165,5 +198,21 @@ final class BenchmarkEngineVLMTests: XCTestCase {
     func testMemoryEstimateForUnknownModel() {
         let memoryMB = BenchmarkEngine.estimateMemoryMB(vlm: "unknown-model", text: "")
         XCTAssertEqual(memoryMB, 0)
+    }
+
+    // MARK: - Helpers
+
+    private func createMinimalPDF(at url: URL) throws {
+        let pdfData = NSMutableData()
+        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData),
+              let context = CGContext(consumer: consumer, mediaBox: nil, nil)
+        else {
+            throw DocScanError.pdfConversionFailed("Could not create PDF context")
+        }
+        var mediaBox = CGRect(x: 0, y: 0, width: 100, height: 100)
+        context.beginPage(mediaBox: &mediaBox)
+        context.endPage()
+        context.closePDF()
+        try (pdfData as Data).write(to: url)
     }
 }

@@ -125,7 +125,10 @@ public extension BenchmarkEngine {
         }
     }
 
-    /// Parse a YES/NO response from a VLM or TextLLM
+    /// Parse a YES/NO response from a VLM or TextLLM.
+    ///
+    /// Returns `true` when the response contains "yes" (case-insensitive) or starts with "ja" (German).
+    /// All other responses — including empty strings, "no", and ambiguous text — return `false`.
     static func parseYesNoResponse(_ response: String) -> Bool {
         let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return lowercased.contains("yes") || lowercased.hasPrefix("ja")

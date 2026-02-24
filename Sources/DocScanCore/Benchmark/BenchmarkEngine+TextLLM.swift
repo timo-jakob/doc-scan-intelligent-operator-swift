@@ -4,7 +4,7 @@ import Foundation
 // MARK: - TextLLM Benchmark Context
 
 /// Groups the shared parameters for a TextLLM benchmark run
-public struct TextLLMBenchmarkContext {
+public struct TextLLMBenchmarkContext: Sendable {
     public let ocrTexts: [String: String]
     public let groundTruths: [String: GroundTruth]
     public let timeoutSeconds: TimeInterval

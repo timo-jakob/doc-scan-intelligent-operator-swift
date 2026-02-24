@@ -128,19 +128,13 @@ public final class BenchmarkEngine: Sendable {
     // MARK: - Sidecar Management
 
     /// Check which PDFs already have sidecar files
-    public func checkExistingSidecars(positiveDir: String, negativeDir: String?) throws -> [String: Bool] {
+    public func checkExistingSidecars(positiveDir: String, negativeDir: String) throws -> [String: Bool] {
         var result: [String: Bool] = [:]
         let fileManager = FileManager.default
 
-        let positivePDFs = try enumeratePDFs(in: positiveDir)
-        for pdf in positivePDFs {
-            let sidecar = GroundTruth.sidecarPath(for: pdf)
-            result[pdf] = fileManager.fileExists(atPath: sidecar)
-        }
-
-        if let negDir = negativeDir {
-            let negativePDFs = try enumeratePDFs(in: negDir)
-            for pdf in negativePDFs {
+        for dir in [positiveDir, negativeDir] {
+            let pdfs = try enumeratePDFs(in: dir)
+            for pdf in pdfs {
                 let sidecar = GroundTruth.sidecarPath(for: pdf)
                 result[pdf] = fileManager.fileExists(atPath: sidecar)
             }
@@ -172,6 +166,7 @@ public final class BenchmarkEngine: Sendable {
     public func preExtractOCRTexts(positivePDFs: [String], negativePDFs: [String]) async -> [String: String] {
         var ocrTexts: [String: String] = [:]
         let allPDFs = positivePDFs + negativePDFs
+        let ocrEngine = OCREngine(config: configuration)
 
         for pdfPath in allPDFs {
             let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
@@ -192,7 +187,6 @@ public final class BenchmarkEngine: Sendable {
                     at: pdfPath,
                     dpi: configuration.pdfDPI
                 )
-                let ocrEngine = OCREngine(config: configuration)
                 let text = try await ocrEngine.extractText(from: image)
                 ocrTexts[pdfPath] = text
                 if verbose {

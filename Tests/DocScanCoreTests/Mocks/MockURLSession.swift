@@ -1,7 +1,10 @@
 @testable import DocScanCore
 import Foundation
 
-/// Mock URLSession for testing HuggingFaceClient without network calls
+/// Mock URLSession for testing HuggingFaceClient without network calls.
+///
+/// Marked `@unchecked Sendable` because mutable state (`mockData`, `mockResponse`, etc.)
+/// is only mutated during single-threaded test setup, never concurrently.
 final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
     var mockData: Data?
     var mockResponse: URLResponse?

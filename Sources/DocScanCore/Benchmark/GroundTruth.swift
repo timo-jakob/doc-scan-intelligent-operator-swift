@@ -1,7 +1,7 @@
 import Foundation
 
 /// Metadata about how ground truth was generated
-public struct GroundTruthMetadata: Codable, Equatable {
+public struct GroundTruthMetadata: Codable, Equatable, Sendable {
     /// VLM model used to generate this ground truth
     public var vlmModel: String?
 
@@ -28,7 +28,7 @@ public struct GroundTruthMetadata: Codable, Equatable {
 }
 
 /// Ground truth for a single document, stored as a JSON sidecar file
-public struct GroundTruth: Codable, Equatable {
+public struct GroundTruth: Codable, Equatable, Sendable {
     /// Whether this document matches the target document type
     public var isMatch: Bool
 

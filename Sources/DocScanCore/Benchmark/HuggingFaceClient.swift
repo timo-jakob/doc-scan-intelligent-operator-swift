@@ -60,7 +60,7 @@ public enum HFGated: Codable, Equatable {
 }
 
 /// Client for querying the Hugging Face API
-public class HuggingFaceClient {
+public final class HuggingFaceClient: Sendable {
     private let session: URLSessionProtocol
     private let apiToken: String?
     private let baseURL: String

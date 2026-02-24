@@ -153,6 +153,31 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         XCTAssertEqual(benchmark.elapsedSeconds, 33.7)
     }
 
+    // MARK: - TextLLM Benchmark Happy Path
+
+    func testBenchmarkTextLLMHappyPathWithEmptyDocs() async {
+        let factory = MockTextLLMOnlyFactory()
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: [:], groundTruths: [:],
+            timeoutSeconds: 10, textLLMFactory: factory
+        )
+
+        let result = await engine.benchmarkTextLLM(
+            modelName: "test/mock-text",
+            positivePDFs: [],
+            negativePDFs: [],
+            context: context
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.modelName, "test/mock-text")
+        XCTAssertEqual(result.documentResults.count, 0)
+        XCTAssertEqual(result.totalScore, 0)
+        XCTAssertEqual(result.maxScore, 0)
+        XCTAssertEqual(result.score, 0)
+        XCTAssertGreaterThanOrEqual(result.elapsedSeconds, 0)
+    }
+
     // MARK: - Memory Estimation
 
     func testMemoryEstimateForTextOnly() {
