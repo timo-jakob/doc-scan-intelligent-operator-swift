@@ -92,7 +92,7 @@ private extension BenchmarkCommand {
         positiveDir: String,
         negativeDir: String
     ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]?) {
-        let needsGeneration = try promptGroundTruthStrategy(
+        let (needsGeneration, skipExisting) = try promptGroundTruthStrategy(
             engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
             positiveDir: positiveDir, negativeDir: negativeDir
         )
@@ -101,7 +101,7 @@ private extension BenchmarkCommand {
         if needsGeneration {
             ocrTexts = try await generateAndReviewGroundTruths(
                 engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
-                positiveDir: positiveDir, negativeDir: negativeDir
+                skipExisting: skipExisting
             )
         }
 
@@ -110,21 +110,22 @@ private extension BenchmarkCommand {
         return (groundTruths, ocrTexts)
     }
 
-    /// Check existing sidecars and prompt the user for reuse/regeneration strategy
+    /// Check existing sidecars and prompt the user for reuse/regeneration strategy.
+    /// Returns `(needsGeneration, skipExisting)`.
     func promptGroundTruthStrategy(
         engine: BenchmarkEngine,
         positivePDFs: [String],
         negativePDFs: [String],
         positiveDir: String,
         negativeDir: String
-    ) throws -> Bool {
+    ) throws -> (needsGeneration: Bool, skipExisting: Bool) {
         let existingMap = try engine.checkExistingSidecars(
             positiveDir: positiveDir, negativeDir: negativeDir
         )
         let existingCount = existingMap.filter(\.value).count
         let allPDFCount = positivePDFs.count + negativePDFs.count
 
-        guard existingCount > 0 else { return true }
+        guard existingCount > 0 else { return (true, false) }
 
         print("Found \(existingCount)/\(allPDFCount) existing ground truth file(s).")
         print()
@@ -142,12 +143,13 @@ private extension BenchmarkCommand {
         if choice == 0, existingCount == allPDFCount {
             print("Reusing all existing ground truth files.")
             print()
-            return false
+            return (false, false)
         } else if choice == 0 {
-            print("Regenerating missing ground truth files...")
+            print("Generating missing ground truth files (keeping existing)...")
             print()
+            return (true, true)
         }
-        return true
+        return (true, false)
     }
 
     /// Generate ground truths and pause for user review. Returns the OCR texts for reuse.
@@ -156,22 +158,24 @@ private extension BenchmarkCommand {
         engine: BenchmarkEngine,
         positivePDFs: [String],
         negativePDFs: [String],
-        positiveDir: String,
-        negativeDir: String
+        skipExisting: Bool
     ) async throws -> [String: String] {
         print("Generating ground truth files...")
         let ocrTexts = await engine.preExtractOCRTexts(
             positivePDFs: positivePDFs, negativePDFs: negativePDFs
         )
         _ = try await engine.generateGroundTruths(
-            positivePDFs: positivePDFs, negativePDFs: negativePDFs, ocrTexts: ocrTexts
+            positivePDFs: positivePDFs, negativePDFs: negativePDFs, ocrTexts: ocrTexts,
+            skipExisting: skipExisting
         )
         print()
 
         print("Ground truth JSON files have been generated next to each PDF.")
         print("Please review them before continuing.")
         print()
-        await printAndOfferSidecars(positiveDir: positiveDir, negativeDir: negativeDir)
+        let resolvedPositiveDir = PathUtils.resolvePath(positiveDir)
+        let resolvedNegativeDir = PathUtils.resolvePath(negativeDir)
+        await printAndOfferSidecars(positiveDir: resolvedPositiveDir, negativeDir: resolvedNegativeDir)
 
         print()
         print("After reviewing, press Enter to continue...")

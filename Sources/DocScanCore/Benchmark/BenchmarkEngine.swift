@@ -202,29 +202,32 @@ public final class BenchmarkEngine: Sendable {
 
     // MARK: - Ground Truth Generation
 
-    /// Generate ground truth sidecar files for all documents
+    /// Generate ground truth sidecar files for all documents.
+    /// - Parameter skipExisting: When `true`, PDFs that already have a sidecar file are left untouched.
     public func generateGroundTruths(
         positivePDFs: [String],
         negativePDFs: [String],
-        ocrTexts: [String: String]
+        ocrTexts: [String: String],
+        skipExisting: Bool = false
     ) async throws -> [String: GroundTruth] {
         var groundTruths: [String: GroundTruth] = [:]
-        let textLLM = TextLLMManager(config: configuration)
-        try await textLLM.preload { progress in
-            print("\r  Loading TextLLM for ground truth generation (\(Int(progress * 100))%)...", terminator: "")
-            fflush(stdout)
-        }
-        print(" Ready")
+
+        // Lazy-load TextLLM only when a positive document actually needs extraction.
+        // This avoids a costly model preload when skipExisting covers all positives.
+        var textLLM: TextLLMManager?
 
         for pdfPath in positivePDFs {
             let groundTruth = try await generatePositiveGroundTruth(
-                pdfPath: pdfPath, ocrTexts: ocrTexts, textLLM: textLLM
+                pdfPath: pdfPath, ocrTexts: ocrTexts, textLLM: &textLLM,
+                skipExisting: skipExisting
             )
             groundTruths[pdfPath] = groundTruth
         }
 
         for pdfPath in negativePDFs {
-            let groundTruth = try generateNegativeGroundTruth(pdfPath: pdfPath)
+            let groundTruth = try generateNegativeGroundTruth(
+                pdfPath: pdfPath, skipExisting: skipExisting
+            )
             groundTruths[pdfPath] = groundTruth
         }
 
@@ -234,9 +237,31 @@ public final class BenchmarkEngine: Sendable {
     private func generatePositiveGroundTruth(
         pdfPath: String,
         ocrTexts: [String: String],
-        textLLM: TextLLMManager
+        textLLM: inout TextLLMManager?,
+        skipExisting: Bool
     ) async throws -> GroundTruth {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+        let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+
+        if skipExisting, FileManager.default.fileExists(atPath: sidecarPath) {
+            print("  \(filename) — Keeping existing sidecar")
+            return try GroundTruth.load(from: sidecarPath)
+        }
+
+        // Lazy-load TextLLM on first document that needs extraction
+        if textLLM == nil {
+            let manager = TextLLMManager(config: configuration)
+            try await manager.preload { progress in
+                print(
+                    "\r  Loading TextLLM for ground truth generation (\(Int(progress * 100))%)...",
+                    terminator: ""
+                )
+                fflush(stdout)
+            }
+            print(" Ready")
+            textLLM = manager
+        }
+
         print("  \(filename) — Extracting...", terminator: "")
         fflush(stdout)
 
@@ -244,9 +269,9 @@ public final class BenchmarkEngine: Sendable {
         var secondaryField: String?
         var patientName: String?
 
-        if let ocrText = ocrTexts[pdfPath] {
+        if let ocrText = ocrTexts[pdfPath], let llm = textLLM {
             do {
-                let extraction = try await textLLM.extractData(for: documentType, from: ocrText)
+                let extraction = try await llm.extractData(for: documentType, from: ocrText)
                 if let extractedDate = extraction.date {
                     date = DateUtils.formatDate(extractedDate)
                 }
@@ -266,14 +291,23 @@ public final class BenchmarkEngine: Sendable {
             metadata: makeGroundTruthMetadata()
         )
 
-        let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
         try groundTruth.save(to: sidecarPath)
         print(" Done")
         return groundTruth
     }
 
-    private func generateNegativeGroundTruth(pdfPath: String) throws -> GroundTruth {
+    private func generateNegativeGroundTruth(
+        pdfPath: String,
+        skipExisting: Bool
+    ) throws -> GroundTruth {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+        let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
+
+        if skipExisting, FileManager.default.fileExists(atPath: sidecarPath) {
+            print("  \(filename) — Keeping existing sidecar")
+            return try GroundTruth.load(from: sidecarPath)
+        }
+
         print("  \(filename) — Negative sample")
 
         let groundTruth = GroundTruth(
@@ -282,7 +316,6 @@ public final class BenchmarkEngine: Sendable {
             metadata: makeGroundTruthMetadata()
         )
 
-        let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
         try groundTruth.save(to: sidecarPath)
         return groundTruth
     }

@@ -189,6 +189,60 @@ final class BenchmarkEngineTests: XCTestCase {
         // If missing, blank PDF produced no text — also acceptable
     }
 
+    // MARK: - generateGroundTruths skipExisting
+
+    func testGenerateGroundTruthsSkipExistingPreservesVerifiedSidecars() async throws {
+        let pdfPath = tempDir.appendingPathComponent("verified.pdf").path
+        try createMinimalPDF(at: tempDir.appendingPathComponent("verified.pdf"))
+
+        // Write a "verified" sidecar that should be preserved
+        let existing = GroundTruth(
+            isMatch: true,
+            documentType: .invoice,
+            date: "2025-06-01",
+            secondaryField: "Verified_Corp",
+            metadata: GroundTruthMetadata(verified: true)
+        )
+        try existing.save(to: GroundTruth.sidecarPath(for: pdfPath))
+
+        // Generate with skipExisting: true — the verified sidecar should survive
+        let results = try await engine.generateGroundTruths(
+            positivePDFs: [pdfPath],
+            negativePDFs: [],
+            ocrTexts: [:],
+            skipExisting: true
+        )
+
+        let loaded = results[pdfPath]
+        XCTAssertEqual(loaded?.date, "2025-06-01")
+        XCTAssertEqual(loaded?.secondaryField, "Verified_Corp")
+        XCTAssertTrue(loaded?.metadata.verified ?? false, "Verified flag should be preserved")
+    }
+
+    func testGenerateGroundTruthsWithoutSkipOverwritesSidecars() async throws {
+        let negPath = tempDir.appendingPathComponent("neg.pdf").path
+        try createMinimalPDF(at: tempDir.appendingPathComponent("neg.pdf"))
+
+        // Write an existing sidecar with a distinctive field
+        let existing = GroundTruth(
+            isMatch: false,
+            documentType: .invoice,
+            metadata: GroundTruthMetadata(vlmModel: "old-model", verified: true)
+        )
+        try existing.save(to: GroundTruth.sidecarPath(for: negPath))
+
+        // Generate with skipExisting: false — should overwrite
+        let results = try await engine.generateGroundTruths(
+            positivePDFs: [],
+            negativePDFs: [negPath],
+            ocrTexts: [:],
+            skipExisting: false
+        )
+
+        let loaded = results[negPath]
+        XCTAssertFalse(loaded?.metadata.verified ?? true, "Overwritten sidecar should not be verified")
+    }
+
     func testPreExtractOCRTextsEmptyInput() async {
         let ocrTexts = await engine.preExtractOCRTexts(
             positivePDFs: [],
