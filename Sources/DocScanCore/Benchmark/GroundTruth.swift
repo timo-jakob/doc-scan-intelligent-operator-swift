@@ -91,15 +91,20 @@ public struct GroundTruth: Codable, Equatable, Sendable {
 
     /// Save ground truth to a JSON sidecar file (pretty-printed, sorted keys)
     public func save(to path: String) throws(DocScanError) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data: Data
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            encoder.dateEncodingStrategy = .iso8601
-            let data = try encoder.encode(self)
+            data = try encoder.encode(self)
+        } catch {
+            throw DocScanError.benchmarkError("Failed to encode ground truth: \(error.localizedDescription)")
+        }
+        do {
             let url = URL(fileURLWithPath: path)
             try data.write(to: url)
         } catch {
-            throw DocScanError.benchmarkError("Failed to save ground truth: \(error.localizedDescription)")
+            throw DocScanError.fileOperationFailed("Failed to write ground truth: \(error.localizedDescription)")
         }
     }
 }
