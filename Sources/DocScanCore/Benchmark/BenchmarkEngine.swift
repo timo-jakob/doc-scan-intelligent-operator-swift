@@ -101,16 +101,18 @@ public actor DefaultTextLLMOnlyFactory: TextLLMOnlyFactory {
 public final class BenchmarkEngine: Sendable {
     public let configuration: Configuration
     public let documentType: DocumentType
-    public let verbose: Bool
+
+    /// Convenience accessor — always reads from `configuration.verbose` to avoid dual source of truth.
+    public var verbose: Bool {
+        configuration.verbose
+    }
 
     public init(
         configuration: Configuration,
-        documentType: DocumentType,
-        verbose: Bool = false
+        documentType: DocumentType
     ) {
         self.configuration = configuration
         self.documentType = documentType
-        self.verbose = verbose
     }
 
     // MARK: - MLX Setup

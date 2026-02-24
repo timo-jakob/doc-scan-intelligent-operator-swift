@@ -40,10 +40,12 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
     ) async throws -> BenchmarkWorkerOutput {
         BenchmarkEngine.configureMLXMemoryBudget()
 
+        var workerConfig = workerInput.configuration
+        workerConfig.verbose = workerInput.verbose
+
         let engine = BenchmarkEngine(
-            configuration: workerInput.configuration,
-            documentType: workerInput.documentType,
-            verbose: workerInput.verbose
+            configuration: workerConfig,
+            documentType: workerInput.documentType
         )
 
         return switch workerInput.phase {

@@ -9,8 +9,7 @@ final class BenchmarkEngineTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice,
-            verbose: false
+            documentType: .invoice
         )
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("BenchmarkEngineTests-\(UUID().uuidString)")
@@ -245,10 +244,11 @@ final class BenchmarkEngineTests: XCTestCase {
 
     func testPreExtractOCRTextsVerboseMode() async {
         // Verbose engine should still work (exercises verbose print paths)
+        var verboseConfig = Configuration()
+        verboseConfig.verbose = true
         let verboseEngine = BenchmarkEngine(
-            configuration: Configuration(),
-            documentType: .invoice,
-            verbose: true
+            configuration: verboseConfig,
+            documentType: .invoice
         )
         try? createMinimalPDF(at: tempDir.appendingPathComponent("verbose.pdf"))
         let pdfPath = tempDir.appendingPathComponent("verbose.pdf").path

@@ -9,8 +9,7 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice,
-            verbose: false
+            documentType: .invoice
         )
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("BenchmarkCleanupTests-\(UUID().uuidString)")

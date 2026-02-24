@@ -28,6 +28,9 @@ public struct SubprocessRunner: Sendable {
     /// and loading before inference begins.
     static let modelLoadingBufferSeconds: TimeInterval = 300
 
+    /// Grace period (seconds) between SIGTERM and SIGKILL escalation for stuck processes.
+    static let killEscalationSeconds: TimeInterval = 5
+
     /// Compute a generous overall timeout for a worker subprocess.
     ///
     /// Formula: `(inferenceTimeout × documentCount) + modelLoadingBuffer`
@@ -85,7 +88,16 @@ public struct SubprocessRunner: Sendable {
     ) async throws -> TermResult {
         try await withCheckedThrowingContinuation { continuation in
             let watchdog = DispatchWorkItem { [process] in
-                if process.isRunning { process.terminate() }
+                guard process.isRunning else { return }
+                process.terminate()
+                // Escalate to SIGKILL if SIGTERM doesn't stop the process
+                // (e.g. MLX C++ stuck in a tight loop ignoring signals)
+                let pid = process.processIdentifier
+                DispatchQueue.global().asyncAfter(
+                    deadline: .now() + SubprocessRunner.killEscalationSeconds
+                ) {
+                    if process.isRunning { kill(pid, SIGKILL) }
+                }
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
 

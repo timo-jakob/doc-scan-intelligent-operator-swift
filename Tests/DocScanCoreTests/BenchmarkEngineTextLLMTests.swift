@@ -81,8 +81,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice,
-            verbose: false
+            documentType: .invoice
         )
     }
 

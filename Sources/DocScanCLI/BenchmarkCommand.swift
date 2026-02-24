@@ -61,7 +61,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         configuration: Configuration, documentType: DocumentType
     ) -> BenchmarkEngine {
         BenchmarkEngine(
-            configuration: configuration, documentType: documentType, verbose: verbose
+            configuration: configuration, documentType: documentType
         )
     }
 
