@@ -90,26 +90,6 @@ public struct Configuration: Codable, Sendable {
     /// Benchmark-related settings
     public var benchmark: BenchmarkSettings
 
-    // TODO: Migrate call sites to use `benchmark.*` directly, then remove these convenience accessors
-
-    /// Hugging Face username (convenience accessor)
-    public var huggingFaceUsername: String? {
-        get { benchmark.huggingFaceUsername }
-        set { benchmark.huggingFaceUsername = newValue }
-    }
-
-    /// Override VLM model list for benchmarking (convenience accessor)
-    public var benchmarkVLMModels: [String]? {
-        get { benchmark.vlmModels }
-        set { benchmark.vlmModels = newValue }
-    }
-
-    /// Override TextLLM model list for benchmarking (convenience accessor)
-    public var benchmarkTextLLMModels: [String]? {
-        get { benchmark.textLLMModels }
-        set { benchmark.textLLMModels = newValue }
-    }
-
     /// Maximum number of tokens to generate (convenience accessor)
     public var maxTokens: Int {
         get { processing.maxTokens }

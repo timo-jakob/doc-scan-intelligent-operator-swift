@@ -37,7 +37,7 @@ extension BenchmarkCommand {
         }
         print()
 
-        let textLLMModels = configuration.benchmarkTextLLMModels ?? DefaultModelLists.textLLMModels
+        let textLLMModels = configuration.benchmark.textLLMModels ?? DefaultModelLists.textLLMModels
         print("Evaluating \(textLLMModels.count) TextLLM model(s)")
         print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
         print("Timeout: \(Int(timeoutSeconds))s per inference")
