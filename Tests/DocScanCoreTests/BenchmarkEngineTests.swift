@@ -243,6 +243,25 @@ final class BenchmarkEngineTests: XCTestCase {
         XCTAssertFalse(loaded?.metadata.verified ?? true, "Overwritten sidecar should not be verified")
     }
 
+    func testPreExtractOCRTextsVerboseMode() async {
+        // Verbose engine should still work (exercises verbose print paths)
+        let verboseEngine = BenchmarkEngine(
+            configuration: Configuration(),
+            documentType: .invoice,
+            verbose: true
+        )
+        try? createMinimalPDF(at: tempDir.appendingPathComponent("verbose.pdf"))
+        let pdfPath = tempDir.appendingPathComponent("verbose.pdf").path
+
+        let ocrTexts = await verboseEngine.preExtractOCRTexts(
+            positivePDFs: [pdfPath],
+            negativePDFs: []
+        )
+
+        // Just verify it completes without crash — verbose output goes to stdout
+        XCTAssertNotNil(ocrTexts)
+    }
+
     func testPreExtractOCRTextsEmptyInput() async {
         let ocrTexts = await engine.preExtractOCRTexts(
             positivePDFs: [],

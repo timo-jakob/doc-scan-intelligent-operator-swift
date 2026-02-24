@@ -316,6 +316,24 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         XCTAssertEqual(result.score, 0)
     }
 
+    // MARK: - VLM Memory Disqualification
+
+    func testBenchmarkVLMDisqualifiedOnInsufficientMemory() async {
+        let factory = MockVLMOnlyFactory()
+
+        // Use an absurdly large model name to trigger the memory check
+        let result = await engine.benchmarkVLM(
+            modelName: "org/Model-999999B-4bit",
+            positivePDFs: [],
+            negativePDFs: [],
+            timeoutSeconds: 10,
+            vlmFactory: factory
+        )
+
+        XCTAssertTrue(result.isDisqualified)
+        XCTAssertTrue(result.disqualificationReason?.contains("Insufficient memory") ?? false)
+    }
+
     // MARK: - Helpers
 
     private func createMinimalPDF(at url: URL) throws {

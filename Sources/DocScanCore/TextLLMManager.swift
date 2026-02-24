@@ -250,13 +250,11 @@ open class TextLLMManager: @unchecked Sendable {
     private func extractDateWithRegex(from text: String) -> Date? {
         DateUtils.extractDateFromText(text)
     }
-}
 
-// MARK: - LLM Generation
+    // MARK: - LLM Generation
 
-extension TextLLMManager {
-    /// Generate text using MLX LLM
-    func generate(
+    /// Generate text using MLX LLM. Open so tests can override without loading a real model.
+    open func generate(
         systemPrompt: String,
         userPrompt: String,
         maxTokens: Int
@@ -311,7 +309,11 @@ extension TextLLMManager {
             return fullOutput
         }
     }
+}
 
+// MARK: - Private Helpers
+
+extension TextLLMManager {
     /// Load model if not already loaded
     private func loadModelIfNeeded() async throws {
         if modelContainer != nil {

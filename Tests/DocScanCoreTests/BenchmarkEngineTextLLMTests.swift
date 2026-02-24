@@ -1,9 +1,47 @@
 @testable import DocScanCore
 import XCTest
 
-/// Mock TextLLM factory for testing
+/// Mock TextLLM manager for benchmark tests. Returns controlled responses for both
+/// categorization (generate) and extraction without loading a real model.
+class BenchmarkMockTextLLMManager: TextLLMManager, @unchecked Sendable {
+    /// Response returned by `generate()` — controls categorization (YES/NO)
+    var generateResponse: String = "YES"
+
+    /// Result returned by `extractData()` — controls extraction scoring
+    var mockExtractionResult = ExtractionResult(date: nil, secondaryField: nil, patientName: nil)
+
+    /// Whether generate should throw
+    var generateError: Error?
+
+    init() {
+        super.init(config: Configuration())
+    }
+
+    override func extractData(
+        for _: DocumentType,
+        from _: String
+    ) async throws -> ExtractionResult {
+        mockExtractionResult
+    }
+
+    override func generate(
+        systemPrompt _: String,
+        userPrompt _: String,
+        maxTokens _: Int
+    ) async throws -> String {
+        if let error = generateError {
+            throw error
+        }
+        return generateResponse
+    }
+}
+
+/// Mock TextLLM factory for testing.
+/// When a mock manager is explicitly set via `setMockManager()`, it survives
+/// `releaseTextLLM()` and `preloadTextLLM()` so the benchmark flow can use it.
 actor MockTextLLMOnlyFactory: TextLLMOnlyFactory {
-    var mockManager: TextLLMManager?
+    private var mockManager: TextLLMManager?
+    private var explicitlySet = false
     var preloadCalled = false
     var releaseCalled = false
     var preloadError: Error?
@@ -13,8 +51,6 @@ actor MockTextLLMOnlyFactory: TextLLMOnlyFactory {
         if let error = preloadError {
             throw error
         }
-        // In tests, we don't actually load a real model
-        mockManager = nil
     }
 
     func makeTextLLMManager() -> TextLLMManager? {
@@ -23,11 +59,18 @@ actor MockTextLLMOnlyFactory: TextLLMOnlyFactory {
 
     func releaseTextLLM() {
         releaseCalled = true
-        mockManager = nil
+        if !explicitlySet {
+            mockManager = nil
+        }
     }
 
     func setPreloadError(_ error: Error) {
         preloadError = error
+    }
+
+    func setMockManager(_ manager: TextLLMManager?) {
+        mockManager = manager
+        explicitlySet = manager != nil
     }
 }
 
@@ -277,6 +320,27 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         // Empty OCR text guard triggers → both false
         XCTAssertFalse(docResult.categorizationCorrect)
         XCTAssertFalse(docResult.extractionCorrect)
+    }
+
+    // MARK: - Memory Disqualification
+
+    func testBenchmarkTextLLMDisqualifiedOnInsufficientMemory() async {
+        let factory = MockTextLLMOnlyFactory()
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: [:], groundTruths: [:],
+            timeoutSeconds: 10, textLLMFactory: factory
+        )
+
+        // Use an absurdly large model name to trigger memory check
+        let result = await engine.benchmarkTextLLM(
+            modelName: "org/Model-999999B-4bit",
+            positivePDFs: [],
+            negativePDFs: [],
+            context: context
+        )
+
+        XCTAssertTrue(result.isDisqualified)
+        XCTAssertTrue(result.disqualificationReason?.contains("Insufficient memory") ?? false)
     }
 
     // MARK: - Memory Estimation
