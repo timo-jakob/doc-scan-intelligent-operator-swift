@@ -136,7 +136,7 @@ public struct BenchmarkEngine: Sendable {
         do {
             contents = try fileManager.contentsOfDirectory(atPath: directory)
         } catch {
-            throw DocScanError.fileNotFound("Failed to list directory: \(error.localizedDescription)")
+            throw DocScanError.fileOperationFailed("Failed to list directory: \(error.localizedDescription)")
         }
         return contents
             .filter { $0.lowercased().hasSuffix(".pdf") }
