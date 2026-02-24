@@ -7,9 +7,12 @@ public extension BenchmarkEngine {
     /// - Parameters:
     ///   - modelNames: All model names that were benchmarked
     ///   - keepModel: Model name to keep (final selected); nil to delete all
+    ///   - cachePath: Override for the HuggingFace hub cache path. Pass `nil` (default)
+    ///     to resolve automatically via environment variables.
     func cleanupBenchmarkedModels(
         modelNames: [String],
-        keepModel: String?
+        keepModel: String?,
+        cachePath: String? = nil
     ) {
         let keepModels: Set<String> = keepModel.map { [$0] } ?? []
 
@@ -22,7 +25,7 @@ public extension BenchmarkEngine {
         }
 
         let fileManager = FileManager.default
-        let hubCache = Self.huggingFaceCachePath()
+        let hubCache = cachePath ?? Self.huggingFaceCachePath()
 
         for modelName in toDelete.sorted() {
             // mlx-community/Qwen2-VL-2B-Instruct-4bit → models--mlx-community--Qwen2-VL-2B-Instruct-4bit
@@ -44,12 +47,17 @@ public extension BenchmarkEngine {
 
     /// Resolve the HuggingFace hub cache directory, respecting environment overrides.
     /// Checks HUGGINGFACE_HUB_CACHE, then HF_HOME/hub, then the default ~/.cache/huggingface/hub.
-    internal static func huggingFaceCachePath() -> String {
-        let env = ProcessInfo.processInfo.environment
-        if let hubCache = env["HUGGINGFACE_HUB_CACHE"] {
+    ///
+    /// - Parameter environment: Environment dictionary to read from. Defaults to
+    ///   `ProcessInfo.processInfo.environment`. Pass a custom dictionary in tests
+    ///   to avoid thread-unsafe `setenv`/`unsetenv` calls.
+    internal static func huggingFaceCachePath(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
+        if let hubCache = environment["HUGGINGFACE_HUB_CACHE"] {
             return hubCache
         }
-        if let hfHome = env["HF_HOME"] {
+        if let hfHome = environment["HF_HOME"] {
             return (hfHome as NSString).appendingPathComponent("hub")
         }
         return FileManager.default.homeDirectoryForCurrentUser

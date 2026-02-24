@@ -35,7 +35,11 @@ actor MockVLMOnlyFactory: VLMOnlyFactory {
     }
 }
 
-/// Mock VLM provider for testing
+/// Mock VLM provider for testing.
+///
+/// `@unchecked Sendable` is safe here because this mock is only mutated during
+/// single-threaded test setup (before any async work begins) and read during
+/// sequential test execution.
 class BenchmarkMockVLMProvider: VLMProvider, @unchecked Sendable {
     var mockResponse: String = "Yes"
 
@@ -48,7 +52,10 @@ class BenchmarkMockVLMProvider: VLMProvider, @unchecked Sendable {
     }
 }
 
-/// Mock VLM provider that throws errors
+/// Mock VLM provider that throws errors.
+///
+/// `@unchecked Sendable` is safe here because the error property is only set
+/// at initialization and never mutated during concurrent access.
 class BenchmarkMockVLMProviderThrowing: VLMProvider, @unchecked Sendable {
     var errorToThrow: Error = DocScanError.inferenceError("mock error")
 
@@ -336,16 +343,6 @@ final class BenchmarkEngineVLMTests: XCTestCase {
     // MARK: - Helpers
 
     private func createMinimalPDF(at url: URL) throws {
-        let pdfData = NSMutableData()
-        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData),
-              let context = CGContext(consumer: consumer, mediaBox: nil, nil)
-        else {
-            throw DocScanError.pdfConversionFailed("Could not create PDF context")
-        }
-        var mediaBox = CGRect(x: 0, y: 0, width: 100, height: 100)
-        context.beginPage(mediaBox: &mediaBox)
-        context.endPage()
-        context.closePDF()
-        try (pdfData as Data).write(to: url)
+        try TestHelpers.createMinimalPDF(at: url)
     }
 }

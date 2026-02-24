@@ -29,11 +29,9 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
     }
 
     func testCleanupKeepsSelectedModel() throws {
-        // Set HUGGINGFACE_HUB_CACHE to our temp dir so cleanup looks there
+        // Use temp dir as the HF hub cache
         let hubDir = tempDir.appendingPathComponent("hub")
         try FileManager.default.createDirectory(at: hubDir, withIntermediateDirectories: true)
-        setenv("HUGGINGFACE_HUB_CACHE", hubDir.path, 1)
-        defer { unsetenv("HUGGINGFACE_HUB_CACHE") }
 
         // Create model cache dirs matching the HF naming convention
         let keepDir = hubDir.appendingPathComponent("models--org--keep-model")
@@ -47,7 +45,8 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
 
         engine.cleanupBenchmarkedModels(
             modelNames: ["org/keep-model", "org/delete-model"],
-            keepModel: "org/keep-model"
+            keepModel: "org/keep-model",
+            cachePath: hubDir.path
         )
 
         // The kept model dir should still exist
@@ -81,21 +80,25 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
 
     func testHuggingFaceCachePathRespectsEnvOverride() {
         let customPath = "/tmp/custom-hf-cache-\(UUID().uuidString)"
-        setenv("HUGGINGFACE_HUB_CACHE", customPath, 1)
-        defer { unsetenv("HUGGINGFACE_HUB_CACHE") }
+        let env = ["HUGGINGFACE_HUB_CACHE": customPath]
 
-        let resolved = BenchmarkEngine.huggingFaceCachePath()
+        let resolved = BenchmarkEngine.huggingFaceCachePath(environment: env)
         XCTAssertEqual(resolved, customPath)
     }
 
     func testHuggingFaceCachePathRespectsHFHome() {
-        // Clear HUGGINGFACE_HUB_CACHE to test HF_HOME fallback
-        unsetenv("HUGGINGFACE_HUB_CACHE")
         let hfHome = "/tmp/hf-home-\(UUID().uuidString)"
-        setenv("HF_HOME", hfHome, 1)
-        defer { unsetenv("HF_HOME") }
+        let env = ["HF_HOME": hfHome]
 
-        let resolved = BenchmarkEngine.huggingFaceCachePath()
+        let resolved = BenchmarkEngine.huggingFaceCachePath(environment: env)
         XCTAssertEqual(resolved, (hfHome as NSString).appendingPathComponent("hub"))
+    }
+
+    func testHuggingFaceCachePathFallsBackToDefault() {
+        let resolved = BenchmarkEngine.huggingFaceCachePath(environment: [:])
+        let expected = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".cache/huggingface/hub")
+            .path
+        XCTAssertEqual(resolved, expected)
     }
 }

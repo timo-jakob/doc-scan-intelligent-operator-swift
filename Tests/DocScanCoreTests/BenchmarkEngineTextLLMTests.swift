@@ -3,6 +3,10 @@ import XCTest
 
 /// Mock TextLLM manager for benchmark tests. Returns controlled responses for both
 /// categorization (generate) and extraction without loading a real model.
+///
+/// `@unchecked Sendable` is safe here because this mock is only mutated during
+/// single-threaded test setup (before any async work begins) and read during
+/// sequential test execution.
 class BenchmarkMockTextLLMManager: TextLLMManager, @unchecked Sendable {
     /// Response returned by `generate()` — controls categorization (YES/NO)
     var generateResponse: String = "YES"
