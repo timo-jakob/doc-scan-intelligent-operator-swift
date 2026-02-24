@@ -1,220 +1,56 @@
-import AppKit
-import ArgumentParser
 import DocScanCore
 import Foundation
 
-// MARK: - Phase A: Initial Benchmark Run + Sidecar Generation
+// MARK: - Phase A: VLM Categorization Benchmark
 
 extension BenchmarkCommand {
-    /// Phase A: Run initial benchmark, generate sidecar files
+    /// Phase A: Run each VLM model against all documents for categorization scoring
     func runPhaseA(
         engine: BenchmarkEngine,
-        positiveDir: String,
-        negativeDir: String?
-    ) async throws -> [ModelPairResult] {
-        printBenchmarkPhaseHeader("A", title: "Initial Benchmark Run")
+        positivePDFs: [String],
+        negativePDFs: [String],
+        configuration: Configuration,
+        timeoutSeconds: TimeInterval
+    ) async throws -> [VLMBenchmarkResult] {
+        printBenchmarkPhaseHeader("A", title: "VLM Categorization Benchmark")
 
-        let existingMap = try engine.checkExistingSidecars(
-            positiveDir: positiveDir, negativeDir: negativeDir
-        )
-        let existingPaths = existingMap.filter(\.value).map(\.key).sorted()
-        let skipPaths = try promptForExistingSidecars(existingPaths)
-
-        print("Running current model pair against document corpus...")
+        let vlmModels = configuration.benchmarkVLMModels ?? DefaultModelLists.vlmModels
+        print("Evaluating \(vlmModels.count) VLM model(s)")
+        print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
+        print("Timeout: \(Int(timeoutSeconds))s per inference")
         print()
 
-        let results = try await engine.runInitialBenchmark(
-            positiveDir: positiveDir,
-            negativeDir: negativeDir,
-            skipPaths: skipPaths
-        )
+        let vlmFactory = DefaultVLMOnlyFactory()
+        var results: [VLMBenchmarkResult] = []
 
-        if let first = results.first {
-            print("Initial run complete:")
-            print("  Documents processed: \(first.documentResults.count)")
-            print("  Score: \(String(format: "%.1f%%", first.metrics.score * 100))")
-            print()
+        for (index, modelName) in vlmModels.enumerated() {
+            print("[\(index + 1)/\(vlmModels.count)] \(modelName)")
 
-            for doc in first.documentResults {
-                let icon = switch doc.documentScore {
-                case 2: "✅"
-                case 1: "⚠️"
-                default: "❌"
-                }
-                let match = doc.predictedIsMatch ? "match" : "no match"
-                print("  \(icon) \(doc.filename) (\(match)) [\(doc.documentScore)/2]")
+            let result = await engine.benchmarkVLM(
+                modelName: modelName,
+                positivePDFs: positivePDFs,
+                negativePDFs: negativePDFs,
+                timeoutSeconds: timeoutSeconds,
+                vlmFactory: vlmFactory
+            )
+
+            if result.isDisqualified {
+                print("  DISQUALIFIED: \(result.disqualificationReason ?? "Unknown")")
+            } else {
+                let scoreStr = String(format: "%.1f%%", result.score * 100)
+                let points = "\(result.totalScore)/\(result.maxScore)"
+                let time = String(format: "%.1fs", result.elapsedSeconds)
+                print("  Score: \(scoreStr) (\(points)) in \(time)")
             }
             print()
+
+            results.append(result)
         }
+
+        // Display VLM leaderboard
+        print(TerminalUtils.formatVLMLeaderboard(results: results))
+        print()
 
         return results
-    }
-
-    /// Prompt user about existing sidecar files, returning paths to skip
-    private func promptForExistingSidecars(_ existingPaths: [String]) throws -> Set<String> {
-        guard !existingPaths.isEmpty else { return [] }
-
-        print("Found \(existingPaths.count) existing sidecar file(s):")
-        for path in existingPaths {
-            let filename = URL(fileURLWithPath: path).lastPathComponent
-            print("  \(filename).json")
-        }
-        print()
-
-        guard let choice = TerminalUtils.menu(
-            "How would you like to handle existing sidecars?",
-            options: [
-                "Reuse all (keep existing ground truth)",
-                "Regenerate all (overwrite with fresh results)",
-                "Decide per-document",
-                "Cancel benchmarking",
-            ]
-        ) else {
-            throw ExitCode.success
-        }
-
-        var skipPaths: Set<String> = []
-
-        switch choice {
-        case 0: // Reuse all
-            skipPaths = Set(existingPaths)
-        case 1: // Regenerate all
-            break
-        case 2: // Per-document
-            skipPaths = try promptPerDocument(existingPaths)
-        default: // Cancel
-            throw ExitCode.success
-        }
-
-        print()
-        return skipPaths
-    }
-
-    /// Prompt for each existing sidecar individually
-    private func promptPerDocument(_ paths: [String]) throws -> Set<String> {
-        var skipPaths: Set<String> = []
-        for path in paths {
-            let filename = URL(fileURLWithPath: path).lastPathComponent
-            guard let docChoice = TerminalUtils.menu(
-                "\(filename).json exists. What to do?",
-                options: [
-                    "Reuse existing",
-                    "Regenerate",
-                    "Cancel benchmarking",
-                ]
-            ) else {
-                throw ExitCode.success
-            }
-            switch docChoice {
-            case 0: skipPaths.insert(path)
-            case 2: throw ExitCode.success
-            default: break
-            }
-        }
-        return skipPaths
-    }
-
-    /// Phase A.1: Verification pause — let user review sidecar files
-    func runPhaseA1(positiveDir: String, negativeDir: String?) throws {
-        printBenchmarkPhaseHeader("A.1", title: "Ground Truth Verification")
-
-        print("JSON sidecar files have been generated next to each PDF.")
-        print("Please review and correct them before continuing.")
-        print()
-        print("Sidecar locations:")
-
-        let fileManager = FileManager.default
-        let posContents = try fileManager.contentsOfDirectory(atPath: positiveDir)
-        for file in posContents.sorted() where file.hasSuffix(".pdf.json") {
-            let path = (positiveDir as NSString).appendingPathComponent(file)
-            print("  \(path)")
-        }
-
-        if let negDir = negativeDir {
-            let negContents = try fileManager.contentsOfDirectory(atPath: negDir)
-            for file in negContents.sorted() where file.hasSuffix(".pdf.json") {
-                let path = (negDir as NSString).appendingPathComponent(file)
-                print("  \(path)")
-            }
-        }
-
-        print()
-
-        // Offer to open sidecar files
-        if TerminalUtils.confirm("Open sidecar files in default editor?") {
-            for file in posContents.sorted() where file.hasSuffix(".pdf.json") {
-                let path = (positiveDir as NSString).appendingPathComponent(file)
-                NSWorkspace.shared.open(URL(fileURLWithPath: path))
-            }
-            if let negDir = negativeDir {
-                let negFiles = try fileManager.contentsOfDirectory(atPath: negDir)
-                for file in negFiles.sorted() where file.hasSuffix(".pdf.json") {
-                    let path = (negDir as NSString).appendingPathComponent(file)
-                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
-                }
-            }
-        }
-
-        print()
-        print("After reviewing, press Enter to continue...")
-        _ = readLine()
-    }
-
-    /// Phase A.2: Credential check for HF API
-    func runPhaseA2(configuration: inout Configuration) throws -> String? {
-        printBenchmarkPhaseHeader("A.2", title: "Hugging Face Credentials")
-
-        // Prompt for username if not already set
-        let account: String
-        if let existing = configuration.huggingFaceUsername, !existing.isEmpty {
-            account = existing
-            print("Hugging Face username: \(account)")
-        } else {
-            if let entered = TerminalUtils.prompt("Enter your Hugging Face username (or press Enter to skip):"),
-               !entered.isEmpty {
-                account = entered
-                configuration.huggingFaceUsername = account
-                print("Username set to: \(account)")
-            } else {
-                account = "default"
-            }
-        }
-        print()
-
-        // Check Keychain first
-        if let stored = try KeychainManager.retrieveToken(forAccount: account) {
-            print("Found existing Hugging Face token in Keychain.")
-            if TerminalUtils.confirm("Use stored token?") {
-                return stored
-            }
-        }
-
-        print("A Hugging Face API token enables model discovery.")
-        print("Without a token, only public models with no rate limiting.")
-        print()
-
-        guard let choice = TerminalUtils.menu(
-            "How would you like to proceed?",
-            options: [
-                "Enter HF token (will be stored in Keychain)",
-                "Skip (continue without token)",
-            ]
-        ) else {
-            return nil
-        }
-
-        if choice == 0 {
-            guard let token = TerminalUtils.promptMasked("Enter your Hugging Face token:"),
-                  !token.isEmpty
-            else {
-                print("No token entered. Continuing without authentication.")
-                return nil
-            }
-            try KeychainManager.saveToken(token, forAccount: account)
-            print("Token saved to Keychain.")
-            return token
-        }
-
-        return nil
     }
 }

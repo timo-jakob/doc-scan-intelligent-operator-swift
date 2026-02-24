@@ -38,6 +38,22 @@ final class DocumentTypeTests: XCTestCase {
         XCTAssertTrue(prompt.contains("YES or NO"))
     }
 
+    // MARK: - Text Categorization Prompt Tests
+
+    func testInvoiceTextCategorizationPrompt() {
+        let prompt = DocumentType.invoice.textCategorizationPrompt
+        XCTAssertTrue(prompt.contains("INVOICE"))
+        XCTAssertTrue(prompt.contains("Rechnung"))
+        XCTAssertTrue(prompt.contains("YES or NO"))
+    }
+
+    func testPrescriptionTextCategorizationPrompt() {
+        let prompt = DocumentType.prescription.textCategorizationPrompt
+        XCTAssertTrue(prompt.contains("PRESCRIPTION"))
+        XCTAssertTrue(prompt.contains("Arzt-Rezept"))
+        XCTAssertTrue(prompt.contains("YES or NO"))
+    }
+
     // MARK: - Strong Keywords Tests
 
     func testInvoiceStrongKeywords() {

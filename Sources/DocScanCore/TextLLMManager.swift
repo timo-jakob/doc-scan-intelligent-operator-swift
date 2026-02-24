@@ -3,8 +3,13 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
-/// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm
-open class TextLLMManager {
+/// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm.
+///
+/// Marked `@unchecked Sendable` because the mutable `modelContainer` is only written once
+/// during `preload()` and then read during sequential `generate()` calls. The benchmark
+/// engine serialises all access (one model at a time, documents processed sequentially),
+/// so no concurrent mutation is possible.
+open class TextLLMManager: @unchecked Sendable {
     private let config: Configuration
 
     /// Model container (lazy loaded)
@@ -245,13 +250,11 @@ open class TextLLMManager {
     private func extractDateWithRegex(from text: String) -> Date? {
         DateUtils.extractDateFromText(text)
     }
-}
 
-// MARK: - LLM Generation
+    // MARK: - LLM Generation
 
-extension TextLLMManager {
-    /// Generate text using MLX LLM
-    func generate(
+    /// Generate text using MLX LLM. Open so tests can override without loading a real model.
+    open func generate(
         systemPrompt: String,
         userPrompt: String,
         maxTokens: Int
@@ -306,7 +309,11 @@ extension TextLLMManager {
             return fullOutput
         }
     }
+}
 
+// MARK: - Private Helpers
+
+extension TextLLMManager {
     /// Load model if not already loaded
     private func loadModelIfNeeded() async throws {
         if modelContainer != nil {

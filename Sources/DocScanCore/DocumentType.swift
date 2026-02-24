@@ -37,6 +37,18 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Text-based LLM prompt for categorization of OCR text (used in TextLLM benchmarking)
+    public var textCategorizationPrompt: String {
+        switch self {
+        case .invoice:
+            "Based on the following document text, is this an INVOICE (Rechnung)? " +
+                "Look for billing information, amounts, invoice numbers. Answer only YES or NO."
+        case .prescription:
+            "Based on the following document text, is this a DOCTOR'S PRESCRIPTION (Arzt-Rezept)? " +
+                "Look for medication names, doctor information, patient details. Answer only YES or NO."
+        }
+    }
+
     /// Strong indicator keywords (high confidence)
     public var strongKeywords: [String] {
         switch self {

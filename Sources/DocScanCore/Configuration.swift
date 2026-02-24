@@ -2,7 +2,7 @@ import Foundation
 import Yams
 
 /// Processing settings for LLM generation and PDF rendering
-public struct ProcessingSettings: Codable, Equatable {
+public struct ProcessingSettings: Codable, Equatable, Sendable {
     /// Maximum number of tokens to generate
     public var maxTokens: Int
 
@@ -24,7 +24,7 @@ public struct ProcessingSettings: Codable, Equatable {
 }
 
 /// Output formatting settings for invoice filenames
-public struct OutputSettings: Codable, Equatable {
+public struct OutputSettings: Codable, Equatable, Sendable {
     /// Date format for invoice filename (e.g., "yyyy-MM-dd")
     public var dateFormat: String
 
@@ -41,7 +41,7 @@ public struct OutputSettings: Codable, Equatable {
 }
 
 /// Configuration for document scanning and invoice processing
-public struct Configuration: Codable {
+public struct Configuration: Codable, Sendable {
     /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
     public var modelName: String
 
@@ -62,6 +62,12 @@ public struct Configuration: Codable {
 
     /// Hugging Face username (for model discovery)
     public var huggingFaceUsername: String?
+
+    /// Override VLM model list for benchmarking (nil = use DefaultModelLists.vlmModels)
+    public var benchmarkVLMModels: [String]?
+
+    /// Override TextLLM model list for benchmarking (nil = use DefaultModelLists.textLLMModels)
+    public var benchmarkTextLLMModels: [String]?
 
     /// Maximum number of tokens to generate (convenience accessor)
     public var maxTokens: Int {
@@ -123,7 +129,9 @@ public struct Configuration: Codable {
         processing: ProcessingSettings = ProcessingSettings(),
         verbose: Bool = false,
         output: OutputSettings = OutputSettings(),
-        huggingFaceUsername: String? = nil
+        huggingFaceUsername: String? = nil,
+        benchmarkVLMModels: [String]? = nil,
+        benchmarkTextLLMModels: [String]? = nil
     ) {
         self.modelName = modelName
         self.textModelName = textModelName
@@ -132,6 +140,8 @@ public struct Configuration: Codable {
         self.verbose = verbose
         self.output = output
         self.huggingFaceUsername = huggingFaceUsername
+        self.benchmarkVLMModels = benchmarkVLMModels
+        self.benchmarkTextLLMModels = benchmarkTextLLMModels
     }
 
     /// Explicit CodingKeys to maintain flat YAML format
@@ -139,6 +149,7 @@ public struct Configuration: Codable {
         case modelName, textModelName, modelCacheDir
         case maxTokens, temperature, pdfDPI
         case verbose, output, huggingFaceUsername
+        case benchmarkVLMModels, benchmarkTextLLMModels
     }
 
     public init(from decoder: Decoder) throws {
@@ -160,6 +171,8 @@ public struct Configuration: Codable {
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
         huggingFaceUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
+        benchmarkVLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkVLMModels)
+        benchmarkTextLLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -173,6 +186,8 @@ public struct Configuration: Codable {
         try container.encode(verbose, forKey: .verbose)
         try container.encode(output, forKey: .output)
         try container.encodeIfPresent(huggingFaceUsername, forKey: .huggingFaceUsername)
+        try container.encodeIfPresent(benchmarkVLMModels, forKey: .benchmarkVLMModels)
+        try container.encodeIfPresent(benchmarkTextLLMModels, forKey: .benchmarkTextLLMModels)
     }
 
     /// Load configuration from YAML file

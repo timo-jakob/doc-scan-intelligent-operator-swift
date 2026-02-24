@@ -110,4 +110,59 @@ extension ConfigurationTests {
         let config = Configuration()
         XCTAssertFalse(config.description.contains("HuggingFace User:"))
     }
+
+    // MARK: - Benchmark Model Lists
+
+    func testDefaultBenchmarkModelListsAreNil() {
+        let config = Configuration.defaultConfiguration
+        XCTAssertNil(config.benchmarkVLMModels)
+        XCTAssertNil(config.benchmarkTextLLMModels)
+    }
+
+    func testCustomBenchmarkModelLists() {
+        let vlmModels = ["model/vlm-a", "model/vlm-b"]
+        let textModels = ["model/text-a", "model/text-b"]
+        let config = Configuration(
+            benchmarkVLMModels: vlmModels,
+            benchmarkTextLLMModels: textModels
+        )
+        XCTAssertEqual(config.benchmarkVLMModels, vlmModels)
+        XCTAssertEqual(config.benchmarkTextLLMModels, textModels)
+    }
+
+    func testYAMLBackwardsCompatibilityWithoutBenchmarkModels() throws {
+        let yamlContent = """
+        modelName: test-model
+        textModelName: text-model
+        modelCacheDir: /test/cache
+        maxTokens: 256
+        temperature: 0.1
+        pdfDPI: 150
+        verbose: false
+        output:
+          dateFormat: yyyy-MM-dd
+          filenamePattern: "{date}_Rechnung_{company}.pdf"
+        """
+
+        let configPath = tempDirectory.appendingPathComponent("no_benchmark_models.yaml").path
+        try yamlContent.write(toFile: configPath, atomically: true, encoding: .utf8)
+
+        let config = try Configuration.load(from: configPath)
+        XCTAssertNil(config.benchmarkVLMModels)
+        XCTAssertNil(config.benchmarkTextLLMModels)
+    }
+
+    func testYAMLRoundTripWithBenchmarkModels() throws {
+        let config = Configuration(
+            benchmarkVLMModels: ["vlm/a", "vlm/b"],
+            benchmarkTextLLMModels: ["text/a"]
+        )
+
+        let savePath = tempDirectory.appendingPathComponent("benchmark_models.yaml").path
+        try config.save(to: savePath)
+        let loaded = try Configuration.load(from: savePath)
+
+        XCTAssertEqual(loaded.benchmarkVLMModels, ["vlm/a", "vlm/b"])
+        XCTAssertEqual(loaded.benchmarkTextLLMModels, ["text/a"])
+    }
 }

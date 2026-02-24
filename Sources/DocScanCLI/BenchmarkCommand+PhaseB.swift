@@ -3,158 +3,213 @@ import ArgumentParser
 import DocScanCore
 import Foundation
 
-// MARK: - Phase B: Model Discovery
+// MARK: - Phase B: TextLLM Categorization + Extraction Benchmark
 
 extension BenchmarkCommand {
-    /// Phase B: Discover alternative model pairs from Hugging Face
+    /// Phase B: Run each TextLLM model against all documents for categorization + extraction scoring
     func runPhaseB(
+        engine: BenchmarkEngine,
+        positivePDFs: [String],
+        negativePDFs: [String],
         configuration: Configuration,
-        apiToken: String?
-    ) async throws -> [ModelPair]? {
-        printBenchmarkPhaseHeader("B", title: "Model Discovery")
+        timeoutSeconds: TimeInterval
+    ) async throws -> [TextLLMBenchmarkResult] {
+        printBenchmarkPhaseHeader("B", title: "TextLLM Categorization + Extraction Benchmark")
 
-        let client = HuggingFaceClient(apiToken: apiToken)
-        var requestCount = 50
-
-        while true {
-            let pairs = try await discoverAndDisplayPairs(
-                client: client, configuration: configuration, count: requestCount
-            )
-
-            guard let choice = TerminalUtils.menu(
-                "How would you like to proceed?",
-                options: [
-                    "Benchmark these pairs",
-                    "Request 100 model pairs",
-                    "Skip model discovery",
-                ]
-            ) else {
-                return nil
-            }
-
-            switch choice {
-            case 0: return pairs
-            case 1:
-                requestCount = 100
-                print()
-                continue
-            default: return nil
-            }
-        }
-    }
-
-    /// Discover model pairs, check for gated models, and let the user handle them
-    private func discoverAndDisplayPairs(
-        client: HuggingFaceClient,
-        configuration: Configuration,
-        count: Int
-    ) async throws -> [ModelPair] {
-        print("Searching for alternative MLX model pairs on Hugging Face...")
-        print()
-
-        var pairs = try await client.discoverModelPairs(
-            currentVLM: configuration.modelName,
-            currentTextLLM: configuration.textModelName,
-            count: count
+        let (groundTruths, cachedOCRTexts) = try await manageGroundTruths(
+            engine: engine,
+            positivePDFs: positivePDFs,
+            negativePDFs: negativePDFs,
+            positiveDir: PathUtils.resolvePath(positiveDir),
+            negativeDir: PathUtils.resolvePath(negativeDir)
         )
 
-        print("Discovered \(pairs.count) model pairs:")
-        for (index, pair) in pairs.enumerated() {
-            let current = (pair.vlmModelName == configuration.modelName
-                && pair.textModelName == configuration.textModelName) ? " (current)" : ""
-            print("  [\(index + 1)] VLM: \(pair.vlmModelName)")
-            print("       Text: \(pair.textModelName)\(current)")
-            print()
+        let ocrTexts: [String: String]
+        if let cachedOCRTexts {
+            ocrTexts = cachedOCRTexts
+            print("Reusing OCR text extracted during ground truth generation (\(ocrTexts.count) document(s))")
+        } else {
+            print("Pre-extracting OCR text from all documents...")
+            ocrTexts = await engine.preExtractOCRTexts(
+                positivePDFs: positivePDFs, negativePDFs: negativePDFs
+            )
+            print("  Extracted text from \(ocrTexts.count) document(s)")
+        }
+        print()
+
+        let textLLMModels = configuration.benchmarkTextLLMModels ?? DefaultModelLists.textLLMModels
+        print("Evaluating \(textLLMModels.count) TextLLM model(s)")
+        print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
+        print("Timeout: \(Int(timeoutSeconds))s per inference")
+        print()
+
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: ocrTexts, groundTruths: groundTruths,
+            timeoutSeconds: timeoutSeconds, textLLMFactory: DefaultTextLLMOnlyFactory()
+        )
+        var results: [TextLLMBenchmarkResult] = []
+
+        for (index, modelName) in textLLMModels.enumerated() {
+            print("[\(index + 1)/\(textLLMModels.count)] \(modelName)")
+
+            let result = await engine.benchmarkTextLLM(
+                modelName: modelName,
+                positivePDFs: positivePDFs, negativePDFs: negativePDFs,
+                context: context
+            )
+
+            printTextLLMResult(result)
+            results.append(result)
         }
 
-        // Check for gated models and collect unique gated model IDs
-        var gatedModelIds: Set<String> = []
-        for pair in pairs {
-            if await (try? client.isModelGated(pair.vlmModelName)) == true {
-                gatedModelIds.insert(pair.vlmModelName)
-            }
-            if await (try? client.isModelGated(pair.textModelName)) == true {
-                gatedModelIds.insert(pair.textModelName)
-            }
-        }
-
-        if !gatedModelIds.isEmpty {
-            pairs = try promptForGatedModels(gatedModelIds: gatedModelIds, pairs: pairs)
-        }
-
-        return pairs
+        print(TerminalUtils.formatTextLLMLeaderboard(results: results))
+        print()
+        return results
     }
 
-    /// Prompt user to handle gated models: remove affected pairs or open browser to accept licenses
-    private func promptForGatedModels(
-        gatedModelIds: Set<String>,
-        pairs: [ModelPair]
-    ) throws -> [ModelPair] {
-        let affectedCount = pairs.count(where: { pair in
-            gatedModelIds.contains(pair.vlmModelName) || gatedModelIds.contains(pair.textModelName)
-        })
-
-        print("⚠️  Found \(gatedModelIds.count) gated model(s) affecting \(affectedCount) pair(s):")
-        for modelId in gatedModelIds.sorted() {
-            print("     \(modelId)")
-            print("     \(HuggingFaceClient.modelURL(for: modelId))")
+    private func printTextLLMResult(_ result: TextLLMBenchmarkResult) {
+        if result.isDisqualified {
+            print("  DISQUALIFIED: \(result.disqualificationReason ?? "Unknown")")
+        } else {
+            let scoreStr = String(format: "%.1f%%", result.score * 100)
+            let points = "\(result.totalScore)/\(result.maxScore)"
+            let time = String(format: "%.1fs", result.elapsedSeconds)
+            print("  Score: \(scoreStr) (\(points)) in \(time)")
         }
+        print()
+    }
+}
+
+// MARK: - Ground Truth Management
+
+private extension BenchmarkCommand {
+    /// Manage ground truth JSON files — check for existing, prompt to reuse/regenerate, review.
+    /// Returns ground truths and, when generation occurred, the OCR texts extracted during that pass.
+    func manageGroundTruths(
+        engine: BenchmarkEngine,
+        positivePDFs: [String],
+        negativePDFs: [String],
+        positiveDir: String,
+        negativeDir: String
+    ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]?) {
+        let (needsGeneration, skipExisting) = try promptGroundTruthStrategy(
+            engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
+            positiveDir: positiveDir, negativeDir: negativeDir
+        )
+
+        var ocrTexts: [String: String]?
+        if needsGeneration {
+            ocrTexts = try await generateAndReviewGroundTruths(
+                engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
+                skipExisting: skipExisting
+            )
+        }
+
+        let allPDFs = positivePDFs + negativePDFs
+        let groundTruths = try engine.loadGroundTruths(pdfPaths: allPDFs)
+        return (groundTruths, ocrTexts)
+    }
+
+    /// Check existing sidecars and prompt the user for reuse/regeneration strategy.
+    /// Returns `(needsGeneration, skipExisting)`.
+    func promptGroundTruthStrategy(
+        engine: BenchmarkEngine,
+        positivePDFs: [String],
+        negativePDFs: [String],
+        positiveDir: String,
+        negativeDir: String
+    ) throws -> (needsGeneration: Bool, skipExisting: Bool) {
+        let existingMap = try engine.checkExistingSidecars(
+            positiveDir: positiveDir, negativeDir: negativeDir
+        )
+        let existingCount = existingMap.filter(\.value).count
+        let allPDFCount = positivePDFs.count + negativePDFs.count
+
+        guard existingCount > 0 else { return (true, false) }
+
+        print("Found \(existingCount)/\(allPDFCount) existing ground truth file(s).")
         print()
 
         guard let choice = TerminalUtils.menu(
-            "Gated models require license approval on Hugging Face. How to proceed?",
+            "How would you like to handle existing ground truth files?",
             options: [
-                "Remove pairs with gated models",
-                "Open license pages in browser, then keep all pairs",
-                "Keep all pairs (may fail during benchmark)",
+                "Reuse existing (keep current ground truth)",
+                "Regenerate all (overwrite with fresh results)",
             ]
         ) else {
             throw ExitCode.success
         }
 
-        switch choice {
-        case 0:
-            let filtered = pairs.filter { pair in
-                !gatedModelIds.contains(pair.vlmModelName) && !gatedModelIds.contains(pair.textModelName)
-            }
-            print("Removed \(pairs.count - filtered.count) pair(s). \(filtered.count) remaining.")
+        if choice == 0, existingCount == allPDFCount {
+            print("Reusing all existing ground truth files.")
             print()
-            return filtered
-        case 1:
-            for modelId in gatedModelIds.sorted() {
-                let urlString = HuggingFaceClient.modelURL(for: modelId)
-                if let url = URL(string: urlString) {
-                    NSWorkspace.shared.open(url)
+            return (false, false)
+        } else if choice == 0 {
+            print("Generating missing ground truth files (keeping existing)...")
+            print()
+            return (true, true)
+        }
+        return (true, false)
+    }
+
+    /// Generate ground truths and pause for user review. Returns the OCR texts for reuse.
+    @discardableResult
+    func generateAndReviewGroundTruths(
+        engine: BenchmarkEngine,
+        positivePDFs: [String],
+        negativePDFs: [String],
+        skipExisting: Bool
+    ) async throws -> [String: String] {
+        print("Generating ground truth files...")
+        let ocrTexts = await engine.preExtractOCRTexts(
+            positivePDFs: positivePDFs, negativePDFs: negativePDFs
+        )
+        _ = try await engine.generateGroundTruths(
+            positivePDFs: positivePDFs, negativePDFs: negativePDFs, ocrTexts: ocrTexts,
+            skipExisting: skipExisting
+        )
+        print()
+
+        print("Ground truth JSON files have been generated next to each PDF.")
+        print("Please review them before continuing.")
+        print()
+        let resolvedPositiveDir = PathUtils.resolvePath(positiveDir)
+        let resolvedNegativeDir = PathUtils.resolvePath(negativeDir)
+        await printAndOfferSidecars(positiveDir: resolvedPositiveDir, negativeDir: resolvedNegativeDir)
+
+        print()
+        print("After reviewing, press Enter to continue...")
+        _ = readLine()
+
+        return ocrTexts
+    }
+
+    /// Print sidecar locations and offer to open them in the default editor
+    func printAndOfferSidecars(positiveDir: String, negativeDir: String) async {
+        let fileManager = FileManager.default
+        let posSidecars = sidecarPaths(in: positiveDir, fileManager: fileManager)
+        let negSidecars = sidecarPaths(in: negativeDir, fileManager: fileManager)
+
+        print("Sidecar locations:")
+        for path in posSidecars + negSidecars {
+            print("  \(path)")
+        }
+        print()
+
+        if TerminalUtils.confirm("Open sidecar files in default editor?") {
+            let allPaths = posSidecars + negSidecars
+            await MainActor.run {
+                for path in allPaths {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
                 }
             }
-            print("Opened \(gatedModelIds.count) license page(s) in your browser.")
-            print("Accept the licenses, then press Enter to continue...")
-            _ = readLine()
-            return pairs
-        default:
-            return pairs
         }
     }
 
-    /// Phase B.1: Timeout selection
-    func runPhaseB1() -> TimeInterval {
-        printBenchmarkPhaseHeader("B.1", title: "Timeout Configuration")
-
-        guard let choice = TerminalUtils.menu(
-            "Select per-document timeout for benchmark runs:",
-            options: [
-                "10 seconds (strict)",
-                "30 seconds (recommended)",
-                "60 seconds (lenient)",
-            ]
-        ) else {
-            print("Using default: 30 seconds")
-            return 30
-        }
-
-        let timeouts: [TimeInterval] = [10, 30, 60]
-        let selected = timeouts[choice]
-        print("Timeout set to \(Int(selected)) seconds per document.")
-        return selected
+    func sidecarPaths(in directory: String, fileManager: FileManager) -> [String] {
+        let contents = (try? fileManager.contentsOfDirectory(atPath: directory)) ?? []
+        return contents.sorted()
+            .filter { $0.hasSuffix(".pdf.json") }
+            .map { (directory as NSString).appendingPathComponent($0) }
     }
 }

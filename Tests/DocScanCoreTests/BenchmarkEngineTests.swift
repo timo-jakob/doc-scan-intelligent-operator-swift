@@ -1,302 +1,272 @@
-import AppKit
-import CoreGraphics
-import CoreText
 @testable import DocScanCore
-import PDFKit
 import XCTest
 
 final class BenchmarkEngineTests: XCTestCase {
-    var tempDirectory: URL!
-    var positiveDir: URL!
-    var negativeDir: URL!
+    var engine: BenchmarkEngine!
+    var tempDir: URL!
 
     override func setUp() {
         super.setUp()
-        tempDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-        positiveDir = tempDirectory.appendingPathComponent("positive")
-        negativeDir = tempDirectory.appendingPathComponent("negative")
-        try? FileManager.default.createDirectory(at: positiveDir, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(at: negativeDir, withIntermediateDirectories: true)
+        engine = BenchmarkEngine(
+            configuration: Configuration(),
+            documentType: .invoice,
+            verbose: false
+        )
+        tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BenchmarkEngineTests-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        try? FileManager.default.removeItem(at: tempDirectory)
+        try? FileManager.default.removeItem(at: tempDir)
         super.tearDown()
     }
 
-    /// Create a minimal valid PDF file with text content for testing
-    static let defaultPDFText = "Rechnung Nr. 12345\nRechnungsdatum: 27.06.2025\nTest Company GmbH"
+    // MARK: - Helpers
 
-    func createTestPDF(at url: URL, text: String = defaultPDFText) {
+    private func createMinimalPDF(at url: URL) throws {
         let pdfData = NSMutableData()
-        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData) else { return }
-        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
-        guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return }
-
+        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData),
+              let context = CGContext(consumer: consumer, mediaBox: nil, nil)
+        else {
+            throw DocScanError.pdfConversionFailed("Could not create PDF context")
+        }
+        var mediaBox = CGRect(x: 0, y: 0, width: 100, height: 100)
         context.beginPage(mediaBox: &mediaBox)
-        let font = CTFontCreateWithName("Helvetica" as CFString, 12, nil)
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: CGColor(red: 0, green: 0, blue: 0, alpha: 1),
-        ]
-        let attrString = NSAttributedString(string: text, attributes: attrs)
-        let line = CTLineCreateWithAttributedString(attrString)
-        context.textPosition = CGPoint(x: 72, y: 700)
-        CTLineDraw(line, context)
         context.endPage()
         context.closePDF()
-
-        try? pdfData.write(to: url)
+        try (pdfData as Data).write(to: url)
     }
 
-    /// Create a text file (non-PDF)
-    func createTextFile(at url: URL) {
-        try? "not a pdf".write(to: url, atomically: true, encoding: .utf8)
+    // MARK: - enumeratePDFs
+
+    func testEnumeratePDFsFiltersPDFsAndSorts() throws {
+        // Create mixed files
+        try createMinimalPDF(at: tempDir.appendingPathComponent("beta.pdf"))
+        try createMinimalPDF(at: tempDir.appendingPathComponent("alpha.pdf"))
+        try "not a pdf".write(to: tempDir.appendingPathComponent("readme.txt"), atomically: true, encoding: .utf8)
+        try "image data".write(to: tempDir.appendingPathComponent("photo.png"), atomically: true, encoding: .utf8)
+
+        let pdfs = try engine.enumeratePDFs(in: tempDir.path)
+
+        XCTAssertEqual(pdfs.count, 2)
+        // Should be sorted alphabetically
+        XCTAssertTrue(pdfs[0].hasSuffix("alpha.pdf"))
+        XCTAssertTrue(pdfs[1].hasSuffix("beta.pdf"))
     }
 
-    // MARK: - PDF Enumeration
-
-    func testEnumeratePDFs() throws {
-        createTestPDF(at: positiveDir.appendingPathComponent("a.pdf"))
-        createTestPDF(at: positiveDir.appendingPathComponent("b.pdf"))
-        createTestPDF(at: positiveDir.appendingPathComponent("c.pdf"))
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-        let pdfs = try engine.enumeratePDFs(in: positiveDir.path)
-
-        XCTAssertEqual(pdfs.count, 3)
-        XCTAssertTrue(pdfs[0].hasSuffix("a.pdf"))
-        XCTAssertTrue(pdfs[1].hasSuffix("b.pdf"))
-        XCTAssertTrue(pdfs[2].hasSuffix("c.pdf"))
-    }
-
-    func testEnumeratePDFsFilterNonPDFs() throws {
-        createTestPDF(at: positiveDir.appendingPathComponent("doc.pdf"))
-        createTextFile(at: positiveDir.appendingPathComponent("readme.txt"))
-        createTextFile(at: positiveDir.appendingPathComponent("image.jpg"))
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-        let pdfs = try engine.enumeratePDFs(in: positiveDir.path)
-
-        XCTAssertEqual(pdfs.count, 1)
-        XCTAssertTrue(pdfs[0].hasSuffix("doc.pdf"))
-    }
-
-    func testEnumerateEmptyDirectory() throws {
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-        let pdfs = try engine.enumeratePDFs(in: positiveDir.path)
-
-        XCTAssertTrue(pdfs.isEmpty)
-    }
-
-    func testEnumerateNonExistentDirectory() {
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-
-        XCTAssertThrowsError(try engine.enumeratePDFs(in: "/non/existent/dir")) { error in
-            XCTAssertTrue(error is DocScanError)
-        }
-    }
-
-    // MARK: - Sidecar Management
-
-    func testCheckExistingSidecarsNone() throws {
-        createTestPDF(at: positiveDir.appendingPathComponent("a.pdf"))
-        createTestPDF(at: positiveDir.appendingPathComponent("b.pdf"))
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-        let sidecars = try engine.checkExistingSidecars(positiveDir: positiveDir.path, negativeDir: nil)
-
-        XCTAssertEqual(sidecars.count, 2)
-        for (_, exists) in sidecars {
-            XCTAssertFalse(exists)
-        }
-    }
-
-    func testCheckExistingSidecarsWithExisting() throws {
-        let pdfPath = positiveDir.appendingPathComponent("a.pdf")
-        createTestPDF(at: pdfPath)
-
-        // Create a sidecar
-        let groundTruth = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01")
-        try groundTruth.save(to: pdfPath.path + ".json")
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-        let sidecars = try engine.checkExistingSidecars(positiveDir: positiveDir.path, negativeDir: nil)
-
-        XCTAssertTrue(sidecars[pdfPath.path] ?? false)
-    }
-
-    // MARK: - Ground Truth Loading
-
-    func testLoadGroundTruths() throws {
-        let pdfPath1 = positiveDir.appendingPathComponent("a.pdf")
-        let pdfPath2 = positiveDir.appendingPathComponent("b.pdf")
-        createTestPDF(at: pdfPath1)
-        createTestPDF(at: pdfPath2)
-
-        let gt1 = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01", secondaryField: "Company_A")
-        let gt2 = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-02-02", secondaryField: "Company_B")
-        try gt1.save(to: pdfPath1.path + ".json")
-        try gt2.save(to: pdfPath2.path + ".json")
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-        let gts = try engine.loadGroundTruths(pdfPaths: [pdfPath1.path, pdfPath2.path])
-
-        XCTAssertEqual(gts.count, 2)
-        XCTAssertEqual(gts[pdfPath1.path]?.secondaryField, "Company_A")
-        XCTAssertEqual(gts[pdfPath2.path]?.secondaryField, "Company_B")
-    }
-
-    func testLoadGroundTruthsMissingSidecar() throws {
-        let pdfPath = positiveDir.appendingPathComponent("a.pdf")
-        createTestPDF(at: pdfPath)
-        // No sidecar created
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(configuration: config, documentType: .invoice)
-
-        XCTAssertThrowsError(try engine.loadGroundTruths(pdfPaths: [pdfPath.path])) { error in
-            if let docError = error as? DocScanError,
-               case let .benchmarkError(msg) = docError {
-                XCTAssertTrue(msg.contains("Missing ground truth"))
+    func testEnumeratePDFsThrowsForNonExistentDirectory() {
+        let badPath = tempDir.appendingPathComponent("nonexistent").path
+        XCTAssertThrowsError(try engine.enumeratePDFs(in: badPath)) { error in
+            guard let docError = error as? DocScanError else {
+                XCTFail("Expected DocScanError, got \(error)")
+                return
+            }
+            if case let .fileNotFound(path) = docError {
+                XCTAssertEqual(path, badPath)
             } else {
-                XCTFail("Expected benchmarkError")
+                XCTFail("Expected fileNotFound error, got \(docError)")
             }
         }
     }
 
-    // MARK: - Memory Check
-
-    func testAvailableMemoryMBReturnsPositive() {
-        let memory = BenchmarkEngine.availableMemoryMB()
-        XCTAssertGreaterThan(memory, 0)
+    func testEnumeratePDFsReturnsEmptyForEmptyDirectory() throws {
+        let pdfs = try engine.enumeratePDFs(in: tempDir.path)
+        XCTAssertEqual(pdfs, [])
     }
 
-    // MARK: - Parameter Parsing
+    // MARK: - checkExistingSidecars
 
-    func testParseParamBillions7B() {
-        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "mlx-community/Qwen2-VL-7B-Instruct-4bit"), 7.0)
-    }
+    func testCheckExistingSidecarsDetectsPresence() throws {
+        let posDir = tempDir.appendingPathComponent("positive")
+        let negDir = tempDir.appendingPathComponent("negative")
+        try FileManager.default.createDirectory(at: posDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: negDir, withIntermediateDirectories: true)
 
-    func testParseParamBillions2B() {
-        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "mlx-community/Qwen2-VL-2B-Instruct-4bit"), 2.0)
-    }
+        // Create PDFs
+        try createMinimalPDF(at: posDir.appendingPathComponent("a.pdf"))
+        try createMinimalPDF(at: posDir.appendingPathComponent("b.pdf"))
+        try createMinimalPDF(at: negDir.appendingPathComponent("c.pdf"))
 
-    func testParseParamBillionsFractional() {
-        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "org/model-0.5B-instruct"), 0.5)
-    }
+        // Create sidecar for a.pdf only
+        let sidecarPath = posDir.appendingPathComponent("a.pdf.json").path
+        let groundTruth = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01")
+        try groundTruth.save(to: sidecarPath)
 
-    func testParseParamBillions72B() {
-        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "org/Qwen2.5-72B-Instruct-4bit"), 72.0)
-    }
-
-    func testParseParamBillionsNoMatch() {
-        XCTAssertEqual(BenchmarkEngine.parseParamBillions(from: "org/some-model-instruct"), 0)
-    }
-
-    // MARK: - Memory Estimation
-
-    func testEstimateMemoryMBTwoModels() {
-        // 7B + 7B = 14B params; 4-bit ≈ 0.5 * 1.2 bytes/param = 0.6 bytes/param
-        // 14B * 0.6 = 8.4 GB = 8400 MB
-        let estimate = BenchmarkEngine.estimateMemoryMB(
-            vlm: "org/vlm-7B-4bit", text: "org/text-7B-4bit"
+        let result = try engine.checkExistingSidecars(
+            positiveDir: posDir.path,
+            negativeDir: negDir.path
         )
-        XCTAssertEqual(estimate, 8400)
+
+        XCTAssertEqual(result.count, 3)
+        // a.pdf has a sidecar
+        let aPath = posDir.appendingPathComponent("a.pdf").path
+        XCTAssertTrue(result[aPath] ?? false)
+        // b.pdf does not
+        let bPath = posDir.appendingPathComponent("b.pdf").path
+        XCTAssertFalse(result[bPath] ?? true)
+        // c.pdf does not
+        let cPath = negDir.appendingPathComponent("c.pdf").path
+        XCTAssertFalse(result[cPath] ?? true)
     }
 
-    func testEstimateMemoryMBUnknownModels() {
-        let estimate = BenchmarkEngine.estimateMemoryMB(
-            vlm: "org/unknown-model", text: "org/another-model"
+    func testCheckExistingSidecarsEmptyDirectories() throws {
+        let posDir = tempDir.appendingPathComponent("pos")
+        let negDir = tempDir.appendingPathComponent("neg")
+        try FileManager.default.createDirectory(at: posDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: negDir, withIntermediateDirectories: true)
+
+        let result = try engine.checkExistingSidecars(
+            positiveDir: posDir.path,
+            negativeDir: negDir.path
         )
-        XCTAssertEqual(estimate, 0)
+        XCTAssertEqual(result, [:])
     }
 
-    func testEstimateMemoryMBOneKnown() {
-        // Only VLM has a parseable size: 2B * 0.6 = 1.2 GB = 1200 MB
-        let estimate = BenchmarkEngine.estimateMemoryMB(
-            vlm: "org/vlm-2B-4bit", text: "org/unknown"
+    // MARK: - loadGroundTruths
+
+    func testLoadGroundTruthsLoadsAllSidecars() throws {
+        // Create PDFs with sidecars
+        try createMinimalPDF(at: tempDir.appendingPathComponent("inv1.pdf"))
+        try createMinimalPDF(at: tempDir.appendingPathComponent("inv2.pdf"))
+
+        let gt1 = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-01", secondaryField: "Acme")
+        let gt2 = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-02-15", secondaryField: "Corp")
+
+        let path1 = tempDir.appendingPathComponent("inv1.pdf").path
+        let path2 = tempDir.appendingPathComponent("inv2.pdf").path
+        try gt1.save(to: GroundTruth.sidecarPath(for: path1))
+        try gt2.save(to: GroundTruth.sidecarPath(for: path2))
+
+        let groundTruths = try engine.loadGroundTruths(pdfPaths: [path1, path2])
+
+        XCTAssertEqual(groundTruths.count, 2)
+        XCTAssertEqual(groundTruths[path1]?.date, "2025-01-01")
+        XCTAssertEqual(groundTruths[path1]?.secondaryField, "Acme")
+        XCTAssertEqual(groundTruths[path2]?.date, "2025-02-15")
+        XCTAssertEqual(groundTruths[path2]?.secondaryField, "Corp")
+    }
+
+    func testLoadGroundTruthsThrowsForMissingSidecar() throws {
+        try createMinimalPDF(at: tempDir.appendingPathComponent("missing.pdf"))
+        let pdfPath = tempDir.appendingPathComponent("missing.pdf").path
+
+        XCTAssertThrowsError(try engine.loadGroundTruths(pdfPaths: [pdfPath])) { error in
+            guard let docError = error as? DocScanError else {
+                XCTFail("Expected DocScanError, got \(error)")
+                return
+            }
+            if case let .benchmarkError(message) = docError {
+                XCTAssertTrue(message.contains("missing.pdf"), "Error should mention the filename")
+            } else {
+                XCTFail("Expected benchmarkError, got \(docError)")
+            }
+        }
+    }
+
+    func testLoadGroundTruthsEmptyList() throws {
+        let groundTruths = try engine.loadGroundTruths(pdfPaths: [])
+        XCTAssertEqual(groundTruths, [:])
+    }
+
+    // MARK: - preExtractOCRTexts
+
+    func testPreExtractOCRTextsHandlesMinimalPDFs() async {
+        // Minimal PDFs have no text; OCR should return empty or short text
+        try? createMinimalPDF(at: tempDir.appendingPathComponent("blank.pdf"))
+        let pdfPath = tempDir.appendingPathComponent("blank.pdf").path
+
+        let ocrTexts = await engine.preExtractOCRTexts(
+            positivePDFs: [pdfPath],
+            negativePDFs: []
         )
-        XCTAssertEqual(estimate, 1200)
+
+        // The blank PDF should either not appear (OCR finds nothing) or have very short text
+        if let text = ocrTexts[pdfPath] {
+            // If it did extract something, that's fine — just verify it's non-empty
+            XCTAssertFalse(text.isEmpty)
+        }
+        // If missing, blank PDF produced no text — also acceptable
     }
 
-    // MARK: - Benchmark with Mocks
+    // MARK: - generateGroundTruths skipExisting
 
-    func testBenchmarkModelPairAllCorrect() async throws {
-        let pdfPath = positiveDir.appendingPathComponent("invoice.pdf")
-        createTestPDF(at: pdfPath)
+    func testGenerateGroundTruthsSkipExistingPreservesVerifiedSidecars() async throws {
+        let pdfPath = tempDir.appendingPathComponent("verified.pdf").path
+        try createMinimalPDF(at: tempDir.appendingPathComponent("verified.pdf"))
 
-        let groundTruth = GroundTruth(
+        // Write a "verified" sidecar that should be preserved
+        let existing = GroundTruth(
             isMatch: true,
             documentType: .invoice,
-            date: "2025-06-27",
-            secondaryField: "Test_Company"
+            date: "2025-06-01",
+            secondaryField: "Verified_Corp",
+            metadata: GroundTruthMetadata(verified: true)
+        )
+        try existing.save(to: GroundTruth.sidecarPath(for: pdfPath))
+
+        // Generate with skipExisting: true — the verified sidecar should survive
+        let results = try await engine.generateGroundTruths(
+            positivePDFs: [pdfPath],
+            negativePDFs: [],
+            ocrTexts: [:],
+            skipExisting: true
         )
 
-        let factory = MockDocumentDetectorFactory()
-        factory.mockVLMResponse = "YES"
-        factory.mockDate = DateUtils.parseDate("2025-06-27")
-        factory.mockSecondaryField = "Test_Company"
-
-        let config = Configuration()
-        let engine = BenchmarkEngine(
-            configuration: config,
-            documentType: .invoice,
-            detectorFactory: factory
-        )
-
-        let pair = ModelPair(vlmModelName: config.modelName, textModelName: config.textModelName)
-        let result = try await engine.benchmarkModelPair(
-            pair,
-            pdfPaths: [pdfPath.path],
-            groundTruths: [pdfPath.path: groundTruth],
-            timeoutSeconds: 30
-        )
-
-        XCTAssertFalse(result.isDisqualified)
-        XCTAssertEqual(result.metrics.score, 1.0)
+        let loaded = results[pdfPath]
+        XCTAssertEqual(loaded?.date, "2025-06-01")
+        XCTAssertEqual(loaded?.secondaryField, "Verified_Corp")
+        XCTAssertTrue(loaded?.metadata.verified ?? false, "Verified flag should be preserved")
     }
 
-    func testBenchmarkModelPairWrongResult() async throws {
-        let pdfPath = positiveDir.appendingPathComponent("invoice.pdf")
-        createTestPDF(at: pdfPath)
+    func testGenerateGroundTruthsWithoutSkipOverwritesSidecars() async throws {
+        let negPath = tempDir.appendingPathComponent("neg.pdf").path
+        try createMinimalPDF(at: tempDir.appendingPathComponent("neg.pdf"))
 
-        let groundTruth = GroundTruth(
-            isMatch: true,
+        // Write an existing sidecar with a distinctive field
+        let existing = GroundTruth(
+            isMatch: false,
             documentType: .invoice,
-            date: "2025-06-27",
-            secondaryField: "Expected_Company"
+            metadata: GroundTruthMetadata(vlmModel: "old-model", verified: true)
+        )
+        try existing.save(to: GroundTruth.sidecarPath(for: negPath))
+
+        // Generate with skipExisting: false — should overwrite
+        let results = try await engine.generateGroundTruths(
+            positivePDFs: [],
+            negativePDFs: [negPath],
+            ocrTexts: [:],
+            skipExisting: false
         )
 
-        let factory = MockDocumentDetectorFactory()
-        factory.mockVLMResponse = "YES"
-        factory.mockDate = DateUtils.parseDate("2025-06-27")
-        factory.mockSecondaryField = "Wrong_Company"
+        let loaded = results[negPath]
+        XCTAssertFalse(loaded?.metadata.verified ?? true, "Overwritten sidecar should not be verified")
+    }
 
-        let config = Configuration()
-        let engine = BenchmarkEngine(
-            configuration: config,
+    func testPreExtractOCRTextsVerboseMode() async {
+        // Verbose engine should still work (exercises verbose print paths)
+        let verboseEngine = BenchmarkEngine(
+            configuration: Configuration(),
             documentType: .invoice,
-            detectorFactory: factory
+            verbose: true
+        )
+        try? createMinimalPDF(at: tempDir.appendingPathComponent("verbose.pdf"))
+        let pdfPath = tempDir.appendingPathComponent("verbose.pdf").path
+
+        let ocrTexts = await verboseEngine.preExtractOCRTexts(
+            positivePDFs: [pdfPath],
+            negativePDFs: []
         )
 
-        let pair = ModelPair(vlmModelName: config.modelName, textModelName: config.textModelName)
-        let result = try await engine.benchmarkModelPair(
-            pair,
-            pdfPaths: [pdfPath.path],
-            groundTruths: [pdfPath.path: groundTruth],
-            timeoutSeconds: 30
-        )
+        // Just verify it completes without crash — verbose output goes to stdout
+        XCTAssertNotNil(ocrTexts)
+    }
 
-        // Categorization correct but extraction wrong → score 1/2 = 0.5
-        XCTAssertEqual(result.metrics.score, 0.5)
+    func testPreExtractOCRTextsEmptyInput() async {
+        let ocrTexts = await engine.preExtractOCRTexts(
+            positivePDFs: [],
+            negativePDFs: []
+        )
+        XCTAssertEqual(ocrTexts, [:])
     }
 }
