@@ -12,8 +12,13 @@ public enum SubprocessResult: Equatable, Sendable {
     case decodingFailed(String)
 }
 
-/// Spawns `docscan benchmark-worker` subprocesses to isolate MLX model crashes
-public struct SubprocessRunner: Sendable {
+/// Spawns `docscan benchmark-worker` subprocesses to isolate MLX model crashes.
+///
+/// Owns a dedicated temp directory (`workDir`) that is created on init and
+/// removed by ``cleanup()``. Modelled as a `final class` so there is exactly
+/// one owner of the filesystem resource — copying a struct could lead to
+/// double-cleanup or use-after-cleanup across async boundaries.
+public final class SubprocessRunner: Sendable {
     /// Dedicated temp directory for all worker handover files.
     /// Created on init, removed by ``cleanup()``.
     let workDir: URL
