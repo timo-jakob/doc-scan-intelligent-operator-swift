@@ -99,9 +99,9 @@ public actor DefaultTextLLMOnlyFactory: TextLLMOnlyFactory {
 
 /// Core benchmark orchestration engine
 public final class BenchmarkEngine: Sendable {
-    let configuration: Configuration
-    let documentType: DocumentType
-    let verbose: Bool
+    public let configuration: Configuration
+    public let documentType: DocumentType
+    public let verbose: Bool
 
     public init(
         configuration: Configuration,

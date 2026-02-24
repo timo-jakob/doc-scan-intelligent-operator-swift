@@ -6,7 +6,8 @@ import Foundation
 // MARK: - Phase B: TextLLM Categorization + Extraction Benchmark
 
 extension BenchmarkCommand {
-    /// Phase B: Run each TextLLM model against all documents for categorization + extraction scoring
+    /// Phase B: Run each TextLLM model against all documents for categorization + extraction scoring.
+    /// Each model runs in a subprocess so that MLX fatal errors are contained.
     func runPhaseB(
         engine: BenchmarkEngine,
         positivePDFs: [String],
@@ -16,6 +17,50 @@ extension BenchmarkCommand {
     ) async throws -> [TextLLMBenchmarkResult] {
         printBenchmarkPhaseHeader("B", title: "TextLLM Categorization + Extraction Benchmark")
 
+        let (groundTruths, ocrTexts) = try await prepareTextLLMData(
+            engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs
+        )
+
+        let textLLMModels = configuration.benchmark.textLLMModels ?? DefaultModelLists.textLLMModels
+        print("Evaluating \(textLLMModels.count) TextLLM model(s)")
+        print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
+        print("Timeout: \(Int(timeoutSeconds))s per inference")
+        print()
+
+        let runner = SubprocessRunner()
+        var results: [TextLLMBenchmarkResult] = []
+
+        for (index, modelName) in textLLMModels.enumerated() {
+            print("[\(index + 1)/\(textLLMModels.count)] \(modelName)")
+
+            let input = BenchmarkWorkerInput(
+                phase: .textLLM,
+                modelName: modelName,
+                positivePDFs: positivePDFs,
+                negativePDFs: negativePDFs,
+                timeoutSeconds: timeoutSeconds,
+                documentType: engine.documentType,
+                configuration: configuration,
+                verbose: verbose,
+                ocrTexts: ocrTexts,
+                groundTruths: groundTruths
+            )
+
+            let result = await runTextLLMWorker(runner: runner, input: input, modelName: modelName)
+            printTextLLMResult(result)
+            results.append(result)
+        }
+
+        print(TerminalUtils.formatTextLLMLeaderboard(results: results))
+        print()
+        return results
+    }
+
+    private func prepareTextLLMData(
+        engine: BenchmarkEngine,
+        positivePDFs: [String],
+        negativePDFs: [String]
+    ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]) {
         let (groundTruths, cachedOCRTexts) = try await manageGroundTruths(
             engine: engine,
             positivePDFs: positivePDFs,
@@ -37,34 +82,36 @@ extension BenchmarkCommand {
         }
         print()
 
-        let textLLMModels = configuration.benchmark.textLLMModels ?? DefaultModelLists.textLLMModels
-        print("Evaluating \(textLLMModels.count) TextLLM model(s)")
-        print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
-        print("Timeout: \(Int(timeoutSeconds))s per inference")
-        print()
+        return (groundTruths, ocrTexts)
+    }
 
-        let context = TextLLMBenchmarkContext(
-            ocrTexts: ocrTexts, groundTruths: groundTruths,
-            timeoutSeconds: timeoutSeconds, textLLMFactory: DefaultTextLLMOnlyFactory()
-        )
-        var results: [TextLLMBenchmarkResult] = []
-
-        for (index, modelName) in textLLMModels.enumerated() {
-            print("[\(index + 1)/\(textLLMModels.count)] \(modelName)")
-
-            let result = await engine.benchmarkTextLLM(
+    private func runTextLLMWorker(
+        runner: SubprocessRunner,
+        input: BenchmarkWorkerInput,
+        modelName: String
+    ) async -> TextLLMBenchmarkResult {
+        do {
+            let subprocessResult = try await runner.run(input: input)
+            switch subprocessResult {
+            case let .success(output):
+                return output.textLLMResult ?? .disqualified(
+                    modelName: modelName, reason: "Worker produced no TextLLM result"
+                )
+            case let .crashed(exitCode, signal):
+                let detail = signal != nil
+                    ? "signal \(signal!)" : "exit code \(exitCode)"
+                return .disqualified(
+                    modelName: modelName, reason: "Worker crashed (\(detail))"
+                )
+            case let .decodingFailed(message):
+                return .disqualified(modelName: modelName, reason: message)
+            }
+        } catch {
+            return .disqualified(
                 modelName: modelName,
-                positivePDFs: positivePDFs, negativePDFs: negativePDFs,
-                context: context
+                reason: "Failed to spawn worker: \(error.localizedDescription)"
             )
-
-            printTextLLMResult(result)
-            results.append(result)
         }
-
-        print(TerminalUtils.formatTextLLMLeaderboard(results: results))
-        print()
-        return results
     }
 
     private func printTextLLMResult(_ result: TextLLMBenchmarkResult) {

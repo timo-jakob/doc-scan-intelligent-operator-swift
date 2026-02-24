@@ -201,4 +201,83 @@ final class BenchmarkMetricsTests: XCTestCase {
         XCTAssertEqual(result.score, 0)
         XCTAssertEqual(result.maxScore, 0)
     }
+
+    // MARK: - Codable Round-Trip Tests
+
+    func testVLMDocumentResultCodableRoundTrip() throws {
+        let original = VLMDocumentResult(
+            filename: "invoice.pdf",
+            isPositiveSample: true,
+            predictedIsMatch: false
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(VLMDocumentResult.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testVLMBenchmarkResultCodableRoundTrip() throws {
+        let docResults = [
+            VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true),
+            VLMDocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: true),
+        ]
+        let original = VLMBenchmarkResult.from(
+            modelName: "test/vlm-model",
+            documentResults: docResults,
+            elapsedSeconds: 7.5
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(VLMBenchmarkResult.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testVLMBenchmarkResultDisqualifiedCodableRoundTrip() throws {
+        let original = VLMBenchmarkResult.disqualified(
+            modelName: "bad/model", reason: "Out of memory"
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(VLMBenchmarkResult.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testTextLLMDocumentResultCodableRoundTrip() throws {
+        let original = TextLLMDocumentResult(
+            filename: "invoice.pdf",
+            isPositiveSample: true,
+            categorizationCorrect: true,
+            extractionCorrect: false
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(TextLLMDocumentResult.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testTextLLMBenchmarkResultCodableRoundTrip() throws {
+        let docResults = [
+            TextLLMDocumentResult(
+                filename: "a.pdf", isPositiveSample: true,
+                categorizationCorrect: true, extractionCorrect: true
+            ),
+            TextLLMDocumentResult(
+                filename: "b.pdf", isPositiveSample: false,
+                categorizationCorrect: true, extractionCorrect: true
+            ),
+        ]
+        let original = TextLLMBenchmarkResult.from(
+            modelName: "test/text-model",
+            documentResults: docResults,
+            elapsedSeconds: 20.0
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(TextLLMBenchmarkResult.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testTextLLMBenchmarkResultDisqualifiedCodableRoundTrip() throws {
+        let original = TextLLMBenchmarkResult.disqualified(
+            modelName: "crash/model", reason: "Signal 11"
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(TextLLMBenchmarkResult.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
 }

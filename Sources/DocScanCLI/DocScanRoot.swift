@@ -18,7 +18,7 @@ struct DocScanRoot: AsyncParsableCommand {
           benchmark      - Evaluate model pairs against a labeled document corpus
         """,
         version: "2.0.0",
-        subcommands: [ScanCommand.self, BenchmarkCommand.self],
+        subcommands: [ScanCommand.self, BenchmarkCommand.self, BenchmarkWorkerCommand.self],
         defaultSubcommand: ScanCommand.self
     )
 }

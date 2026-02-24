@@ -32,7 +32,7 @@ public extension Sequence where Element: BenchmarkResultProtocol {
 // MARK: - VLM Benchmark Results
 
 /// Result for a single document in a VLM categorization benchmark
-public struct VLMDocumentResult: Equatable, Sendable {
+public struct VLMDocumentResult: Codable, Equatable, Sendable {
     /// Filename of the document
     public let filename: String
 
@@ -64,7 +64,7 @@ public struct VLMDocumentResult: Equatable, Sendable {
 }
 
 /// Aggregated result for a single VLM model benchmark
-public struct VLMBenchmarkResult: Equatable, Sendable, BenchmarkResultProtocol {
+public struct VLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkResultProtocol {
     /// Model name
     public let modelName: String
 
@@ -165,7 +165,7 @@ public struct VLMBenchmarkResult: Equatable, Sendable, BenchmarkResultProtocol {
 // MARK: - TextLLM Benchmark Results
 
 /// Result for a single document in a TextLLM benchmark
-public struct TextLLMDocumentResult: Equatable, Sendable {
+public struct TextLLMDocumentResult: Codable, Equatable, Sendable {
     /// Filename of the document
     public let filename: String
 
@@ -197,7 +197,7 @@ public struct TextLLMDocumentResult: Equatable, Sendable {
 }
 
 /// Aggregated result for a single TextLLM model benchmark
-public struct TextLLMBenchmarkResult: Equatable, Sendable, BenchmarkResultProtocol {
+public struct TextLLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkResultProtocol {
     /// Model name
     public let modelName: String
 
