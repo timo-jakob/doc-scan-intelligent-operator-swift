@@ -74,8 +74,8 @@ final class SubprocessRunnerTests: XCTestCase {
 
         let timeout = SubprocessRunner.overallTimeout(for: input)
 
-        // 3 docs × 30s + 300s buffer = 390s
-        XCTAssertEqual(timeout, 390.0)
+        // 3 docs × 30s + 120s buffer = 210s
+        XCTAssertEqual(timeout, 210.0)
     }
 
     func testOverallTimeoutWithZeroDocuments() {
@@ -90,7 +90,7 @@ final class SubprocessRunnerTests: XCTestCase {
 
         let timeout = SubprocessRunner.overallTimeout(for: input)
 
-        // 0 docs × 30s + 300s buffer = 300s (just the loading buffer)
+        // 0 docs × 30s + 120s buffer = 120s (just the loading buffer)
         XCTAssertEqual(timeout, SubprocessRunner.modelLoadingBufferSeconds)
     }
 
@@ -119,9 +119,9 @@ final class SubprocessRunnerTests: XCTestCase {
         let smallTimeout = SubprocessRunner.overallTimeout(for: smallInput)
         let largeTimeout = SubprocessRunner.overallTimeout(for: largeInput)
 
-        // 1 × 10 + 300 = 310 vs 10 × 10 + 300 = 400
-        XCTAssertEqual(smallTimeout, 310.0)
-        XCTAssertEqual(largeTimeout, 400.0)
+        // 1 × 10 + 120 = 130 vs 10 × 10 + 120 = 220
+        XCTAssertEqual(smallTimeout, 130.0)
+        XCTAssertEqual(largeTimeout, 220.0)
         XCTAssertTrue(largeTimeout > smallTimeout)
     }
 

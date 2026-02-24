@@ -53,8 +53,9 @@ public struct SubprocessRunner: Sendable {
     }
 
     /// Buffer time (seconds) added on top of per-document timeouts to account for model downloading
-    /// and loading before inference begins.
-    static let modelLoadingBufferSeconds: TimeInterval = 300
+    /// and loading before inference begins. Kept modest because per-inference hard timeouts now
+    /// prevent individual calls from hanging indefinitely.
+    static let modelLoadingBufferSeconds: TimeInterval = 120
 
     /// Grace period (seconds) between SIGTERM and SIGKILL escalation for stuck processes.
     static let killEscalationSeconds: TimeInterval = 5

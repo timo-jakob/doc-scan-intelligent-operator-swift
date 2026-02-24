@@ -95,9 +95,12 @@ public extension BenchmarkEngine {
                 )
             }
 
-            // Run VLM with timeout
-            let response = try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
-                try await vlmProvider.generateFromImage(image, prompt: self.documentType.vlmPrompt)
+            // Run VLM with cooperative timeout + hard watchdog backstop
+            let prompt = documentType.vlmPrompt
+            let response = try await Self.withHardTimeout(seconds: timeoutSeconds * 2) {
+                try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
+                    try await vlmProvider.generateFromImage(image, prompt: prompt)
+                }
             }
 
             // Parse YES/NO response

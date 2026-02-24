@@ -163,12 +163,14 @@ private extension BenchmarkEngine {
     ) async -> Bool? {
         let prompt = documentType.textCategorizationPrompt
         do {
-            let response = try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
-                try await textLLM.generate(
-                    systemPrompt: "You are a document classification assistant. Answer only YES or NO.",
-                    userPrompt: prompt + "\n\nDocument text:\n" + ocrText,
-                    maxTokens: 10
-                )
+            let response = try await Self.withHardTimeout(seconds: timeoutSeconds * 2) {
+                try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
+                    try await textLLM.generate(
+                        systemPrompt: "You are a document classification assistant. Answer only YES or NO.",
+                        userPrompt: prompt + "\n\nDocument text:\n" + ocrText,
+                        maxTokens: 10
+                    )
+                }
             }
             return Self.parseYesNoResponse(response)
         } catch {
@@ -189,8 +191,10 @@ private extension BenchmarkEngine {
 
         let docType = documentType
         do {
-            let extraction = try await TimeoutError.withTimeout(seconds: context.timeoutSeconds) {
-                try await textLLM.extractData(for: docType, from: ocrText)
+            let extraction = try await Self.withHardTimeout(seconds: context.timeoutSeconds * 2) {
+                try await TimeoutError.withTimeout(seconds: context.timeoutSeconds) {
+                    try await textLLM.extractData(for: docType, from: ocrText)
+                }
             }
 
             var actualDate: String?

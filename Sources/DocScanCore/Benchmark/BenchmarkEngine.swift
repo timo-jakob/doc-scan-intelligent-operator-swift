@@ -1,3 +1,4 @@
+@preconcurrency import Dispatch // TODO: Remove when DispatchWorkItem is Sendable-annotated
 import Foundation
 import MLX
 
@@ -356,5 +357,29 @@ public struct BenchmarkEngine: Sendable {
             generatedAt: Date(),
             verified: false
         )
+    }
+}
+
+// MARK: - Hard Timeout Watchdog
+
+extension BenchmarkEngine {
+    /// Run an async operation with a hard process-level timeout.
+    ///
+    /// Arms a `DispatchWorkItem` watchdog that calls `exit(124)` if the operation
+    /// exceeds `seconds`. This kills the worker process so the parent can detect
+    /// a non-zero exit and disqualify the model. Use this as a backstop around
+    /// cooperative `TimeoutError.withTimeout()` calls, since MLX C++ inference
+    /// ignores Swift task cancellation.
+    static func withHardTimeout<T: Sendable>(
+        seconds: TimeInterval,
+        operation: @Sendable () async throws -> T
+    ) async throws -> T {
+        let watchdog = DispatchWorkItem {
+            fputs("HARD TIMEOUT: inference exceeded \(Int(seconds))s — terminating worker\n", stderr)
+            exit(124)
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds, execute: watchdog)
+        defer { watchdog.cancel() }
+        return try await operation()
     }
 }
