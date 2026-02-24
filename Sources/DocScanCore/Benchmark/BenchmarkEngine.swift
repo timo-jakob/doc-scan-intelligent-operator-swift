@@ -29,6 +29,7 @@ public protocol TextLLMOnlyFactory: Sendable {
 public actor DefaultVLMOnlyFactory: VLMOnlyFactory {
     private var cachedVLM: ModelManager?
 
+    /// No-arg initializer — the cached model is loaded lazily via `preloadVLM`.
     public init() {}
 
     public func preloadVLM(modelName: String, config: Configuration) async throws {
@@ -63,6 +64,7 @@ public actor DefaultVLMOnlyFactory: VLMOnlyFactory {
 public actor DefaultTextLLMOnlyFactory: TextLLMOnlyFactory {
     private var cachedTextLLM: TextLLMManager?
 
+    /// No-arg initializer — the cached model is loaded lazily via `preloadTextLLM`.
     public init() {}
 
     public func preloadTextLLM(modelName: String, config: Configuration) async throws {
