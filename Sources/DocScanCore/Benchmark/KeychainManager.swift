@@ -8,7 +8,7 @@ public enum KeychainManager {
 
     /// Store a new token in the Keychain (use saveToken for upsert).
     /// Returns the OSStatus so the caller can distinguish duplicate-item from real errors.
-    private static func storeToken(_ token: String, forAccount account: String) throws -> OSStatus {
+    private static func storeToken(_ token: String, forAccount account: String) throws(DocScanError) -> OSStatus {
         guard let tokenData = token.data(using: .utf8) else {
             throw DocScanError.keychainError("Failed to encode token")
         }
@@ -42,7 +42,7 @@ public enum KeychainManager {
     }
 
     /// Retrieve a token from the Keychain
-    public static func retrieveToken(forAccount account: String) throws -> String? {
+    public static func retrieveToken(forAccount account: String) throws(DocScanError) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
@@ -74,7 +74,7 @@ public enum KeychainManager {
     }
 
     /// Update an existing token in the Keychain (use saveToken for upsert)
-    private static func updateToken(_ token: String, forAccount account: String) throws {
+    private static func updateToken(_ token: String, forAccount account: String) throws(DocScanError) {
         guard let tokenData = token.data(using: .utf8) else {
             throw DocScanError.keychainError("Failed to encode token")
         }
@@ -98,7 +98,7 @@ public enum KeychainManager {
     }
 
     /// Delete a token from the Keychain
-    public static func deleteToken(forAccount account: String) throws {
+    public static func deleteToken(forAccount account: String) throws(DocScanError) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
@@ -116,7 +116,7 @@ public enum KeychainManager {
     /// Save (upsert) a token — stores if new, updates if existing.
     /// Uses try-store/fallback-update to avoid TOCTOU race conditions.
     /// Only falls through to update on `errSecDuplicateItem`; other store errors propagate.
-    public static func saveToken(_ token: String, forAccount account: String) throws {
+    public static func saveToken(_ token: String, forAccount account: String) throws(DocScanError) {
         let status = try storeToken(token, forAccount: account)
         if status == errSecDuplicateItem {
             try updateToken(token, forAccount: account)

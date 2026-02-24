@@ -60,7 +60,7 @@ public enum PDFUtils {
     }
 
     /// Validate that a file is a valid PDF
-    public static func validatePDF(at path: String) throws {
+    public static func validatePDF(at path: String) throws(DocScanError) {
         let url = URL(fileURLWithPath: path)
 
         guard FileManager.default.fileExists(atPath: path) else {
@@ -77,7 +77,9 @@ public enum PDFUtils {
     }
 
     /// Convert the first page of a PDF to an NSImage at specified DPI
-    public static func pdfToImage(at path: String, dpi: Int = 150, verbose: Bool = false) throws -> NSImage {
+    public static func pdfToImage(
+        at path: String, dpi: Int = 150, verbose: Bool = false
+    ) throws(DocScanError) -> NSImage {
         let url = URL(fileURLWithPath: path)
 
         guard let document = PDFDocument(url: url) else {
@@ -140,7 +142,7 @@ public enum PDFUtils {
     }
 
     /// Convert NSImage to PNG data for MLX Vision models
-    public static func imageToData(_ image: NSImage) throws -> Data {
+    public static func imageToData(_ image: NSImage) throws(DocScanError) -> Data {
         guard let tiffData = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiffData),
               let pngData = bitmap.representation(using: .png, properties: [:])
@@ -151,9 +153,13 @@ public enum PDFUtils {
     }
 
     /// Save NSImage to file (useful for debugging)
-    public static func saveImage(_ image: NSImage, to path: String) throws {
+    public static func saveImage(_ image: NSImage, to path: String) throws(DocScanError) {
         let data = try imageToData(image)
         let url = URL(fileURLWithPath: path)
-        try data.write(to: url)
+        do {
+            try data.write(to: url)
+        } catch {
+            throw DocScanError.fileOperationFailed("Failed to save image: \(error.localizedDescription)")
+        }
     }
 }

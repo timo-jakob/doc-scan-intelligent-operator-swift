@@ -159,7 +159,11 @@ final class GroundTruthTests: XCTestCase {
         try "{ not valid json }}}".write(toFile: path, atomically: true, encoding: .utf8)
 
         XCTAssertThrowsError(try GroundTruth.load(from: path)) { error in
-            XCTAssertTrue(error is DecodingError, "Expected DecodingError, got \(error)")
+            if case .benchmarkError = error as? DocScanError {
+                // Expected
+            } else {
+                XCTFail("Expected DocScanError.benchmarkError, got \(error)")
+            }
         }
     }
 

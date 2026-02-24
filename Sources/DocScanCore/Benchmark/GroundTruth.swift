@@ -69,24 +69,32 @@ public struct GroundTruth: Codable, Equatable, Sendable {
     }
 
     /// Load ground truth from a JSON sidecar file
-    public static func load(from path: String) throws -> GroundTruth {
+    public static func load(from path: String) throws(DocScanError) -> GroundTruth {
         let url = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: path) else {
             throw DocScanError.fileNotFound(path)
         }
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(GroundTruth.self, from: data)
+        do {
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(GroundTruth.self, from: data)
+        } catch {
+            throw DocScanError.benchmarkError("Failed to load ground truth: \(error.localizedDescription)")
+        }
     }
 
     /// Save ground truth to a JSON sidecar file (pretty-printed, sorted keys)
-    public func save(to path: String) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(self)
-        let url = URL(fileURLWithPath: path)
-        try data.write(to: url)
+    public func save(to path: String) throws(DocScanError) {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(self)
+            let url = URL(fileURLWithPath: path)
+            try data.write(to: url)
+        } catch {
+            throw DocScanError.benchmarkError("Failed to save ground truth: \(error.localizedDescription)")
+        }
     }
 }

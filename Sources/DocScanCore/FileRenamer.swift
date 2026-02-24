@@ -13,7 +13,7 @@ public struct FileRenamer: Sendable {
         from sourcePath: String,
         to targetFilename: String,
         dryRun: Bool = false
-    ) throws -> String {
+    ) throws(DocScanError) -> String {
         let sourceURL = URL(fileURLWithPath: sourcePath)
         let sourceDirectory = sourceURL.deletingLastPathComponent()
         let targetURL = sourceDirectory.appendingPathComponent(targetFilename)
@@ -60,7 +60,7 @@ public struct FileRenamer: Sendable {
     }
 
     /// Find an available filename by checking for collisions (used for dry-run)
-    private func findAvailableName(for targetURL: URL) throws -> URL {
+    private func findAvailableName(for targetURL: URL) throws(DocScanError) -> URL {
         if !FileManager.default.fileExists(atPath: targetURL.path) {
             return targetURL
         }
@@ -83,7 +83,7 @@ public struct FileRenamer: Sendable {
 
     /// Atomically rename a file, retrying with incremented counters on collision.
     /// Eliminates the TOCTOU race between existence check and rename.
-    private func moveWithRetry(from sourceURL: URL, to targetURL: URL) throws -> URL {
+    private func moveWithRetry(from sourceURL: URL, to targetURL: URL) throws(DocScanError) -> URL {
         // Try the target directly first
         do {
             try FileManager.default.moveItem(at: sourceURL, to: targetURL)
@@ -124,16 +124,22 @@ public struct FileRenamer: Sendable {
         to targetDirectory: String,
         filename: String,
         dryRun: Bool = false
-    ) throws -> String {
+    ) throws(DocScanError) -> String {
         let sourceURL = URL(fileURLWithPath: sourcePath)
 
         // Ensure target directory exists
         if !dryRun {
-            try FileManager.default.createDirectory(
-                atPath: targetDirectory,
-                withIntermediateDirectories: true,
-                attributes: nil
-            )
+            do {
+                try FileManager.default.createDirectory(
+                    atPath: targetDirectory,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            } catch {
+                throw DocScanError.fileOperationFailed(
+                    "Failed to create directory: \(error.localizedDescription)"
+                )
+            }
         }
 
         let targetURL = URL(fileURLWithPath: targetDirectory)

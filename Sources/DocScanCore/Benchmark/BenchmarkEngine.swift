@@ -126,13 +126,18 @@ public struct BenchmarkEngine: Sendable {
     // MARK: - PDF Enumeration
 
     /// Enumerate PDF files in a directory
-    public func enumeratePDFs(in directory: String) throws -> [String] {
+    public func enumeratePDFs(in directory: String) throws(DocScanError) -> [String] {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: directory) else {
             throw DocScanError.fileNotFound(directory)
         }
 
-        let contents = try fileManager.contentsOfDirectory(atPath: directory)
+        let contents: [String]
+        do {
+            contents = try fileManager.contentsOfDirectory(atPath: directory)
+        } catch {
+            throw DocScanError.fileNotFound("Failed to list directory: \(error.localizedDescription)")
+        }
         return contents
             .filter { $0.lowercased().hasSuffix(".pdf") }
             .sorted()
@@ -142,7 +147,7 @@ public struct BenchmarkEngine: Sendable {
     // MARK: - Sidecar Management
 
     /// Check which PDFs already have sidecar files
-    public func checkExistingSidecars(positiveDir: String, negativeDir: String) throws -> [String: Bool] {
+    public func checkExistingSidecars(positiveDir: String, negativeDir: String) throws(DocScanError) -> [String: Bool] {
         var result: [String: Bool] = [:]
         let fileManager = FileManager.default
 
@@ -158,7 +163,7 @@ public struct BenchmarkEngine: Sendable {
     }
 
     /// Load all ground truth sidecar files for given PDF paths
-    public func loadGroundTruths(pdfPaths: [String]) throws -> [String: GroundTruth] {
+    public func loadGroundTruths(pdfPaths: [String]) throws(DocScanError) -> [String: GroundTruth] {
         var groundTruths: [String: GroundTruth] = [:]
 
         for pdfPath in pdfPaths {
