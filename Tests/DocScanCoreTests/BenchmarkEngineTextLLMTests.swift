@@ -1,13 +1,15 @@
 @testable import DocScanCore
 import XCTest
 
-/// Mock TextLLM manager for benchmark tests. Returns controlled responses for both
+/// Mock TextLLM provider for benchmark tests. Returns controlled responses for both
 /// categorization (generate) and extraction without loading a real model.
 ///
 /// `@unchecked Sendable` is safe here because this mock is only mutated during
 /// single-threaded test setup (before any async work begins) and read during
 /// sequential test execution.
-class BenchmarkMockTextLLMManager: TextLLMManager, @unchecked Sendable {
+final class BenchmarkMockTextLLMProvider: TextLLMProviding, @unchecked Sendable {
+    let modelName: String = "mock-benchmark-text-model"
+
     /// Response returned by `generate()` — controls categorization (YES/NO)
     var generateResponse: String = "YES"
 
@@ -17,18 +19,16 @@ class BenchmarkMockTextLLMManager: TextLLMManager, @unchecked Sendable {
     /// Whether generate should throw
     var generateError: Error?
 
-    init() {
-        super.init(config: Configuration())
-    }
+    func preload(progressHandler _: @escaping @Sendable (Double) -> Void) async throws {}
 
-    override func extractData(
+    func extractData(
         for _: DocumentType,
         from _: String
     ) async throws -> ExtractionResult {
         mockExtractionResult
     }
 
-    override func generate(
+    func generate(
         systemPrompt _: String,
         userPrompt _: String,
         maxTokens _: Int
@@ -41,10 +41,10 @@ class BenchmarkMockTextLLMManager: TextLLMManager, @unchecked Sendable {
 }
 
 /// Mock TextLLM factory for testing.
-/// When a mock manager is explicitly set via `setMockManager()`, it survives
+/// When a mock provider is explicitly set via `setMockProvider()`, it survives
 /// `releaseTextLLM()` and `preloadTextLLM()` so the benchmark flow can use it.
 actor MockTextLLMOnlyFactory: TextLLMOnlyFactory {
-    private var mockManager: TextLLMManager?
+    private var mockProvider: (any TextLLMProviding)?
     private var explicitlySet = false
     var preloadCalled = false
     var releaseCalled = false
@@ -57,14 +57,14 @@ actor MockTextLLMOnlyFactory: TextLLMOnlyFactory {
         }
     }
 
-    func makeTextLLMManager() -> TextLLMManager? {
-        mockManager
+    func makeTextLLMProvider() -> (any TextLLMProviding)? {
+        mockProvider
     }
 
     func releaseTextLLM() {
         releaseCalled = true
         if !explicitlySet {
-            mockManager = nil
+            mockProvider = nil
         }
     }
 
@@ -72,9 +72,9 @@ actor MockTextLLMOnlyFactory: TextLLMOnlyFactory {
         preloadError = error
     }
 
-    func setMockManager(_ manager: TextLLMManager?) {
-        mockManager = manager
-        explicitlySet = manager != nil
+    func setMockProvider(_ provider: (any TextLLMProviding)?) {
+        mockProvider = provider
+        explicitlySet = provider != nil
     }
 }
 
@@ -252,7 +252,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
     }
 
     func testBenchmarkTextLLMDocumentNilFactory() async {
-        // MockTextLLMOnlyFactory returns nil for makeTextLLMManager by default
+        // MockTextLLMOnlyFactory returns nil for makeTextLLMProvider by default
         let factory = MockTextLLMOnlyFactory()
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Some invoice text with Rechnung"],

@@ -119,6 +119,8 @@ public enum PDFUtils {
 
         // Draw PDF page into bitmap
         NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+
         guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
             throw DocScanError.pdfConversionFailed("Unable to create graphics context")
         }
@@ -129,7 +131,6 @@ public enum PDFUtils {
         cgContext.fill(CGRect(origin: .zero, size: scaledSize))
         cgContext.scaleBy(x: scale, y: scale)
         page.draw(with: .mediaBox, to: cgContext)
-        NSGraphicsContext.restoreGraphicsState()
 
         // Create NSImage from bitmap
         let image = NSImage(size: scaledSize)

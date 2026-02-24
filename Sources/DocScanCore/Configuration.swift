@@ -21,6 +21,19 @@ public struct ProcessingSettings: Codable, Equatable, Sendable {
         self.temperature = temperature
         self.pdfDPI = pdfDPI
     }
+
+    /// Validate that all processing settings are within acceptable ranges
+    public func validate() throws {
+        guard maxTokens > 0 else {
+            throw DocScanError.configurationError("maxTokens must be > 0")
+        }
+        guard temperature >= 0, temperature <= 2.0 else {
+            throw DocScanError.configurationError("temperature must be 0..2")
+        }
+        guard pdfDPI > 0 else {
+            throw DocScanError.configurationError("pdfDPI must be > 0")
+        }
+    }
 }
 
 /// Output formatting settings for invoice filenames
@@ -221,7 +234,9 @@ public struct Configuration: Codable, Sendable {
 
         let data = try Data(contentsOf: url)
         let decoder = YAMLDecoder()
-        return try decoder.decode(Configuration.self, from: data)
+        let config = try decoder.decode(Configuration.self, from: data)
+        try config.processing.validate()
+        return config
     }
 
     /// Save configuration to YAML file

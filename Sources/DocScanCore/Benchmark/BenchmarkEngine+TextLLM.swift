@@ -107,7 +107,7 @@ private extension BenchmarkEngine {
             )
         }
 
-        guard let textLLM = await context.textLLMFactory.makeTextLLMManager() else {
+        guard let textLLM = await context.textLLMFactory.makeTextLLMProvider() else {
             return TextLLMDocumentResult(
                 filename: filename, isPositiveSample: isPositive,
                 categorizationCorrect: false, extractionCorrect: false
@@ -154,7 +154,7 @@ private extension BenchmarkEngine {
     /// Categorize a document using the TextLLM. Returns nil on timeout/error.
     func categorizeWithTextLLM(
         ocrText: String,
-        textLLM: TextLLMManager,
+        textLLM: any TextLLMProviding,
         timeoutSeconds: TimeInterval
     ) async -> Bool? {
         do {
@@ -175,7 +175,7 @@ private extension BenchmarkEngine {
     func scoreExtraction(
         pdfPath: String,
         ocrText: String,
-        textLLM: TextLLMManager,
+        textLLM: any TextLLMProviding,
         context: TextLLMBenchmarkContext
     ) async -> Bool {
         guard let groundTruth = context.groundTruths[pdfPath] else {

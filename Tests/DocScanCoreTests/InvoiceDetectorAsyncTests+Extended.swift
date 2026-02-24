@@ -8,7 +8,7 @@ import XCTest
 extension InvoiceDetectorAsyncTests {
     func testExtractDataWithMockTextLLM() async throws {
         // Verify extractData() returns data from the injected TextLLMManager
-        let mockTextLLM = MockTextLLMManager(config: config)
+        let mockTextLLM = MockTextLLMProvider()
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         mockTextLLM.mockDate = dateFormatter.date(from: "2025-06-15")
@@ -34,7 +34,7 @@ extension InvoiceDetectorAsyncTests {
     func testExtractDataVerboseModeInvoice() async throws {
         // Exercises the verbose output inside extractData() for invoice type
         let verboseConfig = Configuration(verbose: true)
-        let mockTextLLM = MockTextLLMManager(config: verboseConfig)
+        let mockTextLLM = MockTextLLMProvider()
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         mockTextLLM.mockDate = dateFormatter.date(from: "2025-06-15")
@@ -59,7 +59,7 @@ extension InvoiceDetectorAsyncTests {
     func testExtractDataVerboseModePrescription() async throws {
         // Exercises the prescription-specific verbose branch in extractData()
         let verboseConfig = Configuration(verbose: true)
-        let mockTextLLM = MockTextLLMManager(config: verboseConfig)
+        let mockTextLLM = MockTextLLMProvider()
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         mockTextLLM.mockDate = dateFormatter.date(from: "2025-04-08")
@@ -86,7 +86,7 @@ extension InvoiceDetectorAsyncTests {
     func testExtractDataVerboseModeNilValues() async throws {
         // Exercises verbose output when date and secondary field are nil
         let verboseConfig = Configuration(verbose: true)
-        let mockTextLLM = MockTextLLMManager(config: verboseConfig)
+        let mockTextLLM = MockTextLLMProvider()
 
         let detector = DocumentDetector(
             config: verboseConfig,

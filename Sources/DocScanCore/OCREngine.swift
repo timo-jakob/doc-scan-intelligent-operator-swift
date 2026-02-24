@@ -15,19 +15,17 @@ public struct KeywordResult: Sendable {
     }
 }
 
-/// OCR engine using Apple's Vision framework for text recognition + Text-LLM for analysis
+/// OCR engine using Apple's Vision framework for text recognition
 public class OCREngine {
     private let config: Configuration
-    private let textLLM: TextLLMManager
 
     public init(config: Configuration) {
         self.config = config
-        textLLM = TextLLMManager(config: config)
     }
 
     /// Extract text from an image using Vision OCR
     /// For very tall images (aspect ratio > 4:1), tiles the image to ensure full text extraction
-    public func extractText(from image: NSImage) async throws -> String {
+    public func extractText(from image: NSImage) throws -> String {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw DocScanError.pdfConversionFailed("Unable to convert NSImage to CGImage")
         }
@@ -42,53 +40,35 @@ public class OCREngine {
                 let ratio = String(format: "%.1f", aspectRatio)
                 print("OCR: Tall image detected (aspect ratio \(ratio):1), using tiled OCR")
             }
-            return try await extractTextTiled(from: cgImage)
+            return try extractTextTiled(from: cgImage)
         }
 
-        return try await extractTextSingle(from: cgImage)
+        return try extractTextSingle(from: cgImage)
     }
 
     /// Extract text from a single image (standard OCR)
-    private func extractTextSingle(from cgImage: CGImage) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            let request = VNRecognizeTextRequest { request, error in
-                if let error {
-                    let msg = "OCR failed: \(error.localizedDescription)"
-                    continuation.resume(throwing: DocScanError.extractionFailed(msg))
-                    return
-                }
+    private func extractTextSingle(from cgImage: CGImage) throws -> String {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US", "de-DE", "fr-FR", "es-ES"]
+        request.usesLanguageCorrection = true
 
-                guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                    continuation.resume(throwing: DocScanError.extractionFailed("No text observations found"))
-                    return
-                }
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try handler.perform([request])
 
-                let recognizedText = Self.extractTextFromObservations(observations)
-
-                if recognizedText.isEmpty {
-                    continuation.resume(throwing: DocScanError.extractionFailed("No text recognized"))
-                } else {
-                    continuation.resume(returning: recognizedText)
-                }
-            }
-
-            // Configure for accurate text recognition
-            request.recognitionLevel = .accurate
-            request.recognitionLanguages = ["en-US", "de-DE", "fr-FR", "es-ES"]
-            request.usesLanguageCorrection = true
-
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            do {
-                try handler.perform([request])
-            } catch {
-                let msg = "OCR request failed: \(error.localizedDescription)"
-                continuation.resume(throwing: DocScanError.extractionFailed(msg))
-            }
+        guard let observations = request.results else {
+            throw DocScanError.extractionFailed("No text observations found")
         }
+
+        let recognizedText = Self.extractTextFromObservations(observations)
+        guard !recognizedText.isEmpty else {
+            throw DocScanError.extractionFailed("No text recognized")
+        }
+        return recognizedText
     }
 
     /// Extract text from a tall image by splitting into tiles
-    private func extractTextTiled(from cgImage: CGImage) async throws -> String {
+    private func extractTextTiled(from cgImage: CGImage) throws -> String {
         let width = cgImage.width
         let height = cgImage.height
         let tileHeight = 800 // Tile height in pixels
@@ -103,7 +83,7 @@ public class OCREngine {
             }
 
             do {
-                let tileText = try await extractTextSingle(from: croppedImage)
+                let tileText = try extractTextSingle(from: croppedImage)
                 allText += tileText + "\n"
             } catch {
                 // Continue with other tiles even if one fails
@@ -227,53 +207,5 @@ public class OCREngine {
 
     private func sanitizeCompanyName(_ name: String) -> String {
         StringUtils.sanitizeCompanyName(name)
-    }
-
-    /// Result of legacy invoice data extraction
-    public struct LegacyInvoiceData {
-        public let isInvoice: Bool
-        public let date: Date?
-        public let company: String?
-    }
-
-    /// Extract all invoice data from OCR text using Text-LLM (legacy method)
-    public func extractInvoiceData(
-        from text: String
-    ) async throws -> LegacyInvoiceData {
-        if config.verbose {
-            print("OCR extracted text (\(text.count) characters)")
-            print("Sending to Text-LLM for analysis...")
-        }
-
-        // Use Text-LLM to analyze the OCR text
-        let result = try await textLLM.analyzeInvoiceText(text)
-
-        if config.verbose {
-            print("OCR + Text-LLM Results:")
-            print("  Is Invoice: \(result.isInvoice)")
-            print("  Date: \(result.date?.description ?? "nil")")
-            print("  Company: \(result.company ?? "nil")")
-        }
-
-        return result
-    }
-
-    /// Extract only date and company from OCR text (no invoice detection)
-    /// Used in Phase 2 after categorization confirms it's an invoice
-    public func extractDateAndCompany(from text: String) async throws -> (date: Date?, company: String?) {
-        if config.verbose {
-            print("Extracting date and company from OCR text (\(text.count) characters)...")
-        }
-
-        // Use Text-LLM to extract date and company
-        let (date, company) = try await textLLM.extractDateAndCompany(from: text)
-
-        if config.verbose {
-            print("Extraction Results:")
-            print("  Date: \(date?.description ?? "not found")")
-            print("  Company: \(company ?? "not found")")
-        }
-
-        return (date, company)
     }
 }

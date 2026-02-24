@@ -5,9 +5,16 @@ final class KeychainManagerTests: XCTestCase {
     /// Unique test account to avoid conflicts with real data
     private let testAccount = "docscan-test-\(UUID().uuidString)"
 
-    // NOTE: These tests are skipped in CI via -skip-testing because
-    // .userPresence access control requires entitlements unavailable
-    // on GitHub Actions runners (errSecMissingEntitlement).
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        // Skip when Keychain entitlements are unavailable (CI, swift test)
+        do {
+            try KeychainManager.saveToken("probe", forAccount: "docscan-entitlement-probe")
+            try KeychainManager.deleteToken(forAccount: "docscan-entitlement-probe")
+        } catch {
+            throw XCTSkip("Keychain not available: \(error.localizedDescription)")
+        }
+    }
 
     override func tearDown() {
         // Clean up any Keychain entries created during tests

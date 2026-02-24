@@ -47,17 +47,20 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
     }
 }
 
-// MARK: - Mock TextLLM Manager
+// MARK: - Mock TextLLM Provider
 
-/// Mock TextLLM manager for testing without actual model loading
-final class MockTextLLMManager: TextLLMManager {
+/// Mock TextLLM provider for testing without actual model loading
+final class MockTextLLMProvider: TextLLMProviding, @unchecked Sendable {
+    var modelName: String = "mock-text-model"
     var mockDate: Date?
     var mockSecondaryField: String?
     var mockPatientName: String?
     var shouldThrowError: Bool = false
     var errorToThrow: Error = DocScanError.inferenceError("Mock TextLLM error")
 
-    override func extractData(
+    func preload(progressHandler _: @escaping @Sendable (Double) -> Void) async throws {}
+
+    func extractData(
         for _: DocumentType,
         from _: String
     ) async throws -> ExtractionResult {
@@ -69,5 +72,16 @@ final class MockTextLLMManager: TextLLMManager {
             secondaryField: mockSecondaryField,
             patientName: mockPatientName
         )
+    }
+
+    func generate(
+        systemPrompt _: String,
+        userPrompt _: String,
+        maxTokens _: Int
+    ) async throws -> String {
+        if shouldThrowError {
+            throw errorToThrow
+        }
+        return "YES"
     }
 }

@@ -1,4 +1,4 @@
-import AppKit
+@preconcurrency import AppKit
 import Foundation
 
 // MARK: - Categorization Results (Phase 1: VLM + OCR in parallel)
@@ -64,7 +64,7 @@ public struct CategorizationResult: Sendable {
 }
 
 /// Comparison result for categorization phase
-public struct CategorizationVerification {
+public struct CategorizationVerification: Sendable {
     public let vlmResult: CategorizationResult
     public let ocrResult: CategorizationResult
     public let bothAgree: Bool
@@ -81,12 +81,12 @@ public struct CategorizationVerification {
 /// Detects documents of a specific type and extracts key information using two-phase approach:
 /// Phase 1: Categorization (VLM + OCR in parallel) - Does this match the document type?
 /// Phase 2: Data Extraction (OCR+TextLLM only) - Extract date and secondary field
-public class DocumentDetector {
-    private let vlmProvider: VLMProvider
+public actor DocumentDetector {
+    private let vlmProvider: any VLMProvider
     private let ocrEngine: OCREngine
-    private let textLLM: TextLLMManager
-    let config: Configuration
-    public let documentType: DocumentType
+    private let textLLM: any TextLLMProviding
+    nonisolated let config: Configuration
+    public nonisolated let documentType: DocumentType
 
     // Cache the image and OCR text between phases
     private var cachedImage: NSImage?
@@ -104,7 +104,7 @@ public class DocumentDetector {
     }
 
     /// Initialize with custom VLM provider (for testing/dependency injection)
-    public init(config: Configuration, documentType: DocumentType = .invoice, vlmProvider: VLMProvider) {
+    public init(config: Configuration, documentType: DocumentType = .invoice, vlmProvider: any VLMProvider) {
         self.config = config
         self.documentType = documentType
         self.vlmProvider = vlmProvider
@@ -116,8 +116,8 @@ public class DocumentDetector {
     public init(
         config: Configuration,
         documentType: DocumentType = .invoice,
-        vlmProvider: VLMProvider,
-        textLLM: TextLLMManager
+        vlmProvider: any VLMProvider,
+        textLLM: any TextLLMProviding
     ) {
         self.config = config
         self.documentType = documentType
@@ -149,11 +149,14 @@ extension DocumentDetector {
             print("Running categorization (VLM + OCR in parallel)...")
         }
 
-        // Run VLM and OCR in parallel, await with timeouts
-        let vlm = await runVLMCategorization(image: image)
-        let ocr = try await runOCRCategorization(
+        // Run VLM and OCR in parallel using async let
+        async let vlmResult = runVLMCategorization(image: image)
+        async let ocrResult = runOCRCategorization(
             image: image, directText: directText
         )
+
+        let vlm = await vlmResult
+        let ocr = try await ocrResult
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
         logVerificationResult(verification)
@@ -179,17 +182,15 @@ extension DocumentDetector {
     /// Run VLM categorization with timeout and error handling
     private func runVLMCategorization(image: NSImage) async -> CategorizationResult {
         let timeoutSeconds: TimeInterval = 30.0
-        let vlmTask = Task { try await self.categorizeWithVLM(image: image) }
 
         do {
             return try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
-                try await vlmTask.value
+                try await self.categorizeWithVLM(image: image)
             }
         } catch is TimeoutError {
             if config.verbose {
                 print("⏱️  VLM timed out after \(Int(timeoutSeconds)) seconds")
             }
-            vlmTask.cancel()
             return CategorizationResult(
                 isMatch: false, confidence: "low",
                 method: "VLM (timeout)", reason: "Timed out"
@@ -209,23 +210,19 @@ extension DocumentDetector {
         directText: String?
     ) async throws -> CategorizationResult {
         let timeoutSeconds: TimeInterval = 30.0
-        let ocrTask = Task {
-            if let text = directText {
-                self.categorizeWithDirectText(text)
-            } else {
-                try await self.categorizeWithOCR(image: image)
-            }
-        }
 
         do {
             return try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
-                try await ocrTask.value
+                if let text = directText {
+                    self.categorizeWithDirectText(text)
+                } else {
+                    try await self.categorizeWithOCR(image: image)
+                }
             }
         } catch is TimeoutError {
             if config.verbose {
                 print("⏱️  OCR timed out after \(Int(timeoutSeconds)) seconds")
             }
-            ocrTask.cancel()
             return CategorizationResult(
                 isMatch: false, confidence: "low",
                 method: "OCR (timeout)", reason: "Timed out"
@@ -312,15 +309,15 @@ extension DocumentDetector {
     // MARK: - Text Categorization
 
     /// Categorize using direct PDF text (no OCR needed)
-    /// Internal access for testability
-    func categorizeWithDirectText(_ text: String) -> CategorizationResult {
+    /// Nonisolated because it only accesses let properties and uses static methods.
+    nonisolated func categorizeWithDirectText(_ text: String) -> CategorizationResult {
         if config.verbose {
             print("PDF: Using direct text extraction for categorization...")
             print("PDF: Text length: \(text.count) characters")
             print("PDF: Text preview: \(String(text.prefix(500)))")
         }
 
-        let result = ocrEngine.detectKeywords(for: documentType, from: text)
+        let result = OCREngine.detectKeywords(for: documentType, from: text)
 
         if config.verbose {
             let typeName = documentType.displayName.lowercased()
@@ -338,7 +335,7 @@ extension DocumentDetector {
     func categorizeWithOCR(image: NSImage) async throws -> CategorizationResult {
         if config.verbose { print("OCR: Starting Vision OCR (scanned document)...") }
 
-        let text = try await ocrEngine.extractText(from: image)
+        let text = try ocrEngine.extractText(from: image)
         cachedOCRText = text
 
         if config.verbose {

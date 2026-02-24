@@ -3,7 +3,7 @@ import XCTest
 
 // MARK: - TextLLM With Mock Manager (categorization + extraction paths)
 
-/// Tests that exercise the full categorization + extraction flow using BenchmarkMockTextLLMManager.
+/// Tests that exercise the full categorization + extraction flow using BenchmarkMockTextLLMProvider.
 /// Split from BenchmarkEngineTextLLMTests to stay within SwiftLint length limits.
 final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     var engine: BenchmarkEngine!
@@ -17,11 +17,11 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testPositiveCategorizationCorrect() async {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateResponse = "YES" // Categorize as match
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         let groundTruth = GroundTruth(
             isMatch: true, documentType: .invoice,
@@ -47,11 +47,11 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testPositiveCategorizationWrong() async {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateResponse = "NO" // Wrong categorization for positive sample
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Rechnung invoice text"],
@@ -73,11 +73,11 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testNegativeCorrectRejection() async {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateResponse = "NO" // Correct rejection of negative sample
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/letter.pdf": "Just a random letter about weather"],
@@ -99,11 +99,11 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testNegativeFalsePositive() async {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateResponse = "YES" // False positive on negative sample
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/letter.pdf": "Just a random letter"],
@@ -124,11 +124,11 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testCategorizationError() async {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateError = DocScanError.inferenceError("mock error")
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Some text"],
@@ -151,7 +151,7 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testExtractionWithGroundTruth() async throws {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateResponse = "YES"
         // Extraction returns matching date and company
         let calendar = Calendar.current
@@ -161,7 +161,7 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         )
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         let groundTruth = GroundTruth(
             isMatch: true, documentType: .invoice,
@@ -189,11 +189,11 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
     }
 
     func testExtractionMissingGroundTruth() async {
-        let mockLLM = BenchmarkMockTextLLMManager()
+        let mockLLM = BenchmarkMockTextLLMProvider()
         mockLLM.generateResponse = "YES"
 
         let factory = MockTextLLMOnlyFactory()
-        await factory.setMockManager(mockLLM)
+        await factory.setMockProvider(mockLLM)
 
         // No ground truth for this PDF → extraction scores false
         let context = TextLLMBenchmarkContext(

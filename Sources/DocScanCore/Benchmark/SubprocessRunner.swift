@@ -1,4 +1,4 @@
-import Foundation
+@preconcurrency import Foundation
 
 /// Outcome of a single benchmark worker subprocess
 public enum SubprocessResult: Sendable {

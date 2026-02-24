@@ -3,20 +3,42 @@ import MLX
 import MLXLLM
 import MLXLMCommon
 
+// MARK: - TextLLM Provider Protocol
+
+/// Protocol for text-based LLM providers
+/// Enables dependency injection and testing without actual model loading
+public protocol TextLLMProviding: Sendable {
+    /// The model identifier used for text LLM inference
+    var modelName: String { get }
+
+    /// Preload the text LLM model so it is ready before processing begins.
+    func preload(progressHandler: @escaping @Sendable (Double) -> Void) async throws
+
+    /// Generic data extraction for any document type
+    func extractData(
+        for documentType: DocumentType,
+        from text: String
+    ) async throws -> ExtractionResult
+
+    /// Generate text from system and user prompts
+    func generate(
+        systemPrompt: String,
+        userPrompt: String,
+        maxTokens: Int
+    ) async throws -> String
+}
+
+// MARK: - TextLLM Manager
+
 /// Manages text-only LLM for analyzing OCR-extracted text using mlx-swift-lm.
-///
-/// Marked `@unchecked Sendable` because the mutable `modelContainer` is only written once
-/// during `preload()` and then read during sequential `generate()` calls. The benchmark
-/// engine serialises all access (one model at a time, documents processed sequentially),
-/// so no concurrent mutation is possible.
-open class TextLLMManager: @unchecked Sendable {
+public actor TextLLMManager: TextLLMProviding {
     private let config: Configuration
 
     /// Model container (lazy loaded)
     private var modelContainer: ModelContainer?
 
     /// The model identifier used for text LLM inference
-    public var modelName: String {
+    public nonisolated var modelName: String {
         config.textModelName
     }
 
@@ -27,7 +49,7 @@ open class TextLLMManager: @unchecked Sendable {
     /// Preload the text LLM model so it is ready before processing begins.
     /// Calls progressHandler with fractions 0.0–1.0 only when a download is required.
     /// If the model is already cached locally the handler is never called.
-    public func preload(progressHandler: @escaping (Double) -> Void) async throws {
+    public func preload(progressHandler: @escaping @Sendable (Double) -> Void) async throws {
         guard modelContainer == nil else { return }
 
         modelContainer = try await LLMModelFactory.shared.loadContainer(
@@ -37,70 +59,9 @@ open class TextLLMManager: @unchecked Sendable {
         }
     }
 
-    /// Analyze OCR text using Text-LLM to extract invoice data
-    public func analyzeInvoiceText(
-        _ text: String
-    ) async throws -> OCREngine.LegacyInvoiceData {
-        if config.verbose {
-            print("Text-LLM: Analyzing OCR text...")
-        }
-
-        // First, check if it's an invoice using keyword detection
-        let isInvoice = detectInvoice(from: text)
-
-        guard isInvoice else {
-            if config.verbose {
-                print("Text-LLM: Not an invoice")
-            }
-            return OCREngine.LegacyInvoiceData(isInvoice: false, date: nil, company: nil)
-        }
-
-        // Extract date and company using LLM
-        let extraction = try await extractInvoiceData(from: text)
-
-        if config.verbose {
-            print("Text-LLM Results:")
-            print("  Is Invoice: \(isInvoice)")
-            print("  Date: \(extraction.date?.description ?? "nil")")
-            print("  Company: \(extraction.company ?? "nil")")
-        }
-
-        return OCREngine.LegacyInvoiceData(
-            isInvoice: isInvoice,
-            date: extraction.date,
-            company: extraction.company
-        )
-    }
-
-    /// Detect if text represents an invoice using keyword detection
-    private func detectInvoice(from text: String) -> Bool {
-        if config.verbose {
-            print("Text-LLM: Checking if text contains invoice...")
-        }
-
-        // Use shared keyword detection from OCREngine
-        let result = OCREngine.detectInvoiceKeywords(from: text)
-
-        if config.verbose {
-            print("Text-LLM: Keyword detection result: \(result.isMatch) (confidence: \(result.confidence))")
-            if let reason = result.reason {
-                print("  - \(reason)")
-            }
-        }
-
-        return result.isMatch
-    }
-
-    /// Extract date and company from text using LLM (public API for Phase 2)
-    /// Legacy method - delegates to generic extractData
-    public func extractDateAndCompany(from text: String) async throws -> (Date?, String?) {
-        let result = try await extractData(for: .invoice, from: text)
-        return (result.date, result.secondaryField)
-    }
-
     /// Generic data extraction for any document type
     /// Returns extracted date, secondary field (company/doctor), and optional patient name
-    open func extractData(
+    public func extractData(
         for documentType: DocumentType,
         from text: String
     ) async throws -> ExtractionResult {
@@ -193,58 +154,6 @@ open class TextLLMManager: @unchecked Sendable {
         }
     }
 
-    /// Result of legacy invoice extraction (date + company)
-    struct InvoiceExtraction {
-        let date: Date?
-        let company: String?
-    }
-
-    /// Extract invoice date and company from text using LLM with regex fallback
-    private func extractInvoiceData(from text: String) async throws -> InvoiceExtraction {
-        let systemPrompt = """
-        You are an invoice data extraction assistant. \
-        Extract information accurately and respond in the exact format requested.
-        """
-
-        let userPrompt = """
-        Extract the following information from this invoice text:
-        1. Invoice date (Rechnungsdatum): Provide in format YYYY-MM-DD
-        2. Invoicing party (company name that issued the invoice)
-
-        Invoice text:
-        \(text)
-
-        Respond in this exact format:
-        DATE: YYYY-MM-DD
-        COMPANY: Company Name
-
-        If you cannot find the information, write "UNKNOWN" for that field.
-        """
-
-        let response = try await generate(
-            systemPrompt: systemPrompt,
-            userPrompt: userPrompt,
-            maxTokens: config.maxTokens
-        )
-
-        let parsed = parseExtractionResponse(response, documentType: .invoice)
-        var date = parsed.date
-        let company = parsed.secondaryField
-
-        // Fallback: If LLM didn't find a date, try regex-based extraction
-        if date == nil {
-            if config.verbose {
-                print("Text-LLM: Date not found by LLM, trying regex fallback...")
-            }
-            date = extractDateWithRegex(from: text)
-            if config.verbose, let date {
-                print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(date))")
-            }
-        }
-
-        return InvoiceExtraction(date: date, company: company)
-    }
-
     /// Extract date using regex patterns (fallback for LLM failures)
     /// Uses shared DateUtils for consistent date extraction across the codebase
     private func extractDateWithRegex(from text: String) -> Date? {
@@ -253,8 +162,8 @@ open class TextLLMManager: @unchecked Sendable {
 
     // MARK: - LLM Generation
 
-    /// Generate text using MLX LLM. Open so tests can override without loading a real model.
-    open func generate(
+    /// Generate text using MLX LLM.
+    public func generate(
         systemPrompt: String,
         userPrompt: String,
         maxTokens: Int
@@ -280,7 +189,7 @@ open class TextLLMManager: @unchecked Sendable {
                 input: input,
                 parameters: .init(
                     maxTokens: maxTokens,
-                    temperature: Float(config.temperature)
+                    temperature: Float(self.config.temperature)
                 ),
                 context: context
             )
@@ -290,19 +199,19 @@ open class TextLLMManager: @unchecked Sendable {
                 switch generation {
                 case let .chunk(text):
                     fullOutput += text
-                    if config.verbose {
+                    if self.config.verbose {
                         print(".", terminator: "")
                     }
                 case .info:
                     break
                 case .toolCall:
-                    if config.verbose {
+                    if self.config.verbose {
                         print("[warn] unexpected toolCall event from TextLLM — ignored")
                     }
                 }
             }
 
-            if config.verbose {
+            if self.config.verbose {
                 print() // New line after progress dots
             }
 

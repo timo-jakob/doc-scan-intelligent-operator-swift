@@ -1,4 +1,4 @@
-import AppKit
+@preconcurrency import AppKit
 import Foundation
 import MLX
 import MLXLLM
@@ -29,7 +29,7 @@ public extension VLMProvider {
 // MARK: - Model Manager
 
 /// Manages Vision-Language Models using mlx-swift-lm
-public class ModelManager: VLMProvider, @unchecked Sendable {
+public actor ModelManager: VLMProvider {
     private let config: Configuration
     private let fileManager = FileManager.default
 
@@ -72,8 +72,11 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
             print("VLM: Sending prompt with image...")
         }
 
-        // Use ChatSession.respond with image parameter
-        let response = try await session.respond(
+        // Use ChatSession.respond with image parameter.
+        // ChatSession is not Sendable-annotated yet, so we use nonisolated(unsafe)
+        // to allow sending it to the nonisolated respond method.
+        nonisolated(unsafe) let sendableSession = session
+        let response = try await sendableSession.respond(
             to: prompt,
             image: .url(tempURL)
         )
@@ -145,7 +148,7 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
     /// If the model is already cached locally the handler is never called.
     public func preload(
         modelName: String,
-        progressHandler: @escaping (Double) -> Void
+        progressHandler: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard loadedModel == nil || currentModelName != modelName else { return }
 
@@ -159,9 +162,9 @@ public class ModelManager: VLMProvider, @unchecked Sendable {
     }
 
     /// Clear model cache
-    public func clearCache() throws {
-        if fileManager.fileExists(atPath: config.modelCacheDir) {
-            try fileManager.removeItem(atPath: config.modelCacheDir)
+    public nonisolated func clearCache() throws {
+        if FileManager.default.fileExists(atPath: config.modelCacheDir) {
+            try FileManager.default.removeItem(atPath: config.modelCacheDir)
         }
     }
 }

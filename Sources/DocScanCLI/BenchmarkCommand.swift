@@ -103,24 +103,11 @@ struct BenchmarkCommand: AsyncParsableCommand {
     // MARK: - Helpers
 
     private func parseDocumentType() throws -> DocumentType {
-        guard let documentType = DocumentType(rawValue: type.lowercased()) else {
-            let validTypes = DocumentType.allCases.map(\.rawValue).joined(separator: ", ")
-            print("Invalid document type: '\(type)'")
-            print("Valid types: \(validTypes)")
-            throw ExitCode.failure
-        }
-        return documentType
+        try CLIHelpers.parseDocumentType(type)
     }
 
     private func loadConfiguration() throws -> Configuration {
-        if let configPath = config {
-            return try Configuration.load(from: configPath)
-        }
-        let defaultPath = Configuration.defaultConfigPath
-        if FileManager.default.fileExists(atPath: defaultPath) {
-            return try Configuration.load(from: defaultPath)
-        }
-        return Configuration.defaultConfiguration
+        try CLIHelpers.loadConfiguration(configPath: config)
     }
 
     private func printBenchmarkHeader(_ configuration: Configuration, documentType: DocumentType) {

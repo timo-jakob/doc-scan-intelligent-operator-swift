@@ -18,8 +18,8 @@ public protocol TextLLMOnlyFactory: Sendable {
     /// Pre-download and load a TextLLM model
     func preloadTextLLM(modelName: String, config: Configuration) async throws
 
-    /// Get the currently loaded TextLLM manager
-    func makeTextLLMManager() async -> TextLLMManager?
+    /// Get the currently loaded TextLLM provider
+    func makeTextLLMProvider() async -> (any TextLLMProviding)?
 
     /// Release GPU resources held by the TextLLM
     func releaseTextLLM() async
@@ -83,7 +83,7 @@ public actor DefaultTextLLMOnlyFactory: TextLLMOnlyFactory {
         cachedTextLLM = textLLM
     }
 
-    public func makeTextLLMManager() -> TextLLMManager? {
+    public func makeTextLLMProvider() -> (any TextLLMProviding)? {
         cachedTextLLM
     }
 
@@ -201,7 +201,7 @@ public final class BenchmarkEngine: Sendable {
                     at: pdfPath,
                     dpi: configuration.pdfDPI
                 )
-                let text = try await ocrEngine.extractText(from: image)
+                let text = try ocrEngine.extractText(from: image)
                 ocrTexts[pdfPath] = text
                 if verbose {
                     print("  \(filename): OCR text (\(text.count) chars)")
@@ -228,7 +228,7 @@ public final class BenchmarkEngine: Sendable {
 
         // Lazy-load TextLLM only when a positive document actually needs extraction.
         // This avoids a costly model preload when skipExisting covers all positives.
-        var textLLM: TextLLMManager?
+        var textLLM: (any TextLLMProviding)?
 
         for pdfPath in positivePDFs {
             let groundTruth = try await generatePositiveGroundTruth(
@@ -251,7 +251,7 @@ public final class BenchmarkEngine: Sendable {
     private func generatePositiveGroundTruth(
         pdfPath: String,
         ocrTexts: [String: String],
-        textLLM: inout TextLLMManager?,
+        textLLM: inout (any TextLLMProviding)?,
         skipExisting: Bool
     ) async throws -> GroundTruth {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent

@@ -52,6 +52,33 @@ public enum DateUtils {
         "jan", "feb", "mrz", "apr", "jun", "jul", "aug", "sep", "sept", "okt", "nov", "dez",
     ]
 
+    // MARK: - Cached Formatters & Regex
+
+    /// Cached DateFormatter instances (one per format string), thread-safe as static lets
+    private static let cachedFormatters: [DateFormatter] = dateFormats.map { format in
+        let formatter = DateFormatter()
+        formatter.dateFormat = format
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }
+
+    /// Cached ISO formatter for `formatDate`
+    private static let isoFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    /// Cached NSRegularExpression instances (one per date pattern), compiled once
+    private static let cachedDateRegexes: [NSRegularExpression] = datePatterns.compactMap { pattern in
+        try? NSRegularExpression(pattern: pattern)
+    }
+
+    /// Cached year regex for German month/year parsing
+    private static let yearRegex: NSRegularExpression = // swiftlint:disable:next force_try
+        try! NSRegularExpression(pattern: "\\b(20\\d{2})\\b")
+
     /// Parse a date string using multiple format attempts
     /// - Parameter dateString: The string to parse
     /// - Parameter validate: Whether to validate the date is reasonable (default: true)
@@ -59,12 +86,8 @@ public enum DateUtils {
     public static func parseDate(_ dateString: String, validate: Bool = true) -> Date? {
         let trimmed = dateString.trimmingCharacters(in: .whitespaces)
 
-        // Try standard formats first
-        for format in dateFormats {
-            let formatter = DateFormatter()
-            formatter.dateFormat = format
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-
+        // Try standard formats first (using cached formatters)
+        for formatter in cachedFormatters {
             if let date = formatter.date(from: trimmed) {
                 if validate, !isValidDate(date) {
                     continue // Try other formats
@@ -89,10 +112,8 @@ public enum DateUtils {
         let lowercased = text.lowercased()
 
         for (monthName, monthNumber) in germanMonths where lowercased.contains(monthName) {
-            // Extract year (4 digits)
-            let yearPattern = "\\b(20\\d{2})\\b"
-            guard let regex = try? NSRegularExpression(pattern: yearPattern),
-                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+            // Extract year (4 digits) using cached regex
+            guard let match = yearRegex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
                   let range = Range(match.range(at: 1), in: text)
             else {
                 continue
@@ -143,6 +164,9 @@ public enum DateUtils {
     ///   - format: The desired format string (default: yyyy-MM-dd)
     /// - Returns: The formatted date string
     public static func formatDate(_ date: Date, format: String = "yyyy-MM-dd") -> String {
+        if format == "yyyy-MM-dd" {
+            return isoFormatter.string(from: date)
+        }
         let formatter = DateFormatter()
         formatter.dateFormat = format
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -164,9 +188,9 @@ public enum DateUtils {
                 let afterKeyword = String(text[range.upperBound...])
                 let nearbyText = String(afterKeyword.prefix(40))
 
-                // Try numeric patterns near keywords
-                for pattern in datePatterns {
-                    if let date = extractDateWithPattern(nearbyText, pattern: pattern) {
+                // Try numeric patterns near keywords (using cached regexes)
+                for regex in cachedDateRegexes {
+                    if let date = extractDateWithCachedRegex(nearbyText, regex: regex) {
                         return date
                     }
                 }
@@ -185,9 +209,9 @@ public enum DateUtils {
             return date
         }
 
-        // Strategy 3: Fallback - try any numeric date pattern in the text
-        for pattern in datePatterns {
-            if let date = extractDateWithPattern(text, pattern: pattern) {
+        // Strategy 3: Fallback - try any numeric date pattern in the text (using cached regexes)
+        for regex in cachedDateRegexes {
+            if let date = extractDateWithCachedRegex(text, regex: regex) {
                 return date
             }
         }
@@ -218,18 +242,16 @@ public enum DateUtils {
                 continue
             }
 
-            // Look for a 4-digit year after the month
+            // Look for a 4-digit year after the month (using cached regex)
             let afterMonthString = String(String(lowercased[monthRange.upperBound...]).prefix(20))
-            let yearPattern = "\\b(20\\d{2})\\b"
 
             let yearRange2 = NSRange(
                 afterMonthString.startIndex..., in: afterMonthString
             )
-            guard let yearRegex = try? NSRegularExpression(pattern: yearPattern),
-                  let yearMatch = yearRegex.firstMatch(
-                      in: afterMonthString, range: yearRange2
-                  ),
-                  let yearRange = Range(yearMatch.range, in: afterMonthString)
+            guard let yearMatch = yearRegex.firstMatch(
+                in: afterMonthString, range: yearRange2
+            ),
+                let yearRange = Range(yearMatch.range, in: afterMonthString)
             else {
                 continue
             }
@@ -244,6 +266,20 @@ public enum DateUtils {
         return nil
     }
 
+    /// Extract a date using a pre-compiled regex (internal fast path)
+    private static func extractDateWithCachedRegex(_ text: String, regex: NSRegularExpression) -> Date? {
+        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        for match in matches {
+            if let range = Range(match.range, in: text) {
+                let dateString = String(text[range])
+                if let date = parseDate(dateString) {
+                    return date
+                }
+            }
+        }
+        return nil
+    }
+
     /// Extract a date using a specific regex pattern
     /// - Parameters:
     ///   - text: The text to search
@@ -253,18 +289,6 @@ public enum DateUtils {
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return nil
         }
-
-        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
-
-        for match in matches {
-            if let range = Range(match.range, in: text) {
-                let dateString = String(text[range])
-                if let date = parseDate(dateString) {
-                    return date
-                }
-            }
-        }
-
-        return nil
+        return extractDateWithCachedRegex(text, regex: regex)
     }
 }

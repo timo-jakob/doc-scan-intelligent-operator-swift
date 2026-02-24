@@ -2,7 +2,7 @@ import Foundation
 
 extension DocumentDetector {
     /// Generate filename from document data
-    public func generateFilename(from data: DocumentData) -> String? {
+    public nonisolated func generateFilename(from data: DocumentData) -> String? {
         guard data.isMatch else { return nil }
         guard let date = data.date else { return nil }
 
@@ -22,9 +22,9 @@ extension DocumentDetector {
         // Replace the secondary field placeholder based on document type
         switch documentType {
         case .invoice:
-            // swiftlint:disable:next force_unwrapping
+            guard let company = data.secondaryField else { return nil }
             pattern = pattern.replacingOccurrences(
-                of: "{company}", with: data.secondaryField!
+                of: "{company}", with: company
             )
         case .prescription:
             pattern = applyPrescriptionPlaceholders(
@@ -36,7 +36,7 @@ extension DocumentDetector {
     }
 
     /// Apply prescription-specific placeholder replacements
-    private func applyPrescriptionPlaceholders(
+    private nonisolated func applyPrescriptionPlaceholders(
         pattern: String,
         data: DocumentData
     ) -> String {

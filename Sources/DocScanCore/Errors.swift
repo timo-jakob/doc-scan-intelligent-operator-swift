@@ -7,9 +7,9 @@ public struct TimeoutError: Error, LocalizedError {
     }
 
     /// Execute an async operation with a timeout
-    public static func withTimeout<T>(
+    public static func withTimeout<T: Sendable>(
         seconds: TimeInterval,
-        operation: @escaping () async throws -> T
+        operation: @Sendable @escaping () async throws -> T
     ) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask { try await operation() }

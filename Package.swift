@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -41,8 +41,7 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
             ],
-            path: "Sources/DocScanCore",
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            path: "Sources/DocScanCore"
         ),
 
         // CLI executable
@@ -52,16 +51,14 @@ let package = Package(
                 "DocScanCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/DocScanCLI",
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            path: "Sources/DocScanCLI"
         ),
 
         // Tests
         .testTarget(
             name: "DocScanCoreTests",
             dependencies: ["DocScanCore"],
-            path: "Tests/DocScanCoreTests",
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            path: "Tests/DocScanCoreTests"
         ),
     ]
 )

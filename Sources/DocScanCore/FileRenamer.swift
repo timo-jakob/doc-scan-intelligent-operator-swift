@@ -1,8 +1,7 @@
 import Foundation
 
 /// Handles safe file renaming with collision detection
-public class FileRenamer {
-    private let fileManager = FileManager.default
+public struct FileRenamer: Sendable {
     private let verbose: Bool
 
     public init(verbose: Bool = false) {
@@ -20,7 +19,7 @@ public class FileRenamer {
         let targetURL = sourceDirectory.appendingPathComponent(targetFilename)
 
         // Check if source exists
-        guard fileManager.fileExists(atPath: sourcePath) else {
+        guard FileManager.default.fileExists(atPath: sourcePath) else {
             throw DocScanError.fileNotFound(sourcePath)
         }
 
@@ -46,7 +45,7 @@ public class FileRenamer {
 
         // Perform rename
         do {
-            try fileManager.moveItem(at: sourceURL, to: finalURL)
+            try FileManager.default.moveItem(at: sourceURL, to: finalURL)
             if verbose {
                 print("Renamed:")
                 print("  From: \(sourcePath)")
@@ -64,7 +63,7 @@ public class FileRenamer {
         var counter = 1
 
         // If target doesn't exist, use it as-is
-        if !fileManager.fileExists(atPath: targetURL.path) {
+        if !FileManager.default.fileExists(atPath: targetURL.path) {
             return targetURL
         }
 
@@ -73,7 +72,7 @@ public class FileRenamer {
         let filename = targetURL.deletingPathExtension().lastPathComponent
         let ext = targetURL.pathExtension
 
-        while fileManager.fileExists(atPath: finalURL.path) {
+        while FileManager.default.fileExists(atPath: finalURL.path) {
             let newFilename = if ext.isEmpty {
                 "\(filename)_\(counter)"
             } else {
@@ -107,7 +106,7 @@ public class FileRenamer {
 
         // Ensure target directory exists
         if !dryRun {
-            try fileManager.createDirectory(
+            try FileManager.default.createDirectory(
                 atPath: targetDirectory,
                 withIntermediateDirectories: true,
                 attributes: nil
@@ -118,7 +117,7 @@ public class FileRenamer {
             .appendingPathComponent(filename)
 
         // Check if source exists
-        guard fileManager.fileExists(atPath: sourcePath) else {
+        guard FileManager.default.fileExists(atPath: sourcePath) else {
             throw DocScanError.fileNotFound(sourcePath)
         }
 
@@ -136,7 +135,7 @@ public class FileRenamer {
 
         // Perform move
         do {
-            try fileManager.moveItem(at: sourceURL, to: finalURL)
+            try FileManager.default.moveItem(at: sourceURL, to: finalURL)
             if verbose {
                 print("Moved:")
                 print("  From: \(sourcePath)")

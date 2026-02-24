@@ -178,25 +178,11 @@ struct ScanCommand: AsyncParsableCommand {
 
 extension ScanCommand {
     private func parseDocumentType() throws -> DocumentType {
-        switch type.lowercased() {
-        case "invoice": return .invoice
-        case "prescription": return .prescription
-        default:
-            print("❌ Invalid document type: '\(type)'")
-            print("   Valid types: invoice, prescription")
-            throw ExitCode.failure
-        }
+        try CLIHelpers.parseDocumentType(type)
     }
 
     private func loadConfiguration() throws -> Configuration {
-        if let configPath = config {
-            return try Configuration.load(from: configPath)
-        }
-        let defaultPath = Configuration.defaultConfigPath
-        if FileManager.default.fileExists(atPath: defaultPath) {
-            return try Configuration.load(from: defaultPath)
-        }
-        return Configuration.defaultConfiguration
+        try CLIHelpers.loadConfiguration(configPath: config)
     }
 
     private func applyCliOverrides(to configuration: inout Configuration) {
@@ -263,16 +249,18 @@ extension ScanCommand {
         label: String,
         modelName: String,
         tty: Bool,
-        load: (@escaping (Double) -> Void) async throws -> Void
+        load: (@escaping @Sendable (Double) -> Void) async throws -> Void
     ) async throws {
         if tty { writeStdout("\(emoji) \(label)\(modelName)") }
-        var downloading = false
+        nonisolated(unsafe) var downloading = false
         try await load { fraction in
             if fraction < 0.999 { downloading = true }
             guard downloading, tty else { return }
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
-            self.writeStdout("\r\(emoji) \(label)\(modelName)  ⬇️  \(bar) \(pct)%")
+            FileHandle.standardOutput.write(
+                Data("\r\(emoji) \(label)\(modelName)  ⬇️  \(bar) \(pct)%".utf8)
+            )
         }
         if tty {
             writeStdout(downloading ? "\r\(emoji) \(label)\(modelName)  ✅ ready\n" : "\n")
