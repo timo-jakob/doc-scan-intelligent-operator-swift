@@ -61,21 +61,33 @@ public struct BenchmarkWorkerInput: Codable, Sendable {
         self.ocrTexts = ocrTexts
         self.groundTruths = groundTruths
     }
+
+    /// Create a disqualified output for the appropriate phase when the worker encounters an error
+    public func makeDisqualifiedOutput(reason: String) -> BenchmarkWorkerOutput {
+        switch phase {
+        case .vlm:
+            .vlm(.disqualified(modelName: modelName, reason: reason))
+        case .textLLM:
+            .textLLM(.disqualified(modelName: modelName, reason: reason))
+        }
+    }
 }
 
-/// Output written by the benchmark worker subprocess
-public struct BenchmarkWorkerOutput: Codable, Sendable {
-    /// Result from a VLM benchmark (nil when phase is textLLM)
-    public let vlmResult: VLMBenchmarkResult?
+/// Output written by the benchmark worker subprocess.
+/// Exactly one result variant is produced per worker invocation.
+public enum BenchmarkWorkerOutput: Codable, Sendable {
+    case vlm(VLMBenchmarkResult)
+    case textLLM(TextLLMBenchmarkResult)
 
-    /// Result from a TextLLM benchmark (nil when phase is vlm)
-    public let textLLMResult: TextLLMBenchmarkResult?
+    /// Extract the VLM result, or nil if this is a TextLLM output
+    public var vlmResult: VLMBenchmarkResult? {
+        if case let .vlm(result) = self { return result }
+        return nil
+    }
 
-    public init(
-        vlmResult: VLMBenchmarkResult? = nil,
-        textLLMResult: TextLLMBenchmarkResult? = nil
-    ) {
-        self.vlmResult = vlmResult
-        self.textLLMResult = textLLMResult
+    /// Extract the TextLLM result, or nil if this is a VLM output
+    public var textLLMResult: TextLLMBenchmarkResult? {
+        if case let .textLLM(result) = self { return result }
+        return nil
     }
 }

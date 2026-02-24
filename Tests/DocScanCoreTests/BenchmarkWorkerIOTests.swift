@@ -74,7 +74,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             ],
             elapsedSeconds: 5.0
         )
-        let output = BenchmarkWorkerOutput(vlmResult: vlmResult)
+        let output = BenchmarkWorkerOutput.vlm(vlmResult)
 
         let data = try JSONEncoder().encode(output)
         let decoded = try JSONDecoder().decode(BenchmarkWorkerOutput.self, from: data)
@@ -101,7 +101,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             ],
             elapsedSeconds: 12.0
         )
-        let output = BenchmarkWorkerOutput(textLLMResult: textResult)
+        let output = BenchmarkWorkerOutput.textLLM(textResult)
 
         let data = try JSONEncoder().encode(output)
         let decoded = try JSONDecoder().decode(BenchmarkWorkerOutput.self, from: data)
@@ -119,7 +119,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
         let vlmResult = VLMBenchmarkResult.disqualified(
             modelName: "bad/model", reason: "Worker crashed (signal 6)"
         )
-        let output = BenchmarkWorkerOutput(vlmResult: vlmResult)
+        let output = BenchmarkWorkerOutput.vlm(vlmResult)
 
         let data = try JSONEncoder().encode(output)
         let decoded = try JSONDecoder().decode(BenchmarkWorkerOutput.self, from: data)

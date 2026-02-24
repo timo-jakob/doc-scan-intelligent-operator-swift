@@ -1,7 +1,6 @@
 import ArgumentParser
 import DocScanCore
 import Foundation
-import MLX
 
 struct BenchmarkCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -25,8 +24,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
     var verbose: Bool = false
 
     func run() async throws {
-        let memoryBudget = Int(Double(ProcessInfo.processInfo.physicalMemory) * 0.8)
-        Memory.memoryLimit = memoryBudget
+        BenchmarkEngine.configureMLXMemoryBudget()
 
         let documentType = try parseDocumentType()
         var configuration = try loadConfiguration()

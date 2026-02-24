@@ -1,7 +1,6 @@
 import ArgumentParser
 import DocScanCore
 import Foundation
-import MLX
 
 /// Hidden subcommand spawned by `BenchmarkCommand` to isolate each model benchmark in its own
 /// process. If the model triggers a `fatalError` in MLX's C++ layer, only this worker dies —
@@ -23,9 +22,22 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
         let inputData = try Data(contentsOf: URL(fileURLWithPath: input))
         let workerInput = try JSONDecoder().decode(BenchmarkWorkerInput.self, from: inputData)
 
-        // Set MLX memory budget (same as parent)
-        let memoryBudget = Int(Double(ProcessInfo.processInfo.physicalMemory) * 0.8)
-        Memory.memoryLimit = memoryBudget
+        do {
+            let workerOutput = try await executeBenchmark(workerInput: workerInput)
+            try writeOutput(workerOutput)
+        } catch {
+            // Write a disqualified result so the parent gets a meaningful error message
+            // instead of "output file not found"
+            let reason = "Worker error: \(error.localizedDescription)"
+            let errorOutput = workerInput.makeDisqualifiedOutput(reason: reason)
+            try writeOutput(errorOutput)
+        }
+    }
+
+    private func executeBenchmark(
+        workerInput: BenchmarkWorkerInput
+    ) async throws -> BenchmarkWorkerOutput {
+        BenchmarkEngine.configureMLXMemoryBudget()
 
         let engine = BenchmarkEngine(
             configuration: workerInput.configuration,
@@ -33,13 +45,15 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
             verbose: workerInput.verbose
         )
 
-        let workerOutput: BenchmarkWorkerOutput = switch workerInput.phase {
+        return switch workerInput.phase {
         case .vlm:
             await runVLMBenchmark(engine: engine, input: workerInput)
         case .textLLM:
             await runTextLLMBenchmark(engine: engine, input: workerInput)
         }
+    }
 
+    private func writeOutput(_ workerOutput: BenchmarkWorkerOutput) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let outputData = try encoder.encode(workerOutput)
@@ -58,7 +72,7 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
             timeoutSeconds: workerInput.timeoutSeconds,
             vlmFactory: vlmFactory
         )
-        return BenchmarkWorkerOutput(vlmResult: result)
+        return .vlm(result)
     }
 
     private func runTextLLMBenchmark(
@@ -81,6 +95,6 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
             negativePDFs: workerInput.negativePDFs,
             context: context
         )
-        return BenchmarkWorkerOutput(textLLMResult: result)
+        return .textLLM(result)
     }
 }

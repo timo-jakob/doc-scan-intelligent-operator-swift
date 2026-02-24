@@ -24,6 +24,18 @@ public struct SubprocessRunner: Sendable {
         PathUtils.resolvePath(CommandLine.arguments[0])
     }
 
+    /// Buffer time (seconds) added on top of per-document timeouts to account for model downloading
+    /// and loading before inference begins.
+    static let modelLoadingBufferSeconds: TimeInterval = 300
+
+    /// Compute a generous overall timeout for a worker subprocess.
+    ///
+    /// Formula: `(inferenceTimeout × documentCount) + modelLoadingBuffer`
+    static func overallTimeout(for input: BenchmarkWorkerInput) -> TimeInterval {
+        let documentCount = input.positivePDFs.count + input.negativePDFs.count
+        return input.timeoutSeconds * Double(documentCount) + modelLoadingBufferSeconds
+    }
+
     /// Run a single benchmark worker in a subprocess.
     ///
     /// - Parameter input: The worker input describing what to benchmark.
@@ -62,14 +74,36 @@ public struct SubprocessRunner: Sendable {
         // Launch process — if run() throws, the process never started
         try process.run()
 
+        let timeout = Self.overallTimeout(for: input)
+        return await awaitProcess(process, outputURL: outputURL, timeout: timeout)
+    }
+
+    /// Wait for a process to finish (with timeout), then interpret the result.
+    private func awaitProcess(
+        _ process: Process, outputURL: URL, timeout: TimeInterval
+    ) async -> SubprocessResult {
         // Wait for termination asynchronously.
         // Foundation guarantees terminationHandler fires even if the process
         // already exited before the handler was set.
         typealias TermResult = (Int32, Process.TerminationReason)
-        let (status, reason) = await withCheckedContinuation { (continuation: CheckedContinuation<TermResult, Never>) in
+        let termination = await withCheckedContinuation { (continuation: CheckedContinuation<TermResult?, Never>) in
+            // Watchdog: terminate the process if it exceeds the overall timeout
+            let watchdog = DispatchWorkItem { [process] in
+                if process.isRunning {
+                    process.terminate()
+                }
+            }
+            let deadline: DispatchTime = .now() + timeout
+            DispatchQueue.global().asyncAfter(deadline: deadline, execute: watchdog)
+
             process.terminationHandler = { proc in
+                watchdog.cancel()
                 continuation.resume(returning: (proc.terminationStatus, proc.terminationReason))
             }
+        }
+
+        guard let (status, reason) = termination else {
+            return .crashed(exitCode: -1, signal: nil)
         }
 
         // Check for crash / non-zero exit.

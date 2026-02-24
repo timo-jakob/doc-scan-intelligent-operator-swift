@@ -113,6 +113,14 @@ public final class BenchmarkEngine: Sendable {
         self.verbose = verbose
     }
 
+    // MARK: - MLX Setup
+
+    /// Set MLX memory budget to 80% of physical RAM.
+    /// Call once before any model loading to give MLX a generous allocation.
+    public static func configureMLXMemoryBudget() {
+        Memory.memoryLimit = Int(Double(ProcessInfo.processInfo.physicalMemory) * 0.8)
+    }
+
     // MARK: - PDF Enumeration
 
     /// Enumerate PDF files in a directory
