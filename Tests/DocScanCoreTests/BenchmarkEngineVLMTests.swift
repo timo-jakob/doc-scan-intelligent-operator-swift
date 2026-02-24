@@ -48,6 +48,46 @@ class BenchmarkMockVLMProvider: VLMProvider, @unchecked Sendable {
     }
 }
 
+/// Mock VLM provider that throws errors
+class BenchmarkMockVLMProviderThrowing: VLMProvider, @unchecked Sendable {
+    var errorToThrow: Error = DocScanError.inferenceError("mock error")
+
+    func generateFromImage(
+        _: NSImage,
+        prompt _: String,
+        modelName _: String?
+    ) async throws -> String {
+        throw errorToThrow
+    }
+}
+
+/// Mock VLM factory that returns a nil provider (simulates unloaded model)
+actor MockVLMOnlyFactoryNilProvider: VLMOnlyFactory {
+    func preloadVLM(modelName _: String, config _: Configuration) async throws {}
+    func makeVLMProvider() -> VLMProvider? {
+        nil
+    }
+
+    func releaseVLM() {}
+}
+
+/// Mock VLM factory that returns a throwing provider
+actor MockVLMOnlyFactoryThrowing: VLMOnlyFactory {
+    var throwingProvider: BenchmarkMockVLMProviderThrowing?
+
+    func preloadVLM(modelName _: String, config _: Configuration) async throws {
+        throwingProvider = BenchmarkMockVLMProviderThrowing()
+    }
+
+    func makeVLMProvider() -> VLMProvider? {
+        throwingProvider
+    }
+
+    func releaseVLM() {
+        throwingProvider = nil
+    }
+}
+
 final class BenchmarkEngineVLMTests: XCTestCase {
     var engine: BenchmarkEngine!
     var tempDir: URL!
@@ -198,6 +238,82 @@ final class BenchmarkEngineVLMTests: XCTestCase {
     func testMemoryEstimateForUnknownModel() {
         let memoryMB = BenchmarkEngine.estimateMemoryMB(vlm: "unknown-model", text: "")
         XCTAssertEqual(memoryMB, 0)
+    }
+
+    // MARK: - VLM Provider Returns Nil
+
+    func testBenchmarkVLMNilProviderScoresZero() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BenchmarkVLMNilTest-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let positivePDF = tempDir.appendingPathComponent("invoice.pdf")
+        try createMinimalPDF(at: positivePDF)
+
+        let factory = MockVLMOnlyFactoryNilProvider()
+        let result = await engine.benchmarkVLM(
+            modelName: "test/nil-vlm",
+            positivePDFs: [positivePDF.path],
+            negativePDFs: [],
+            timeoutSeconds: 10,
+            vlmFactory: factory
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.documentResults.count, 1)
+        // Nil provider → predictedIsMatch = false → positive sample = FN → score 0
+        XCTAssertFalse(result.documentResults[0].predictedIsMatch)
+        XCTAssertEqual(result.documentResults[0].score, 0)
+    }
+
+    // MARK: - VLM Error During Inference
+
+    func testBenchmarkVLMErrorDuringInferenceScoresZero() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BenchmarkVLMErrorTest-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let positivePDF = tempDir.appendingPathComponent("invoice.pdf")
+        let negativePDF = tempDir.appendingPathComponent("letter.pdf")
+        try createMinimalPDF(at: positivePDF)
+        try createMinimalPDF(at: negativePDF)
+
+        let factory = MockVLMOnlyFactoryThrowing()
+        let result = await engine.benchmarkVLM(
+            modelName: "test/throwing-vlm",
+            positivePDFs: [positivePDF.path],
+            negativePDFs: [negativePDF.path],
+            timeoutSeconds: 10,
+            vlmFactory: factory
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.documentResults.count, 2)
+        // Error → predictedIsMatch = !isPositive → always wrong → score 0
+        for docResult in result.documentResults {
+            XCTAssertEqual(docResult.score, 0)
+        }
+    }
+
+    // MARK: - VLM Preload Failure
+
+    func testBenchmarkVLMPreloadFailureDisqualifies() async {
+        let factory = MockVLMOnlyFactory()
+        await factory.setPreloadError(DocScanError.modelLoadFailed("test preload error"))
+
+        let result = await engine.benchmarkVLM(
+            modelName: "test/bad-vlm",
+            positivePDFs: [],
+            negativePDFs: [],
+            timeoutSeconds: 10,
+            vlmFactory: factory
+        )
+
+        XCTAssertTrue(result.isDisqualified)
+        XCTAssertTrue(result.disqualificationReason?.contains("Failed to load") ?? false)
+        XCTAssertEqual(result.score, 0)
     }
 
     // MARK: - Helpers

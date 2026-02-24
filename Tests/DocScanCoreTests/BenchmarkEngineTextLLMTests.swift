@@ -178,6 +178,107 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(result.elapsedSeconds, 0)
     }
 
+    // MARK: - TextLLM Document-Level Edge Cases
+
+    func testBenchmarkTextLLMDocumentMissingOCRText() async {
+        // When ocrTexts is empty for a document, both flags should be false
+        let factory = MockTextLLMOnlyFactory()
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: [:], // No OCR text for any document
+            groundTruths: [:],
+            timeoutSeconds: 10,
+            textLLMFactory: factory
+        )
+
+        let result = await engine.benchmarkTextLLM(
+            modelName: "test/mock-text",
+            positivePDFs: ["/fake/invoice.pdf"],
+            negativePDFs: [],
+            context: context
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.documentResults.count, 1)
+        let docResult = result.documentResults[0]
+        XCTAssertFalse(docResult.categorizationCorrect)
+        XCTAssertFalse(docResult.extractionCorrect)
+        XCTAssertEqual(docResult.score, 0)
+    }
+
+    func testBenchmarkTextLLMDocumentNilFactory() async {
+        // MockTextLLMOnlyFactory returns nil for makeTextLLMManager by default
+        let factory = MockTextLLMOnlyFactory()
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: ["/fake/invoice.pdf": "Some invoice text with Rechnung"],
+            groundTruths: [:],
+            timeoutSeconds: 10,
+            textLLMFactory: factory
+        )
+
+        let result = await engine.benchmarkTextLLM(
+            modelName: "test/mock-text",
+            positivePDFs: ["/fake/invoice.pdf"],
+            negativePDFs: [],
+            context: context
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.documentResults.count, 1)
+        let docResult = result.documentResults[0]
+        // nil TextLLM → both false
+        XCTAssertFalse(docResult.categorizationCorrect)
+        XCTAssertFalse(docResult.extractionCorrect)
+    }
+
+    func testBenchmarkTextLLMNegativeSampleWithNilFactory() async {
+        // Negative sample with nil TextLLM → both flags false
+        let factory = MockTextLLMOnlyFactory()
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: ["/fake/letter.pdf": "Some random text about weather"],
+            groundTruths: [:],
+            timeoutSeconds: 10,
+            textLLMFactory: factory
+        )
+
+        let result = await engine.benchmarkTextLLM(
+            modelName: "test/mock-text",
+            positivePDFs: [],
+            negativePDFs: ["/fake/letter.pdf"],
+            context: context
+        )
+
+        XCTAssertFalse(result.isDisqualified)
+        XCTAssertEqual(result.documentResults.count, 1)
+        let docResult = result.documentResults[0]
+        XCTAssertFalse(docResult.isPositiveSample)
+        XCTAssertFalse(docResult.categorizationCorrect)
+        XCTAssertFalse(docResult.extractionCorrect)
+    }
+
+    func testBenchmarkTextLLMEmptyOCRTextTreatedAsMissing() async {
+        // Empty string OCR text should be treated as missing
+        let factory = MockTextLLMOnlyFactory()
+        let context = TextLLMBenchmarkContext(
+            ocrTexts: ["/fake/invoice.pdf": ""], // Empty string
+            groundTruths: [:],
+            timeoutSeconds: 10,
+            textLLMFactory: factory
+        )
+
+        let result = await engine.benchmarkTextLLM(
+            modelName: "test/mock-text",
+            positivePDFs: ["/fake/invoice.pdf"],
+            negativePDFs: [],
+            context: context
+        )
+
+        XCTAssertEqual(result.documentResults.count, 1)
+        let docResult = result.documentResults[0]
+        // Empty OCR text guard triggers → both false
+        XCTAssertFalse(docResult.categorizationCorrect)
+        XCTAssertFalse(docResult.extractionCorrect)
+    }
+
     // MARK: - Memory Estimation
 
     func testMemoryEstimateForTextOnly() {
