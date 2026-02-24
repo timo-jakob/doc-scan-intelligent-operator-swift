@@ -5,10 +5,10 @@ import Vision
 /// Result of keyword-based document type detection
 public struct KeywordResult: Sendable {
     public let isMatch: Bool
-    public let confidence: String
+    public let confidence: ConfidenceLevel
     public let reason: String?
 
-    public init(isMatch: Bool, confidence: String, reason: String?) {
+    public init(isMatch: Bool, confidence: ConfidenceLevel, reason: String?) {
         self.isMatch = isMatch
         self.confidence = confidence
         self.reason = reason
@@ -148,15 +148,15 @@ public struct OCREngine: Sendable {
         // Determine result
         if !foundStrong.isEmpty {
             let reason = "Found: \(foundStrong.joined(separator: ", "))"
-            return KeywordResult(isMatch: true, confidence: "high", reason: reason)
+            return KeywordResult(isMatch: true, confidence: .high, reason: reason)
         } else if !foundMedium.isEmpty {
             let reason = "Found: \(foundMedium.joined(separator: ", "))"
-            return KeywordResult(isMatch: true, confidence: "medium", reason: reason)
+            return KeywordResult(isMatch: true, confidence: .medium, reason: reason)
         } else {
             let typeName = documentType.displayName.lowercased()
             return KeywordResult(
                 isMatch: false,
-                confidence: "high",
+                confidence: .high,
                 reason: "No \(typeName) keywords found"
             )
         }

@@ -41,20 +41,20 @@ final class OCREngineTests: XCTestCase {
         let strongText = "Rechnungsnummer: 12345"
         let result1 = engine.detectInvoiceKeywords(from: strongText)
         XCTAssertTrue(result1.isMatch)
-        XCTAssertEqual(result1.confidence, "high")
+        XCTAssertEqual(result1.confidence, .high)
         XCTAssertNotNil(result1.reason)
 
         // Medium indicators
         let mediumText = "Rechnung für Dienstleistungen"
         let result2 = engine.detectInvoiceKeywords(from: mediumText)
         XCTAssertTrue(result2.isMatch)
-        XCTAssertEqual(result2.confidence, "medium")
+        XCTAssertEqual(result2.confidence, .medium)
 
         // No invoice keywords
         let noInvoiceText = "Just a regular document"
         let result3 = engine.detectInvoiceKeywords(from: noInvoiceText)
         XCTAssertFalse(result3.isMatch)
-        XCTAssertEqual(result3.confidence, "high") // High confidence it's NOT an invoice
+        XCTAssertEqual(result3.confidence, .high) // High confidence it's NOT an invoice
     }
 
     // MARK: - Date Extraction Tests

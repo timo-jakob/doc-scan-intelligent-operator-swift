@@ -107,29 +107,17 @@ public final class HuggingFaceClient: Sendable {
 
     private func searchModels(query: String, limit: Int) async throws -> [HFModel] {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let urlString = "\(baseURL)/models?search=\(encodedQuery)&sort=downloads&direction=-1&limit=\(limit)"
-
-        guard let url = URL(string: urlString) else {
-            throw DocScanError.huggingFaceAPIError("Invalid URL: \(urlString)")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token = apiToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response)
-
-        let decoder = JSONDecoder()
-        return try decoder.decode([HFModel].self, from: data)
+        let path = "models?search=\(encodedQuery)&sort=downloads&direction=-1&limit=\(limit)"
+        return try await fetchJSON(path: path)
     }
 
     private func fetchModel(_ modelId: String) async throws -> HFModel {
         let encodedId = modelId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? modelId
-        let urlString = "\(baseURL)/models/\(encodedId)"
+        return try await fetchJSON(path: "models/\(encodedId)")
+    }
 
+    private func fetchJSON<T: Decodable>(path: String) async throws -> T {
+        let urlString = "\(baseURL)/\(path)"
         guard let url = URL(string: urlString) else {
             throw DocScanError.huggingFaceAPIError("Invalid URL: \(urlString)")
         }
@@ -142,9 +130,7 @@ public final class HuggingFaceClient: Sendable {
 
         let (data, response) = try await performRequest(request)
         try validateResponse(response)
-
-        let decoder = JSONDecoder()
-        return try decoder.decode(HFModel.self, from: data)
+        return try JSONDecoder().decode(T.self, from: data)
     }
 
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {

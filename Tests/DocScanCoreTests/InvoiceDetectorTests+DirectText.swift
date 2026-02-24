@@ -19,7 +19,7 @@ extension InvoiceDetectorTests {
 
         XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertNotNil(result.reason)
     }
 
@@ -34,7 +34,7 @@ extension InvoiceDetectorTests {
 
         XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
     }
 
     func testCategorizeWithDirectTextInvoiceEnglish() {
@@ -61,7 +61,7 @@ extension InvoiceDetectorTests {
 
         XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
     }
 
     func testCategorizeWithDirectTextMediumConfidence() {
@@ -75,7 +75,7 @@ extension InvoiceDetectorTests {
 
         XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "medium")
+        XCTAssertEqual(result.confidence, .medium)
     }
 
     func testCategorizeWithDirectTextEmptyString() {
@@ -133,7 +133,7 @@ extension InvoiceDetectorTests {
 
         XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.method, "PDF")
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
     }
 
     func testCategorizeWithDirectTextVerboseModeWithReason() {

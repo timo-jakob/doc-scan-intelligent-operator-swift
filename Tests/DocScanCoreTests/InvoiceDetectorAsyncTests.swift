@@ -160,7 +160,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
 
         // VLM should return error result
         XCTAssertFalse(result.vlmResult.isMatch)
-        XCTAssertEqual(result.vlmResult.confidence, "low")
+        XCTAssertEqual(result.vlmResult.confidence, .low)
         XCTAssertTrue(result.vlmResult.method.contains("error"))
 
         // OCR should still work (PDF contains "Rechnung")
@@ -215,7 +215,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
 
         // VLM should return timeout result
         XCTAssertFalse(result.vlmResult.isMatch)
-        XCTAssertEqual(result.vlmResult.confidence, "low")
+        XCTAssertEqual(result.vlmResult.confidence, .low)
         XCTAssertTrue(result.vlmResult.method.contains("timeout"))
         XCTAssertEqual(result.vlmResult.reason, "Timed out")
 

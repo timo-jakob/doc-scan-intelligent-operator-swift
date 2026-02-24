@@ -18,7 +18,7 @@ extension OCREngineTests {
         for text in strongTexts {
             let result = OCREngine.detectInvoiceKeywords(from: text)
             XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
-            XCTAssertEqual(result.confidence, "high", "Should have high confidence for: \(text)")
+            XCTAssertEqual(result.confidence, .high, "Should have high confidence for: \(text)")
         }
     }
 
@@ -35,7 +35,7 @@ extension OCREngineTests {
         for text in mediumTexts {
             let result = OCREngine.detectInvoiceKeywords(from: text)
             XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
-            XCTAssertEqual(result.confidence, "medium", "Should have medium confidence for: \(text)")
+            XCTAssertEqual(result.confidence, .medium, "Should have medium confidence for: \(text)")
         }
     }
 
@@ -51,7 +51,7 @@ extension OCREngineTests {
             let result = OCREngine.detectInvoiceKeywords(from: text)
             XCTAssertFalse(result.isMatch, "Should not detect invoice in: \(text)")
             XCTAssertEqual(
-                result.confidence, "high",
+                result.confidence, .high,
                 "Should have high confidence it's NOT an invoice for: \(text)"
             )
             XCTAssertEqual(result.reason, "No invoice keywords found")
@@ -172,7 +172,7 @@ extension OCREngineTests {
         let result = engine.detectInvoiceKeywords(from: text)
 
         XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.confidence, "high") // Strong indicators present
+        XCTAssertEqual(result.confidence, .high) // Strong indicators present
         XCTAssertNotNil(result.reason)
         // Should contain multiple keywords in reason
         let reason = try XCTUnwrap(result.reason)

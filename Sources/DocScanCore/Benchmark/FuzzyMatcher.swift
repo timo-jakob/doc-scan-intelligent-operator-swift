@@ -1,7 +1,7 @@
 import Foundation
 
 /// Per-document scoring breakdown
-public struct DocumentScoring: Equatable {
+public struct DocumentScoring: Equatable, Sendable {
     public let categorizationCorrect: Bool
     public let extractionCorrect: Bool
     public var score: Int {

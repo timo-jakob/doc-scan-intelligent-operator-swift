@@ -41,7 +41,7 @@ extension ScanCommand {
     ) {
         let typeName = documentType.displayName
         let matchStatus = result.isMatch ? "✅ \(typeName)" : "❌ Not \(typeName)"
-        print("\(prefix)\(matchStatus) (confidence: \(result.confidence))")
+        print("\(prefix)\(matchStatus) (confidence: \(result.confidence.rawValue))")
         if let reason = result.reason, verbose {
             print("\(prefix)Reason: \(String(reason.prefix(40)))")
         }
@@ -173,21 +173,21 @@ extension ScanCommand {
         if vlmTimedOut {
             let isMatch = categorization.ocrResult.isMatch
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR: \(ocrConf)\n")
+            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR: \(ocrConf.rawValue)\n")
             return isMatch
         }
 
         if ocrTimedOut {
             let isMatch = categorization.vlmResult.isMatch
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf) · ⏱️ OCR\n")
+            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf.rawValue) · ⏱️ OCR\n")
             return isMatch
         }
 
         if categorization.bothAgree {
             let isMatch = categorization.agreedIsMatch ?? false
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf) · OCR: \(ocrConf)\n")
+            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf.rawValue) · OCR: \(ocrConf.rawValue)\n")
             return isMatch
         }
 
@@ -202,12 +202,12 @@ extension ScanCommand {
     private func resolveConflictCompact(
         _ categorization: CategorizationVerification,
         documentType: DocumentType,
-        vlmConf: String,
-        ocrConf: String
+        vlmConf: ConfidenceLevel,
+        ocrConf: ConfidenceLevel
     ) throws -> Bool {
         let vlmYN = categorization.vlmResult.isMatch ? "YES" : "NO"
         let ocrYN = categorization.ocrResult.isMatch ? "YES" : "NO"
-        let conflictInfo = "VLM=\(vlmYN)(\(vlmConf)) · OCR=\(ocrYN)(\(ocrConf))"
+        let conflictInfo = "VLM=\(vlmYN)(\(vlmConf.rawValue)) · OCR=\(ocrYN)(\(ocrConf.rawValue))"
         let prompt = "📋 Phase 1  ⚠️  conflict  \(conflictInfo)  →  [v]lm or [o]cr? "
 
         if let mode = autoResolve {

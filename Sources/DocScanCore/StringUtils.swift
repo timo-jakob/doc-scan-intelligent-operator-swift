@@ -26,24 +26,7 @@ public enum StringUtils {
     /// - Parameter name: The raw company name
     /// - Returns: A sanitized string safe for use in filenames
     public static func sanitizeCompanyName(_ name: String) -> String {
-        // Remove special characters problematic in filenames
-        let sanitized = name.components(separatedBy: invalidFilenameChars).joined()
-
-        // Replace multiple spaces with single space
-        let singleSpaced = sanitized.replacingOccurrences(
-            of: "\\s+",
-            with: " ",
-            options: .regularExpression
-        )
-
-        // Trim whitespace
-        let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
-
-        // Replace spaces with underscores for cleaner filenames
-        let underscored = trimmed.replacingOccurrences(of: " ", with: "_")
-
-        // Limit length to avoid overly long filenames
-        return String(underscored.prefix(maxCompanyNameLength))
+        sanitizeForFilename(name, maxLength: maxCompanyNameLength)
     }
 
     /// Sanitize a doctor name for use in filenames
@@ -51,55 +34,32 @@ public enum StringUtils {
     /// - Parameter name: The raw doctor name (may include titles)
     /// - Returns: A sanitized string with just the name, safe for use in filenames
     public static func sanitizeDoctorName(_ name: String) -> String {
-        var sanitized = name
-
-        // Remove doctor titles (case-insensitive)
-        for title in doctorTitles where sanitized.lowercased().hasPrefix(title) {
-            sanitized = String(sanitized.dropFirst(title.count))
+        var cleaned = name
+        for title in doctorTitles where cleaned.lowercased().hasPrefix(title) {
+            cleaned = String(cleaned.dropFirst(title.count))
                 .trimmingCharacters(in: .whitespaces)
         }
-
-        // Remove special characters problematic in filenames
-        sanitized = sanitized.components(separatedBy: invalidFilenameChars).joined()
-
-        // Replace multiple spaces with single space
-        let singleSpaced = sanitized.replacingOccurrences(
-            of: "\\s+",
-            with: " ",
-            options: .regularExpression
-        )
-
-        // Trim whitespace
-        let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
-
-        // Replace spaces with underscores for cleaner filenames
-        let underscored = trimmed.replacingOccurrences(of: " ", with: "_")
-
-        // Limit length to avoid overly long filenames
-        return String(underscored.prefix(maxDoctorNameLength))
+        return sanitizeForFilename(cleaned, maxLength: maxDoctorNameLength)
     }
 
     /// Sanitize a patient name (first name) for use in filenames
     /// - Parameter name: The raw patient first name
     /// - Returns: A sanitized string safe for use in filenames
     public static func sanitizePatientName(_ name: String) -> String {
-        // Remove special characters problematic in filenames
-        let sanitized = name.components(separatedBy: invalidFilenameChars).joined()
+        sanitizeForFilename(name, maxLength: maxPatientNameLength)
+    }
 
-        // Replace multiple spaces with single space
-        let singleSpaced = sanitized.replacingOccurrences(
+    /// Common sanitization pipeline: remove invalid chars, normalize whitespace,
+    /// replace spaces with underscores, and truncate.
+    private static func sanitizeForFilename(_ name: String, maxLength: Int) -> String {
+        let cleaned = name.components(separatedBy: invalidFilenameChars).joined()
+        let singleSpaced = cleaned.replacingOccurrences(
             of: "\\s+",
             with: " ",
             options: .regularExpression
         )
-
-        // Trim whitespace
         let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
-
-        // Replace spaces with underscores for cleaner filenames
         let underscored = trimmed.replacingOccurrences(of: " ", with: "_")
-
-        // Limit length to avoid overly long filenames
-        return String(underscored.prefix(maxPatientNameLength))
+        return String(underscored.prefix(maxLength))
     }
 }

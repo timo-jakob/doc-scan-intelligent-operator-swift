@@ -7,13 +7,13 @@ final class VerificationTests: XCTestCase {
     func testCategorizationResultInitialization() {
         let result = CategorizationResult(
             isMatch: true,
-            confidence: "high",
+            confidence: .high,
             method: "VLM",
             reason: "Contains invoice keywords"
         )
 
         XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertEqual(result.method, "VLM")
         XCTAssertEqual(result.reason, "Contains invoice keywords")
     }
@@ -25,7 +25,7 @@ final class VerificationTests: XCTestCase {
         )
 
         XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.confidence, "high") // default value
+        XCTAssertEqual(result.confidence, .high) // default value
         XCTAssertEqual(result.method, "OCR")
         XCTAssertNil(result.reason)
     }
@@ -235,12 +235,12 @@ final class VerificationTests: XCTestCase {
     }
 
     func testIsTimedOutTrueForVLMTimeout() {
-        let result = CategorizationResult(isMatch: false, confidence: "low", method: "VLM (timeout)")
+        let result = CategorizationResult(isMatch: false, confidence: .low, method: "VLM (timeout)")
         XCTAssertTrue(result.isTimedOut)
     }
 
     func testIsTimedOutTrueForOCRTimeout() {
-        let result = CategorizationResult(isMatch: false, confidence: "low", method: "OCR (timeout)")
+        let result = CategorizationResult(isMatch: false, confidence: .low, method: "OCR (timeout)")
         XCTAssertTrue(result.isTimedOut)
     }
 

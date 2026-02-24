@@ -1,5 +1,14 @@
 import Foundation
 
+// MARK: - Confidence Level
+
+/// Confidence level for categorization results
+public enum ConfidenceLevel: String, Sendable, Codable {
+    case high
+    case medium
+    case low
+}
+
 // MARK: - Extraction Results (Phase 2: OCR+TextLLM only)
 
 /// Result of data extraction (OCR+TextLLM only)

@@ -75,7 +75,7 @@ public struct BenchmarkWorkerInput: Codable, Sendable {
 
 /// Output written by the benchmark worker subprocess.
 /// Exactly one result variant is produced per worker invocation.
-public enum BenchmarkWorkerOutput: Codable, Sendable {
+public enum BenchmarkWorkerOutput: Codable, Equatable, Sendable {
     case vlm(VLMBenchmarkResult)
     case textLLM(TextLLMBenchmarkResult)
 

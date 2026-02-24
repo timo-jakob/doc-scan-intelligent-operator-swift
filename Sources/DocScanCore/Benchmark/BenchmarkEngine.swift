@@ -176,42 +176,51 @@ public final class BenchmarkEngine: Sendable {
 
     // MARK: - OCR Pre-extraction
 
-    /// Pre-extract OCR text from all PDFs (shared across all TextLLM models)
+    /// Pre-extract OCR text from all PDFs in parallel (shared across all TextLLM models)
     public func preExtractOCRTexts(positivePDFs: [String], negativePDFs: [String]) async -> [String: String] {
-        var ocrTexts: [String: String] = [:]
         let allPDFs = positivePDFs + negativePDFs
-        let ocrEngine = OCREngine(config: configuration)
+        let config = configuration
+        let isVerbose = verbose
 
-        for pdfPath in allPDFs {
-            let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
+        return await withTaskGroup(of: (String, String?).self) { group in
+            for pdfPath in allPDFs {
+                group.addTask {
+                    let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
 
-            // Try direct text extraction first (faster, more accurate for searchable PDFs)
-            if let directText = PDFUtils.extractText(from: pdfPath, verbose: verbose),
-               directText.count >= PDFUtils.minimumTextLength {
-                ocrTexts[pdfPath] = directText
-                if verbose {
-                    print("  \(filename): direct text (\(directText.count) chars)")
+                    // Try direct text extraction first (faster, more accurate for searchable PDFs)
+                    if let directText = PDFUtils.extractText(from: pdfPath, verbose: isVerbose),
+                       directText.count >= PDFUtils.minimumTextLength {
+                        if isVerbose {
+                            print("  \(filename): direct text (\(directText.count) chars)")
+                        }
+                        return (pdfPath, directText)
+                    }
+
+                    // Fall back to Vision OCR
+                    let ocrEngine = OCREngine(config: config)
+                    do {
+                        let image = try PDFUtils.pdfToImage(
+                            at: pdfPath,
+                            dpi: config.pdfDPI
+                        )
+                        let text = try ocrEngine.extractText(from: image)
+                        if isVerbose {
+                            print("  \(filename): OCR text (\(text.count) chars)")
+                        }
+                        return (pdfPath, text)
+                    } catch {
+                        print("  \(filename): OCR failed - \(error.localizedDescription)")
+                        return (pdfPath, nil)
+                    }
                 }
-                continue
             }
 
-            // Fall back to Vision OCR
-            do {
-                let image = try PDFUtils.pdfToImage(
-                    at: pdfPath,
-                    dpi: configuration.pdfDPI
-                )
-                let text = try ocrEngine.extractText(from: image)
-                ocrTexts[pdfPath] = text
-                if verbose {
-                    print("  \(filename): OCR text (\(text.count) chars)")
-                }
-            } catch {
-                print("  \(filename): OCR failed - \(error.localizedDescription)")
+            var ocrTexts: [String: String] = [:]
+            for await (path, text) in group {
+                if let text { ocrTexts[path] = text }
             }
+            return ocrTexts
         }
-
-        return ocrTexts
     }
 
     // MARK: - Ground Truth Generation

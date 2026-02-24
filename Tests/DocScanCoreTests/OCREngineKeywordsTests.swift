@@ -20,7 +20,7 @@ final class OCREngineKeywordsTests: XCTestCase {
         let result = OCREngine.detectKeywords(for: .invoice, from: text)
 
         XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertNotNil(result.reason)
     }
 
@@ -30,7 +30,7 @@ final class OCREngineKeywordsTests: XCTestCase {
         let result = OCREngine.detectKeywords(for: .invoice, from: text)
 
         XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.confidence, "medium")
+        XCTAssertEqual(result.confidence, .medium)
     }
 
     func testDetectKeywordsInvoiceNoMatch() {
@@ -39,7 +39,7 @@ final class OCREngineKeywordsTests: XCTestCase {
         let result = OCREngine.detectKeywords(for: .invoice, from: text)
 
         XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertEqual(result.reason, "No invoice keywords found")
     }
 
@@ -55,7 +55,7 @@ final class OCREngineKeywordsTests: XCTestCase {
         for text in strongTexts {
             let result = OCREngine.detectKeywords(for: .prescription, from: text)
             XCTAssertTrue(result.isMatch, "Should detect prescription in: \(text)")
-            XCTAssertEqual(result.confidence, "high", "Should have high confidence for: \(text)")
+            XCTAssertEqual(result.confidence, .high, "Should have high confidence for: \(text)")
         }
     }
 
@@ -70,7 +70,7 @@ final class OCREngineKeywordsTests: XCTestCase {
         for text in mediumTexts {
             let result = OCREngine.detectKeywords(for: .prescription, from: text)
             XCTAssertTrue(result.isMatch, "Should detect prescription in: \(text)")
-            XCTAssertEqual(result.confidence, "medium", "Should have medium confidence for: \(text)")
+            XCTAssertEqual(result.confidence, .medium, "Should have medium confidence for: \(text)")
         }
     }
 
@@ -80,7 +80,7 @@ final class OCREngineKeywordsTests: XCTestCase {
         let result = OCREngine.detectKeywords(for: .prescription, from: text)
 
         XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertEqual(result.reason, "No prescription keywords found")
     }
 

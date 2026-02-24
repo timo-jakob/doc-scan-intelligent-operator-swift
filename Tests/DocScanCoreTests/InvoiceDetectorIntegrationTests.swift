@@ -56,13 +56,13 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
     func testCategorizationResultWithAllParameters() {
         let result = CategorizationResult(
             isMatch: true,
-            confidence: "high",
+            confidence: .high,
             method: "VLM",
             reason: "Found invoice keywords"
         )
 
         XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertEqual(result.method, "VLM")
         XCTAssertEqual(result.reason, "Found invoice keywords")
     }
@@ -74,7 +74,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
         )
 
         XCTAssertFalse(result.isMatch)
-        XCTAssertEqual(result.confidence, "high")
+        XCTAssertEqual(result.confidence, .high)
         XCTAssertEqual(result.method, "OCR")
         XCTAssertNil(result.reason)
     }

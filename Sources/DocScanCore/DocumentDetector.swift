@@ -6,11 +6,11 @@ import Foundation
 /// Result of document categorization from a single method
 public struct CategorizationResult: Sendable {
     public let isMatch: Bool // Whether document matches the target type
-    public let confidence: String // "high", "medium", "low"
+    public let confidence: ConfidenceLevel
     public let method: String // "VLM", "OCR", or "PDF"
     public let reason: String? // Optional explanation
 
-    public init(isMatch: Bool, confidence: String = "high", method: String, reason: String? = nil) {
+    public init(isMatch: Bool, confidence: ConfidenceLevel = .high, method: String, reason: String? = nil) {
         self.isMatch = isMatch
         self.confidence = confidence
         self.method = method
@@ -94,36 +94,19 @@ public actor DocumentDetector {
     private var cachedPDFPath: String?
     private var usedDirectExtraction: Bool = false
 
-    /// Initialize with default ModelManager for a specific document type
-    public init(config: Configuration, documentType: DocumentType = .invoice) {
-        self.config = config
-        self.documentType = documentType
-        vlmProvider = ModelManager(config: config)
-        ocrEngine = OCREngine(config: config)
-        textLLM = TextLLMManager(config: config)
-    }
-
-    /// Initialize with custom VLM provider (for testing/dependency injection)
-    public init(config: Configuration, documentType: DocumentType = .invoice, vlmProvider: any VLMProvider) {
-        self.config = config
-        self.documentType = documentType
-        self.vlmProvider = vlmProvider
-        ocrEngine = OCREngine(config: config)
-        textLLM = TextLLMManager(config: config)
-    }
-
-    /// Initialize with pre-loaded VLM provider and TextLLM manager (for startup preloading)
+    /// Initialize with optional dependency injection for VLM and TextLLM providers.
+    /// Defaults are created automatically when not supplied.
     public init(
         config: Configuration,
         documentType: DocumentType = .invoice,
-        vlmProvider: any VLMProvider,
-        textLLM: any TextLLMProviding
+        vlmProvider: (any VLMProvider)? = nil,
+        textLLM: (any TextLLMProviding)? = nil
     ) {
         self.config = config
         self.documentType = documentType
-        self.vlmProvider = vlmProvider
+        self.vlmProvider = vlmProvider ?? ModelManager(config: config)
         ocrEngine = OCREngine(config: config)
-        self.textLLM = textLLM
+        self.textLLM = textLLM ?? TextLLMManager(config: config)
     }
 }
 
@@ -192,13 +175,13 @@ extension DocumentDetector {
                 print("⏱️  VLM timed out after \(Int(timeoutSeconds)) seconds")
             }
             return CategorizationResult(
-                isMatch: false, confidence: "low",
+                isMatch: false, confidence: .low,
                 method: "VLM (timeout)", reason: "Timed out"
             )
         } catch {
             if config.verbose { print("VLM categorization failed: \(error)") }
             return CategorizationResult(
-                isMatch: false, confidence: "low",
+                isMatch: false, confidence: .low,
                 method: "VLM (error)", reason: error.localizedDescription
             )
         }
@@ -224,7 +207,7 @@ extension DocumentDetector {
                 print("⏱️  OCR timed out after \(Int(timeoutSeconds)) seconds")
             }
             return CategorizationResult(
-                isMatch: false, confidence: "low",
+                isMatch: false, confidence: .low,
                 method: "OCR (timeout)", reason: "Timed out"
             )
         }
@@ -293,7 +276,7 @@ extension DocumentDetector {
 
         let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let isMatch = lowercased.contains("yes") || lowercased.hasPrefix("ja")
-        let confidence = (lowercased == "yes" || lowercased == "no") ? "high" : "medium"
+        let confidence: ConfidenceLevel = (lowercased == "yes" || lowercased == "no") ? .high : .medium
 
         if config.verbose {
             let typeName = documentType.displayName.lowercased()

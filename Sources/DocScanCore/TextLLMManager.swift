@@ -117,7 +117,7 @@ public actor TextLLMManager: TextLLMProviding {
                     .replacingOccurrences(of: "DATE:", with: "")
                     .trimmingCharacters(in: .whitespaces)
                 if value != "UNKNOWN", value != "NOT_FOUND" {
-                    date = parseDate(value)
+                    date = DateUtils.parseDate(value)
                 }
             } else if trimmed.hasPrefix(secondaryPrefix) {
                 let value = trimmed
@@ -246,15 +246,5 @@ extension TextLLMManager {
         if config.verbose {
             print("Text-LLM loaded successfully")
         }
-    }
-
-    /// Parse date string using shared utility
-    func parseDate(_ dateString: String) -> Date? {
-        DateUtils.parseDate(dateString)
-    }
-
-    /// Sanitize company name using shared utility
-    func sanitizeCompanyName(_ name: String) -> String {
-        StringUtils.sanitizeCompanyName(name)
     }
 }
