@@ -111,6 +111,49 @@ extension ConfigurationTests {
         XCTAssertFalse(config.description.contains("HuggingFace User:"))
     }
 
+    // MARK: - BenchmarkSettings
+
+    func testBenchmarkSettingsEquatable() {
+        let settings1 = BenchmarkSettings(huggingFaceUsername: "user", vlmModels: ["m1"])
+        let settings2 = BenchmarkSettings(huggingFaceUsername: "user", vlmModels: ["m1"])
+        let settings3 = BenchmarkSettings(huggingFaceUsername: "other")
+
+        XCTAssertEqual(settings1, settings2)
+        XCTAssertNotEqual(settings1, settings3)
+    }
+
+    // MARK: - Benchmark Convenience Setters
+
+    func testHuggingFaceUsernameConvenienceSetter() {
+        var config = Configuration()
+        XCTAssertNil(config.huggingFaceUsername)
+
+        config.huggingFaceUsername = "new-user"
+
+        XCTAssertEqual(config.huggingFaceUsername, "new-user")
+        XCTAssertEqual(config.benchmark.huggingFaceUsername, "new-user")
+    }
+
+    func testBenchmarkVLMModelsConvenienceSetter() {
+        var config = Configuration()
+        XCTAssertNil(config.benchmarkVLMModels)
+
+        config.benchmarkVLMModels = ["model/a", "model/b"]
+
+        XCTAssertEqual(config.benchmarkVLMModels, ["model/a", "model/b"])
+        XCTAssertEqual(config.benchmark.vlmModels, ["model/a", "model/b"])
+    }
+
+    func testBenchmarkTextLLMModelsConvenienceSetter() {
+        var config = Configuration()
+        XCTAssertNil(config.benchmarkTextLLMModels)
+
+        config.benchmarkTextLLMModels = ["model/x"]
+
+        XCTAssertEqual(config.benchmarkTextLLMModels, ["model/x"])
+        XCTAssertEqual(config.benchmark.textLLMModels, ["model/x"])
+    }
+
     // MARK: - Benchmark Model Lists
 
     func testDefaultBenchmarkModelListsAreNil() {
@@ -162,5 +205,23 @@ extension ConfigurationTests {
 
         XCTAssertEqual(loaded.benchmarkVLMModels, ["vlm/a", "vlm/b"])
         XCTAssertEqual(loaded.benchmarkTextLLMModels, ["text/a"])
+    }
+
+    func testYAMLRoundTripWithAllBenchmarkFields() throws {
+        let config = Configuration(
+            benchmark: BenchmarkSettings(
+                huggingFaceUsername: "user123",
+                vlmModels: ["vlm/x"],
+                textLLMModels: ["text/y", "text/z"]
+            )
+        )
+
+        let path = tempDirectory.appendingPathComponent("all_benchmark.yaml").path
+        try config.save(to: path)
+        let loaded = try Configuration.load(from: path)
+
+        XCTAssertEqual(loaded.benchmark.huggingFaceUsername, "user123")
+        XCTAssertEqual(loaded.benchmark.vlmModels, ["vlm/x"])
+        XCTAssertEqual(loaded.benchmark.textLLMModels, ["text/y", "text/z"])
     }
 }

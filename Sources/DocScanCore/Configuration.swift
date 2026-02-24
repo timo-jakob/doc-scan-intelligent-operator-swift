@@ -41,6 +41,11 @@ public struct OutputSettings: Codable, Equatable, Sendable {
 }
 
 /// Benchmark-related settings for model evaluation
+///
+/// - Note: This struct's synthesized `Codable` uses its own property names as keys
+///   (`vlmModels`, `textLLMModels`). When serialized as part of `Configuration`,
+///   the parent's custom `encode(to:)`/`init(from:)` maps these to the flat YAML
+///   keys `benchmarkVLMModels` and `benchmarkTextLLMModels` for backward compatibility.
 public struct BenchmarkSettings: Codable, Equatable, Sendable {
     /// Hugging Face username (for model discovery)
     public var huggingFaceUsername: String?
@@ -84,6 +89,8 @@ public struct Configuration: Codable, Sendable {
 
     /// Benchmark-related settings
     public var benchmark: BenchmarkSettings
+
+    // TODO: Migrate call sites to use `benchmark.*` directly, then remove these convenience accessors
 
     /// Hugging Face username (convenience accessor)
     public var huggingFaceUsername: String? {
@@ -200,10 +207,13 @@ public struct Configuration: Codable, Sendable {
         )
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
-        benchmark = try BenchmarkSettings(
-            huggingFaceUsername: container.decodeIfPresent(String.self, forKey: .huggingFaceUsername),
-            vlmModels: container.decodeIfPresent([String].self, forKey: .benchmarkVLMModels),
-            textLLMModels: container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
+        let hfUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
+        let vlmModels = try container.decodeIfPresent([String].self, forKey: .benchmarkVLMModels)
+        let textLLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
+        benchmark = BenchmarkSettings(
+            huggingFaceUsername: hfUsername,
+            vlmModels: vlmModels,
+            textLLMModels: textLLMModels
         )
     }
 
