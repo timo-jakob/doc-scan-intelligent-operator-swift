@@ -34,7 +34,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         let (positivePDFs, negativePDFs) = try enumerateAndValidate(engine: engine)
 
         let timeout = promptTimeoutSelection()
-        _ = try promptHuggingFaceCredentials(configuration: &configuration)
+        _ = try promptHuggingFaceCredentials(configuration: configuration)
 
         let vlmResults = try await runPhaseA(
             engine: engine, positivePDFs: positivePDFs, negativePDFs: negativePDFs,
@@ -147,7 +147,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
         return selected
     }
 
-    private func promptHuggingFaceCredentials(configuration: inout Configuration) throws -> String? {
+    private func promptHuggingFaceCredentials(configuration: Configuration) throws -> String? {
         // Check Keychain
         let account = configuration.benchmark.huggingFaceUsername ?? "default"
         if let stored = try KeychainManager.retrieveToken(forAccount: account) {

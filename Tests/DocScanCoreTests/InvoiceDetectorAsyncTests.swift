@@ -112,7 +112,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         XCTAssertEqual(result.agreedIsMatch, true)
 
         // OCR should use direct PDF extraction
-        XCTAssertEqual(result.ocrResult.method, "PDF")
+        XCTAssertEqual(result.ocrResult.method, .pdf)
     }
 
     func testCategorizeWithSearchablePDFVLMSaysNo() async throws {
@@ -161,11 +161,11 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         // VLM should return error result
         XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertEqual(result.vlmResult.confidence, .low)
-        XCTAssertTrue(result.vlmResult.method.contains("error"))
+        XCTAssertTrue(result.vlmResult.method == .vlmError)
 
         // OCR should still work (PDF contains "Rechnung")
         XCTAssertTrue(result.ocrResult.isMatch)
-        XCTAssertEqual(result.ocrResult.method, "PDF")
+        XCTAssertEqual(result.ocrResult.method, .pdf)
 
         // They disagree
         XCTAssertFalse(result.bothAgree)
@@ -216,7 +216,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         // VLM should return timeout result
         XCTAssertFalse(result.vlmResult.isMatch)
         XCTAssertEqual(result.vlmResult.confidence, .low)
-        XCTAssertTrue(result.vlmResult.method.contains("timeout"))
+        XCTAssertTrue(result.vlmResult.method == .vlmTimeout)
         XCTAssertEqual(result.vlmResult.reason, "Timed out")
 
         // OCR should still work
@@ -231,7 +231,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         let result = try await detector.categorize(pdfPath: pdfPath)
 
         // OCR result should indicate PDF method (direct extraction)
-        XCTAssertEqual(result.ocrResult.method, "PDF")
+        XCTAssertEqual(result.ocrResult.method, .pdf)
         XCTAssertTrue(result.ocrResult.isMatch)
         XCTAssertNotNil(result.ocrResult.reason)
     }
@@ -302,7 +302,7 @@ extension InvoiceDetectorAsyncTests {
         let result = try await verboseDetector.categorize(pdfPath: pdfPath)
 
         XCTAssertFalse(result.vlmResult.isMatch)
-        XCTAssertTrue(result.vlmResult.method.contains("error"))
+        XCTAssertTrue(result.vlmResult.method == .vlmError)
         XCTAssertTrue(result.ocrResult.isMatch)
     }
 

@@ -167,6 +167,26 @@ public enum DateUtils {
         return true
     }
 
+    /// Cache for non-default date formatters, keyed by format string
+    private static let formatterCache = FormatterCache()
+
+    /// Thread-safe cache for DateFormatter instances
+    private final class FormatterCache: Sendable {
+        private let lock = NSLock()
+        private nonisolated(unsafe) var cache: [String: DateFormatter] = [:]
+
+        func formatter(for format: String) -> DateFormatter {
+            lock.lock()
+            defer { lock.unlock() }
+            if let existing = cache[format] { return existing }
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            cache[format] = formatter
+            return formatter
+        }
+    }
+
     /// Format a date to the standard invoice filename format
     /// - Parameters:
     ///   - date: The date to format
@@ -176,10 +196,7 @@ public enum DateUtils {
         if format == "yyyy-MM-dd" {
             return isoFormatter.string(from: date)
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = format
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: date)
+        return formatterCache.formatter(for: format).string(from: date)
     }
 
     // MARK: - Text Extraction Functions

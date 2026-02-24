@@ -81,7 +81,7 @@ public struct BenchmarkSettings: Codable, Equatable, Sendable {
 }
 
 /// Configuration for document scanning and invoice processing
-public struct Configuration: Codable, Sendable {
+public struct Configuration: Codable, Equatable, Sendable {
     /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
     public var modelName: String
 

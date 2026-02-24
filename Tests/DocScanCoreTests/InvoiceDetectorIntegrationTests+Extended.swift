@@ -23,7 +23,7 @@ extension InvoiceDetectorIntegrationTests {
         let result = prescriptionDetector.categorizeWithDirectText(prescriptionText)
 
         XCTAssertTrue(result.isMatch)
-        XCTAssertEqual(result.method, "PDF")
+        XCTAssertEqual(result.method, .pdf)
     }
 
     func testPrescriptionFilenameGeneration() throws {

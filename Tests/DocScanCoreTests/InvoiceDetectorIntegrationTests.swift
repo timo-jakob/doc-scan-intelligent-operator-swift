@@ -57,33 +57,33 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
         let result = CategorizationResult(
             isMatch: true,
             confidence: .high,
-            method: "VLM",
+            method: .vlm,
             reason: "Found invoice keywords"
         )
 
         XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.confidence, .high)
-        XCTAssertEqual(result.method, "VLM")
+        XCTAssertEqual(result.method, .vlm)
         XCTAssertEqual(result.reason, "Found invoice keywords")
     }
 
     func testCategorizationResultDefaultValues() {
         let result = CategorizationResult(
             isMatch: false,
-            method: "OCR"
+            method: .ocr
         )
 
         XCTAssertFalse(result.isMatch)
         XCTAssertEqual(result.confidence, .high)
-        XCTAssertEqual(result.method, "OCR")
+        XCTAssertEqual(result.method, .ocr)
         XCTAssertNil(result.reason)
     }
 
     // MARK: - CategorizationVerification Tests
 
     func testCategorizationVerificationAgreement() {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM")
-        let ocr = CategorizationResult(isMatch: true, method: "OCR")
+        let vlm = CategorizationResult(isMatch: true, method: .vlm)
+        let ocr = CategorizationResult(isMatch: true, method: .ocr)
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
@@ -94,8 +94,8 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
     }
 
     func testCategorizationVerificationDisagreement() {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM")
-        let ocr = CategorizationResult(isMatch: false, method: "OCR")
+        let vlm = CategorizationResult(isMatch: true, method: .vlm)
+        let ocr = CategorizationResult(isMatch: false, method: .ocr)
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
@@ -133,8 +133,8 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
     // MARK: - DocumentData with Categorization Tests
 
     func testDocumentDataWithCategorizationAgreement() throws {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM")
-        let ocr = CategorizationResult(isMatch: true, method: "OCR")
+        let vlm = CategorizationResult(isMatch: true, method: .vlm)
+        let ocr = CategorizationResult(isMatch: true, method: .ocr)
         let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
         let data = DocumentData(
@@ -151,8 +151,8 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
     }
 
     func testDocumentDataWithCategorizationDisagreement() throws {
-        let vlm = CategorizationResult(isMatch: true, method: "VLM", reason: "Visual analysis")
-        let ocr = CategorizationResult(isMatch: false, method: "OCR", reason: "No keywords found")
+        let vlm = CategorizationResult(isMatch: true, method: .vlm, reason: "Visual analysis")
+        let ocr = CategorizationResult(isMatch: false, method: .ocr, reason: "No keywords found")
         let categorization = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
 
         let data = DocumentData(
@@ -223,7 +223,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
         if let extractedText = text {
             let result = detector.categorizeWithDirectText(extractedText)
             XCTAssertTrue(result.isMatch)
-            XCTAssertEqual(result.method, "PDF")
+            XCTAssertEqual(result.method, .pdf)
         }
     }
 

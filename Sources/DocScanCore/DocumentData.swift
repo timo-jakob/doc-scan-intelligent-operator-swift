@@ -13,7 +13,7 @@ public enum ConfidenceLevel: String, Sendable, Codable {
 
 /// Result of data extraction (OCR+TextLLM only)
 /// Contains date and a secondary field (company for invoices, doctor for prescriptions)
-public struct ExtractionResult: Sendable {
+public struct ExtractionResult: Equatable, Sendable {
     public let date: Date?
     public let secondaryField: String? // company, doctor, etc. depending on document type
     public let patientName: String? // patient first name (for prescriptions)

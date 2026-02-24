@@ -1,16 +1,33 @@
 @preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated
 import Foundation
 
+// MARK: - Categorization Method
+
+/// The method used for document categorization
+public enum CategorizationMethod: Equatable, Sendable {
+    case vlm
+    case vlmTimeout
+    case vlmError
+    case ocr
+    case ocrTimeout
+    case pdf
+}
+
 // MARK: - Categorization Results (Phase 1: VLM + OCR in parallel)
 
 /// Result of document categorization from a single method
-public struct CategorizationResult: Sendable {
+public struct CategorizationResult: Equatable, Sendable {
     public let isMatch: Bool // Whether document matches the target type
     public let confidence: ConfidenceLevel
-    public let method: String // "VLM", "OCR", or "PDF"
+    public let method: CategorizationMethod
     public let reason: String? // Optional explanation
 
-    public init(isMatch: Bool, confidence: ConfidenceLevel = .high, method: String, reason: String? = nil) {
+    public init(
+        isMatch: Bool,
+        confidence: ConfidenceLevel = .high,
+        method: CategorizationMethod,
+        reason: String? = nil
+    ) {
         self.isMatch = isMatch
         self.confidence = confidence
         self.method = method
@@ -19,52 +36,36 @@ public struct CategorizationResult: Sendable {
 
     /// Full display label for the method (e.g., "VLM (Vision Language Model)")
     public var displayLabel: String {
-        if method.hasPrefix("VLM") {
-            if method.contains("timeout") {
-                return "VLM (Vision Language Model - Timeout)"
-            } else if method.contains("error") {
-                return "VLM (Vision Language Model - Error)"
-            }
-            return "VLM (Vision Language Model)"
-        } else if method.hasPrefix("PDF") {
-            return "PDF (Direct Text Extraction)"
-        } else if method.hasPrefix("OCR") {
-            if method.contains("timeout") {
-                return "OCR (Vision Framework - Timeout)"
-            }
-            return "OCR (Vision Framework)"
+        switch method {
+        case .vlm: "VLM (Vision Language Model)"
+        case .vlmTimeout: "VLM (Vision Language Model - Timeout)"
+        case .vlmError: "VLM (Vision Language Model - Error)"
+        case .ocr: "OCR (Vision Framework)"
+        case .ocrTimeout: "OCR (Vision Framework - Timeout)"
+        case .pdf: "PDF (Direct Text Extraction)"
         }
-        return method
     }
 
     /// True when this result represents a timeout rather than an actual categorisation decision.
     public var isTimedOut: Bool {
-        method.contains("timeout")
+        method == .vlmTimeout || method == .ocrTimeout
     }
 
     /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
     public var shortDisplayLabel: String {
-        if method.hasPrefix("VLM") {
-            if method.contains("timeout") {
-                return "VLM (timeout)"
-            } else if method.contains("error") {
-                return "VLM (error)"
-            }
-            return "VLM"
-        } else if method.hasPrefix("PDF") {
-            return "PDF text"
-        } else if method.hasPrefix("OCR") {
-            if method.contains("timeout") {
-                return "OCR (timeout)"
-            }
-            return "Vision OCR"
+        switch method {
+        case .vlm: "VLM"
+        case .vlmTimeout: "VLM (timeout)"
+        case .vlmError: "VLM (error)"
+        case .ocr: "Vision OCR"
+        case .ocrTimeout: "OCR (timeout)"
+        case .pdf: "PDF text"
         }
-        return method
     }
 }
 
 /// Comparison result for categorization phase
-public struct CategorizationVerification: Sendable {
+public struct CategorizationVerification: Equatable, Sendable {
     public let vlmResult: CategorizationResult
     public let ocrResult: CategorizationResult
     public let bothAgree: Bool
@@ -111,6 +112,9 @@ public actor DocumentDetector {
 }
 
 extension DocumentDetector {
+    /// Timeout for individual categorization methods (VLM or OCR)
+    private static let categorizationTimeoutSeconds: TimeInterval = 30.0
+
     // MARK: - Phase 1: Categorization (VLM + OCR in parallel)
 
     /// Categorize a PDF - determine if it's an invoice using VLM + OCR in parallel
@@ -132,14 +136,28 @@ extension DocumentDetector {
             print("Running categorization (VLM + OCR in parallel)...")
         }
 
-        // Run VLM and OCR in parallel using async let
-        async let vlmResult = runVLMCategorization(image: image)
-        async let ocrResult = runOCRCategorization(
-            image: image, directText: directText
+        // Capture Sendable dependencies for true parallel execution outside actor isolation
+        let vlmProv = vlmProvider
+        let ocrEng = ocrEngine
+        let docType = documentType
+        let cfg = config
+
+        // Run VLM and OCR truly in parallel (nonisolated static methods avoid actor hop)
+        async let vlmResult = Self.performVLMCategorization(
+            image: image, vlmProvider: vlmProv, documentType: docType, config: cfg
+        )
+        async let ocrResult = Self.performOCRCategorization(
+            image: image, directText: directText, ocrEngine: ocrEng,
+            documentType: docType, config: cfg
         )
 
         let vlm = await vlmResult
-        let ocr = try await ocrResult
+        let (ocr, ocrText) = try await ocrResult
+
+        // Cache OCR text from parallel task for Phase 2
+        if let ocrText, cachedOCRText == nil {
+            cachedOCRText = ocrText
+        }
 
         let verification = CategorizationVerification(vlmResult: vlm, ocrResult: ocr)
         logVerificationResult(verification)
@@ -162,54 +180,106 @@ extension DocumentDetector {
         return text
     }
 
-    /// Run VLM categorization with timeout and error handling
-    private func runVLMCategorization(image: NSImage) async -> CategorizationResult {
-        let timeoutSeconds: TimeInterval = 30.0
+    // MARK: - Parallel Categorization Helpers (nonisolated for true concurrency)
 
+    /// Run VLM categorization outside actor isolation for true parallel execution.
+    private nonisolated static func performVLMCategorization(
+        image: NSImage,
+        vlmProvider: any VLMProvider,
+        documentType: DocumentType,
+        config: Configuration
+    ) async -> CategorizationResult {
         do {
-            return try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
-                try await self.categorizeWithVLM(image: image)
+            return try await TimeoutError.withTimeout(seconds: categorizationTimeoutSeconds) {
+                if config.verbose {
+                    let typeName = documentType.displayName.lowercased()
+                    print("VLM: Starting categorization for \(typeName)...")
+                }
+
+                let response = try await vlmProvider.generateFromImage(
+                    image, prompt: documentType.vlmPrompt
+                )
+                if config.verbose { print("VLM response: \(response)") }
+
+                let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                let isMatch = lowercased.contains("yes") || lowercased.hasPrefix("ja")
+                let confidence: ConfidenceLevel = (lowercased == "yes" || lowercased == "no") ? .high : .medium
+
+                if config.verbose {
+                    let typeName = documentType.displayName.lowercased()
+                    print("VLM: Is \(typeName) = \(isMatch) (confidence: \(confidence))")
+                }
+
+                return CategorizationResult(
+                    isMatch: isMatch, confidence: confidence,
+                    method: .vlm, reason: response
+                )
             }
         } catch is TimeoutError {
             if config.verbose {
-                print("⏱️  VLM timed out after \(Int(timeoutSeconds)) seconds")
+                print("⏱️  VLM timed out after \(Int(categorizationTimeoutSeconds)) seconds")
             }
             return CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: "VLM (timeout)", reason: "Timed out"
+                method: .vlmTimeout, reason: "Timed out"
             )
         } catch {
             if config.verbose { print("VLM categorization failed: \(error)") }
             return CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: "VLM (error)", reason: error.localizedDescription
+                method: .vlmError, reason: error.localizedDescription
             )
         }
     }
 
-    /// Run OCR categorization with timeout
-    private func runOCRCategorization(
+    /// Run OCR categorization outside actor isolation for true parallel execution.
+    /// Returns the result and optionally the extracted OCR text (to cache for Phase 2).
+    private nonisolated static func performOCRCategorization(
         image: NSImage,
-        directText: String?
-    ) async throws -> CategorizationResult {
-        let timeoutSeconds: TimeInterval = 30.0
-
+        directText: String?,
+        ocrEngine: OCREngine,
+        documentType: DocumentType,
+        config: Configuration
+    ) async throws -> (CategorizationResult, String?) {
         do {
-            return try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
+            return try await TimeoutError.withTimeout(seconds: categorizationTimeoutSeconds) {
                 if let text = directText {
-                    self.categorizeWithDirectText(text)
+                    // Direct text already cached by tryDirectTextExtraction
+                    let result = OCREngine.detectKeywords(for: documentType, from: text)
+                    if config.verbose {
+                        print("PDF: Using direct text extraction for categorization...")
+                        let typeName = documentType.displayName.lowercased()
+                        print("PDF: Is \(typeName) = \(result.isMatch) (confidence: \(result.confidence))")
+                    }
+                    return (CategorizationResult(
+                        isMatch: result.isMatch, confidence: result.confidence,
+                        method: .pdf, reason: result.reason
+                    ), nil)
                 } else {
-                    try await self.categorizeWithOCR(image: image)
+                    if config.verbose { print("OCR: Starting Vision OCR (scanned document)...") }
+                    let text = try ocrEngine.extractText(from: image)
+                    if config.verbose {
+                        print("OCR: Extracted \(text.count) characters")
+                    }
+                    let result = ocrEngine.detectKeywords(for: documentType, from: text)
+                    if config.verbose {
+                        let typeName = documentType.displayName.lowercased()
+                        print("OCR: Is \(typeName) = \(result.isMatch) (confidence: \(result.confidence))")
+                    }
+                    return (CategorizationResult(
+                        isMatch: result.isMatch, confidence: result.confidence,
+                        method: .ocr, reason: result.reason
+                    ), text)
                 }
             }
         } catch is TimeoutError {
             if config.verbose {
-                print("⏱️  OCR timed out after \(Int(timeoutSeconds)) seconds")
+                print("⏱️  OCR timed out after \(Int(categorizationTimeoutSeconds)) seconds")
             }
-            return CategorizationResult(
+            return (CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: "OCR (timeout)", reason: "Timed out"
-            )
+                method: .ocrTimeout, reason: "Timed out"
+            ), nil)
         }
     }
 
@@ -260,83 +330,19 @@ extension DocumentDetector {
         )
     }
 
-    // MARK: - VLM Categorization
+    // MARK: - Direct Text Categorization (public for testing)
 
-    /// Categorize using VLM - simple yes/no document type detection
-    func categorizeWithVLM(image: NSImage) async throws -> CategorizationResult {
-        if config.verbose {
-            let typeName = documentType.displayName.lowercased()
-            print("VLM: Starting categorization for \(typeName)...")
-        }
-
-        let response = try await vlmProvider.generateFromImage(
-            image, prompt: documentType.vlmPrompt
-        )
-        if config.verbose { print("VLM response: \(response)") }
-
-        let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let isMatch = lowercased.contains("yes") || lowercased.hasPrefix("ja")
-        let confidence: ConfidenceLevel = (lowercased == "yes" || lowercased == "no") ? .high : .medium
-
-        if config.verbose {
-            let typeName = documentType.displayName.lowercased()
-            print("VLM: Is \(typeName) = \(isMatch) (confidence: \(confidence))")
-        }
-
-        return CategorizationResult(
-            isMatch: isMatch, confidence: confidence,
-            method: "VLM", reason: response
-        )
-    }
-
-    // MARK: - Text Categorization
-
-    /// Categorize using direct PDF text (no OCR needed)
+    /// Categorize using direct PDF text (no OCR needed).
     /// Nonisolated because it only accesses let properties and uses static methods.
-    nonisolated func categorizeWithDirectText(_ text: String) -> CategorizationResult {
-        if config.verbose {
-            print("PDF: Using direct text extraction for categorization...")
-            print("PDF: Text length: \(text.count) characters")
-            print("PDF: Text preview: \(String(text.prefix(500)))")
-        }
-
+    public nonisolated func categorizeWithDirectText(_ text: String) -> CategorizationResult {
         let result = OCREngine.detectKeywords(for: documentType, from: text)
-
         if config.verbose {
             let typeName = documentType.displayName.lowercased()
             print("PDF: Is \(typeName) = \(result.isMatch) (confidence: \(result.confidence))")
-            if let reason = result.reason { print("PDF: Reason: \(reason)") }
         }
-
         return CategorizationResult(
             isMatch: result.isMatch, confidence: result.confidence,
-            method: "PDF", reason: result.reason
-        )
-    }
-
-    /// Categorize using Vision OCR (fallback for scanned documents)
-    func categorizeWithOCR(image: NSImage) async throws -> CategorizationResult {
-        if config.verbose { print("OCR: Starting Vision OCR (scanned document)...") }
-
-        let text = try ocrEngine.extractText(from: image)
-        cachedOCRText = text
-
-        if config.verbose {
-            print("OCR: Extracted \(text.count) characters")
-            print("OCR: Text preview: \(String(text.prefix(500)))")
-        }
-
-        let result = ocrEngine.detectKeywords(for: documentType, from: text)
-
-        if config.verbose {
-            let typeName = documentType.displayName.lowercased()
-            print("OCR: Is \(typeName) = \(result.isMatch) (confidence: \(result.confidence))")
-            if let reason = result.reason { print("OCR: Reason: \(reason)") }
-        }
-
-        return CategorizationResult(
-            isMatch: result.isMatch, confidence: result.confidence,
-            method: "OCR", reason: result.reason
+            method: .pdf, reason: result.reason
         )
     }
 }

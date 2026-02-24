@@ -24,35 +24,35 @@ final class OCREngineTests: XCTestCase {
 
     func testDetectInvoiceWithKeywords() {
         let germanText = "Rechnung\nRechnungsnummer: 12345\nDatum: 2024-12-22"
-        XCTAssertTrue(engine.detectInvoice(from: germanText))
+        XCTAssertTrue(engine.detectKeywords(for: .invoice, from: germanText).isMatch)
 
         let englishText = "Invoice\nInvoice Number: 12345\nDate: 2024-12-22"
-        XCTAssertTrue(engine.detectInvoice(from: englishText))
+        XCTAssertTrue(engine.detectKeywords(for: .invoice, from: englishText).isMatch)
 
         let frenchText = "Facture\nNuméro de facture: 12345"
-        XCTAssertTrue(engine.detectInvoice(from: frenchText))
+        XCTAssertTrue(engine.detectKeywords(for: .invoice, from: frenchText).isMatch)
 
         let nonInvoiceText = "This is just a regular document"
-        XCTAssertFalse(engine.detectInvoice(from: nonInvoiceText))
+        XCTAssertFalse(engine.detectKeywords(for: .invoice, from: nonInvoiceText).isMatch)
     }
 
     func testDetectInvoiceKeywordsWithConfidence() {
         // Strong indicators (high confidence)
         let strongText = "Rechnungsnummer: 12345"
-        let result1 = engine.detectInvoiceKeywords(from: strongText)
+        let result1 = engine.detectKeywords(for: .invoice, from: strongText)
         XCTAssertTrue(result1.isMatch)
         XCTAssertEqual(result1.confidence, .high)
         XCTAssertNotNil(result1.reason)
 
         // Medium indicators
         let mediumText = "Rechnung für Dienstleistungen"
-        let result2 = engine.detectInvoiceKeywords(from: mediumText)
+        let result2 = engine.detectKeywords(for: .invoice, from: mediumText)
         XCTAssertTrue(result2.isMatch)
         XCTAssertEqual(result2.confidence, .medium)
 
         // No invoice keywords
         let noInvoiceText = "Just a regular document"
-        let result3 = engine.detectInvoiceKeywords(from: noInvoiceText)
+        let result3 = engine.detectKeywords(for: .invoice, from: noInvoiceText)
         XCTAssertFalse(result3.isMatch)
         XCTAssertEqual(result3.confidence, .high) // High confidence it's NOT an invoice
     }

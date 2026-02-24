@@ -30,13 +30,14 @@ public extension VLMProvider {
 
 /// Manages Vision-Language Models using mlx-swift-lm
 public actor ModelManager: VLMProvider {
-    private let config: Configuration
+    nonisolated let config: Configuration
     private let fileManager = FileManager.default
 
     // Chat session for VLM (lazy loaded)
     private var chatSession: ChatSession?
     private var loadedModel: ModelContext?
     private var currentModelName: String?
+    private var isGenerating = false
 
     public init(config: Configuration) {
         self.config = config
@@ -48,6 +49,12 @@ public actor ModelManager: VLMProvider {
         prompt: String,
         modelName: String? = nil
     ) async throws -> String {
+        guard !isGenerating else {
+            throw DocScanError.inferenceError("VLM generation already in progress")
+        }
+        isGenerating = true
+        defer { isGenerating = false }
+
         let model = modelName ?? config.modelName
 
         if config.verbose {
@@ -75,7 +82,7 @@ public actor ModelManager: VLMProvider {
         // SAFETY: ChatSession is not yet Sendable-annotated in mlx-swift-lm.
         // This is safe because:
         // 1. We create a fresh session per generateFromImage call (resetSession: true above)
-        // 2. Only one call is active at a time within this actor's isolation
+        // 2. The isGenerating reentrancy guard prevents concurrent access
         // 3. The session is never shared outside this actor
         // TODO: Remove nonisolated(unsafe) when mlx-swift-lm adopts Sendable
         nonisolated(unsafe) let sendableSession = session

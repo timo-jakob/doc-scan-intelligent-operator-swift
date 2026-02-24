@@ -2,7 +2,7 @@
 import Vision
 import XCTest
 
-// MARK: - Static detectInvoiceKeywords Tests
+// MARK: - Static detectKeywords Tests
 
 extension OCREngineTests {
     func testStaticDetectInvoiceKeywordsStrongIndicators() {
@@ -16,7 +16,7 @@ extension OCREngineTests {
         ]
 
         for text in strongTexts {
-            let result = OCREngine.detectInvoiceKeywords(from: text)
+            let result = OCREngine.detectKeywords(for: .invoice, from: text)
             XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
             XCTAssertEqual(result.confidence, .high, "Should have high confidence for: \(text)")
         }
@@ -33,7 +33,7 @@ extension OCREngineTests {
         ]
 
         for text in mediumTexts {
-            let result = OCREngine.detectInvoiceKeywords(from: text)
+            let result = OCREngine.detectKeywords(for: .invoice, from: text)
             XCTAssertTrue(result.isMatch, "Should detect invoice in: \(text)")
             XCTAssertEqual(result.confidence, .medium, "Should have medium confidence for: \(text)")
         }
@@ -48,7 +48,7 @@ extension OCREngineTests {
         ]
 
         for text in nonInvoiceTexts {
-            let result = OCREngine.detectInvoiceKeywords(from: text)
+            let result = OCREngine.detectKeywords(for: .invoice, from: text)
             XCTAssertFalse(result.isMatch, "Should not detect invoice in: \(text)")
             XCTAssertEqual(
                 result.confidence, .high,
@@ -69,7 +69,7 @@ extension OCREngineTests {
         ]
 
         for text in testCases {
-            let result = OCREngine.detectInvoiceKeywords(from: text)
+            let result = OCREngine.detectKeywords(for: .invoice, from: text)
             XCTAssertTrue(result.isMatch, "Should detect invoice case-insensitively in: \(text)")
         }
     }
@@ -107,8 +107,8 @@ extension OCREngineTests {
         let text = "Rechnungsnummer: 12345"
 
         // Both should return the same results
-        let instanceResult = engine.detectInvoiceKeywords(from: text)
-        let staticResult = OCREngine.detectInvoiceKeywords(from: text)
+        let instanceResult = engine.detectKeywords(for: .invoice, from: text)
+        let staticResult = OCREngine.detectKeywords(for: .invoice, from: text)
 
         XCTAssertEqual(instanceResult.isMatch, staticResult.isMatch)
         XCTAssertEqual(instanceResult.confidence, staticResult.confidence)
@@ -128,11 +128,11 @@ extension OCREngineTests {
     // MARK: - Detect Invoice Simple Tests
 
     func testDetectInvoiceSimple() {
-        XCTAssertTrue(engine.detectInvoice(from: "Rechnung"))
-        XCTAssertTrue(engine.detectInvoice(from: "Invoice"))
-        XCTAssertTrue(engine.detectInvoice(from: "Rechnungsnummer: 12345"))
-        XCTAssertFalse(engine.detectInvoice(from: "Hello World"))
-        XCTAssertFalse(engine.detectInvoice(from: ""))
+        XCTAssertTrue(engine.detectKeywords(for: .invoice, from: "Rechnung").isMatch)
+        XCTAssertTrue(engine.detectKeywords(for: .invoice, from: "Invoice").isMatch)
+        XCTAssertTrue(engine.detectKeywords(for: .invoice, from: "Rechnungsnummer: 12345").isMatch)
+        XCTAssertFalse(engine.detectKeywords(for: .invoice, from: "Hello World").isMatch)
+        XCTAssertFalse(engine.detectKeywords(for: .invoice, from: "").isMatch)
     }
 
     // MARK: - Company Extraction with Various Legal Suffixes
@@ -169,7 +169,7 @@ extension OCREngineTests {
         Invoice Date: 2024-12-15
         """
 
-        let result = engine.detectInvoiceKeywords(from: text)
+        let result = engine.detectKeywords(for: .invoice, from: text)
 
         XCTAssertTrue(result.isMatch)
         XCTAssertEqual(result.confidence, .high) // Strong indicators present

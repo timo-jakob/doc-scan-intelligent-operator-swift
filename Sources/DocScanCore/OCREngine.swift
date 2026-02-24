@@ -3,7 +3,7 @@ import Foundation
 import Vision
 
 /// Result of keyword-based document type detection
-public struct KeywordResult: Sendable {
+public struct KeywordResult: Equatable, Sendable {
     public let isMatch: Bool
     public let confidence: ConfidenceLevel
     public let reason: String?
@@ -105,22 +105,6 @@ public struct OCREngine: Sendable {
     /// Internal access for testability
     static func extractTextFromObservations(_ observations: [VNRecognizedTextObservation]) -> String {
         observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-    }
-
-    /// Detect if text contains invoice indicators (simple boolean)
-    public func detectInvoice(from text: String) -> Bool {
-        Self.detectInvoiceKeywords(from: text).isMatch
-    }
-
-    /// Detect invoice keywords with confidence and reason (instance method)
-    public func detectInvoiceKeywords(from text: String) -> KeywordResult {
-        Self.detectInvoiceKeywords(from: text)
-    }
-
-    /// Detect invoice keywords with confidence and reason (static, shared implementation)
-    /// Legacy method - delegates to generic detectKeywords
-    public static func detectInvoiceKeywords(from text: String) -> KeywordResult {
-        detectKeywords(for: .invoice, from: text)
     }
 
     /// Generic keyword detection for any document type

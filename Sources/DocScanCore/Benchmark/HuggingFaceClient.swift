@@ -8,7 +8,7 @@ public protocol URLSessionProtocol: Sendable {
 extension URLSession: URLSessionProtocol {}
 
 /// A model discovered from Hugging Face
-public struct HFModel: Codable, Equatable {
+public struct HFModel: Codable, Equatable, Sendable {
     public let modelId: String
     public let downloads: Int?
     public let tags: [String]?
@@ -33,7 +33,7 @@ public struct HFModel: Codable, Equatable {
 }
 
 /// Hugging Face models can have gated as bool or string
-public enum HFGated: Codable, Equatable {
+public enum HFGated: Codable, Equatable, Sendable {
     case bool(Bool)
     case string(String)
 
