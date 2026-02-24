@@ -166,7 +166,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
 
     private func promptHuggingFaceCredentials(configuration: inout Configuration) throws -> String? {
         // Check Keychain
-        let account = configuration.huggingFaceUsername ?? "default"
+        let account = configuration.benchmark.huggingFaceUsername ?? "default"
         if let stored = try KeychainManager.retrieveToken(forAccount: account) {
             if verbose {
                 print("Found existing Hugging Face token in Keychain.")

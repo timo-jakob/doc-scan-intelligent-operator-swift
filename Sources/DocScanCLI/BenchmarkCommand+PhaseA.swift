@@ -14,7 +14,7 @@ extension BenchmarkCommand {
     ) async throws -> [VLMBenchmarkResult] {
         printBenchmarkPhaseHeader("A", title: "VLM Categorization Benchmark")
 
-        let vlmModels = configuration.benchmarkVLMModels ?? DefaultModelLists.vlmModels
+        let vlmModels = configuration.benchmark.vlmModels ?? DefaultModelLists.vlmModels
         print("Evaluating \(vlmModels.count) VLM model(s)")
         print("Documents: \(positivePDFs.count) positive, \(negativePDFs.count) negative")
         print("Timeout: \(Int(timeoutSeconds))s per inference")
