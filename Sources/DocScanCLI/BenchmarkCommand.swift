@@ -254,12 +254,12 @@ struct BenchmarkCommand: AsyncParsableCommand {
     /// Print a benchmark result summary line (works for any BenchmarkResultProtocol)
     func printBenchmarkResult(_ result: some BenchmarkResultProtocol) {
         if result.isDisqualified {
-            print("  DISQUALIFIED: \(result.disqualificationReason ?? "Unknown")")
+            print("    DISQUALIFIED: \(result.disqualificationReason ?? "Unknown")")
         } else {
             let scoreStr = String(format: "%.1f%%", result.score * 100)
             let points = "\(result.totalScore)/\(result.maxScore)"
             let time = String(format: "%.1fs", result.elapsedSeconds)
-            print("  Score: \(scoreStr) (\(points)) in \(time)")
+            print("    Score: \(scoreStr) (\(points)) in \(time)")
         }
         print()
     }

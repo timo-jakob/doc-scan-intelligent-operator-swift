@@ -40,30 +40,12 @@ public extension BenchmarkEngine {
         }
 
         let startTime = Date()
-        var documentResults: [VLMDocumentResult] = []
-
-        // Process positive documents
-        for pdfPath in positivePDFs {
-            let result = await benchmarkVLMDocument(
-                pdfPath: pdfPath,
-                isPositive: true,
-                timeoutSeconds: timeoutSeconds,
-                vlmFactory: vlmFactory
-            )
-            documentResults.append(result)
-        }
-
-        // Process negative documents
-        for pdfPath in negativePDFs {
-            let result = await benchmarkVLMDocument(
-                pdfPath: pdfPath,
-                isPositive: false,
-                timeoutSeconds: timeoutSeconds,
-                vlmFactory: vlmFactory
-            )
-            documentResults.append(result)
-        }
-
+        let documentResults = await processVLMDocuments(
+            positivePDFs: positivePDFs,
+            negativePDFs: negativePDFs,
+            timeoutSeconds: timeoutSeconds,
+            vlmFactory: vlmFactory
+        )
         let elapsedSeconds = Date().timeIntervalSince(startTime)
         await vlmFactory.releaseVLM()
 
@@ -72,6 +54,40 @@ public extension BenchmarkEngine {
             documentResults: documentResults,
             elapsedSeconds: elapsedSeconds
         )
+    }
+
+    /// Process all documents, printing per-document progress dots
+    private func processVLMDocuments(
+        positivePDFs: [String],
+        negativePDFs: [String],
+        timeoutSeconds: TimeInterval,
+        vlmFactory: VLMOnlyFactory
+    ) async -> [VLMDocumentResult] {
+        var results: [VLMDocumentResult] = []
+
+        print("    ✓ ", terminator: "")
+        for pdfPath in positivePDFs {
+            let result = await benchmarkVLMDocument(
+                pdfPath: pdfPath, isPositive: true,
+                timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory
+            )
+            print(result.correct ? "." : "f", terminator: "")
+            results.append(result)
+        }
+
+        print("  ✗ ", terminator: "")
+        for pdfPath in negativePDFs {
+            let result = await benchmarkVLMDocument(
+                pdfPath: pdfPath, isPositive: false,
+                timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory
+            )
+            print(result.correct ? "." : "f", terminator: "")
+            results.append(result)
+        }
+        print("")
+        fflush(stdout)
+
+        return results
     }
 
     /// Benchmark a single document with VLM categorization
