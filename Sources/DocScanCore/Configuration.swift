@@ -82,7 +82,7 @@ public struct BenchmarkSettings: Codable, Equatable, Sendable {
 
 /// Configuration for document scanning and invoice processing
 public struct Configuration: Codable, Equatable, Sendable {
-    /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-2B-Instruct-4bit")
+    /// VLM model identifier (e.g., "mlx-community/Qwen2-VL-7B-Instruct-4bit")
     public var modelName: String
 
     /// Text LLM model identifier (e.g., "mlx-community/Qwen2.5-7B-Instruct-4bit")
@@ -135,7 +135,7 @@ public struct Configuration: Codable, Equatable, Sendable {
 
     // MARK: - Default Values
 
-    public static let defaultModelName = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
+    public static let defaultModelName = "mlx-community/Qwen2-VL-7B-Instruct-4bit"
     public static let defaultTextModelName = "mlx-community/Qwen2.5-7B-Instruct-4bit"
     public static let defaultMaxTokens = 256
     public static let defaultTemperature = 0.1

@@ -33,6 +33,26 @@ public actor ModelManager: VLMProvider {
     nonisolated let config: Configuration
     private let fileManager = FileManager.default
 
+    /// System prompt used to frame the VLM's behavior for classification tasks.
+    private static let classifierInstructions =
+        "You are a document classifier. " +
+        "Analyze the image and answer the question with exactly one word: YES or NO. " +
+        "Do not explain your reasoning."
+
+    /// Generation parameters optimized for YES/NO classification.
+    /// - maxTokens: 8 (only need a single word)
+    /// - temperature: 0 (deterministic output)
+    private static let classificationParams = GenerateParameters(
+        maxTokens: 8,
+        temperature: 0.0
+    )
+
+    /// Image processing that preserves A4 portrait aspect ratio (1:√2).
+    /// The default 512×512 squashes A4 documents; 448×632 keeps layout readable.
+    private static let a4Processing = UserInput.Processing(
+        resize: CGSize(width: 448, height: 632)
+    )
+
     // Chat session for VLM (lazy loaded)
     private var chatSession: ChatSession?
     private var loadedModel: ModelContext?
@@ -116,6 +136,16 @@ public actor ModelManager: VLMProvider {
         return tempURL
     }
 
+    /// Create a new ChatSession with the classifier system prompt, generation params, and A4 image processing.
+    private func makeSession(_ model: ModelContext) -> ChatSession {
+        ChatSession(
+            model,
+            instructions: Self.classifierInstructions,
+            generateParameters: Self.classificationParams,
+            processing: Self.a4Processing
+        )
+    }
+
     /// Load VLM model and create ChatSession if not already loaded
     private func loadModelIfNeeded(modelName: String, resetSession: Bool = false) async throws {
         // Check if model needs to be reloaded (different model or no model loaded)
@@ -138,7 +168,7 @@ public actor ModelManager: VLMProvider {
 
             // Cache the loaded model and create ChatSession
             loadedModel = model
-            chatSession = ChatSession(model)
+            chatSession = makeSession(model)
             currentModelName = modelName
 
             if config.verbose {
@@ -149,7 +179,7 @@ public actor ModelManager: VLMProvider {
             if config.verbose {
                 print("VLM: Creating fresh ChatSession (reusing cached model)")
             }
-            chatSession = ChatSession(model)
+            chatSession = makeSession(model)
         }
     }
 
@@ -167,7 +197,7 @@ public actor ModelManager: VLMProvider {
         }
 
         loadedModel = model
-        chatSession = ChatSession(model)
+        chatSession = makeSession(model)
         currentModelName = modelName
     }
 

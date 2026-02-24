@@ -209,9 +209,12 @@ extension DocumentDetector {
                 )
                 if config.verbose { print("VLM response: \(response)") }
 
-                let lowercased = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                let isMatch = lowercased.contains("yes") || lowercased.hasPrefix("ja")
-                let confidence: ConfidenceLevel = (lowercased == "yes" || lowercased == "no") ? .high : .medium
+                let isMatch = Self.parseYesNoResponse(response)
+                let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                    .trimmingCharacters(in: .punctuationCharacters)
+                let confidence: ConfidenceLevel =
+                    (trimmed == "yes" || trimmed == "no" || trimmed == "ja" || trimmed == "nein") ? .high : .medium
 
                 if config.verbose {
                     let typeName = documentType.displayName.lowercased()
@@ -337,6 +340,24 @@ extension DocumentDetector {
             secondaryField: result.secondaryField,
             patientName: result.patientName
         )
+    }
+
+    // MARK: - Response Parsing
+
+    /// Parse a YES/NO response from a VLM.
+    ///
+    /// Strips whitespace and punctuation, then checks for exact match or common prefixed forms.
+    /// Returns `true` for "yes"/"ja" variants, `false` for everything else.
+    nonisolated static func parseYesNoResponse(_ response: String) -> Bool {
+        let trimmed = response
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .trimmingCharacters(in: .punctuationCharacters)
+
+        if trimmed == "yes" || trimmed == "ja" { return true }
+        if trimmed.hasPrefix("yes,") || trimmed.hasPrefix("yes ") { return true }
+        if trimmed.hasPrefix("ja,") || trimmed.hasPrefix("ja ") { return true }
+        return false
     }
 
     // MARK: - Direct Text Categorization (public for testing)
