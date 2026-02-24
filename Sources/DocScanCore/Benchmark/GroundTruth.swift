@@ -74,13 +74,18 @@ public struct GroundTruth: Codable, Equatable, Sendable {
         guard FileManager.default.fileExists(atPath: path) else {
             throw DocScanError.fileNotFound(path)
         }
+        let data: Data
         do {
-            let data = try Data(contentsOf: url)
+            data = try Data(contentsOf: url)
+        } catch {
+            throw DocScanError.fileOperationFailed("Failed to read ground truth: \(error.localizedDescription)")
+        }
+        do {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             return try decoder.decode(GroundTruth.self, from: data)
         } catch {
-            throw DocScanError.benchmarkError("Failed to load ground truth: \(error.localizedDescription)")
+            throw DocScanError.benchmarkError("Failed to decode ground truth: \(error.localizedDescription)")
         }
     }
 
