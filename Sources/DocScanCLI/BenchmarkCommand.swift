@@ -24,8 +24,6 @@ struct BenchmarkCommand: AsyncParsableCommand {
     var verbose: Bool = false
 
     func run() async throws {
-        BenchmarkEngine.configureMLXMemoryBudget()
-
         let documentType = try parseDocumentType()
         var configuration = try loadConfiguration()
         configuration.verbose = verbose

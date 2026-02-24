@@ -41,73 +41,74 @@ public struct SubprocessRunner: Sendable {
     /// - Parameter input: The worker input describing what to benchmark.
     /// - Returns: A ``SubprocessResult`` indicating success, crash, or decoding failure.
     public func run(input: BenchmarkWorkerInput) async throws -> SubprocessResult {
-        let executablePath = Self.resolveExecutablePath()
         let tempDir = FileManager.default.temporaryDirectory
-
         let inputURL = tempDir.appendingPathComponent("bw-input-\(UUID().uuidString).json")
         let outputURL = tempDir.appendingPathComponent("bw-output-\(UUID().uuidString).json")
 
-        // Write input JSON
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let inputData = try encoder.encode(input)
-        try inputData.write(to: inputURL)
+        try encoder.encode(input).write(to: inputURL)
 
         defer {
             try? FileManager.default.removeItem(at: inputURL)
             try? FileManager.default.removeItem(at: outputURL)
         }
 
-        // Spawn worker
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = [
-            "benchmark-worker",
-            "--input", inputURL.path,
-            "--output", outputURL.path,
-        ]
-
-        // Inherit stdout/stderr so the user sees preloading progress
-        process.standardOutput = FileHandle.standardOutput
-        process.standardError = FileHandle.standardError
-
-        // Launch process — if run() throws, the process never started
-        try process.run()
-
+        let process = makeWorkerProcess(inputPath: inputURL.path, outputPath: outputURL.path)
         let timeout = Self.overallTimeout(for: input)
-        return await awaitProcess(process, outputURL: outputURL, timeout: timeout)
+        let (status, reason) = try await launchAndAwait(process, timeout: timeout)
+
+        return interpretResult(status: status, reason: reason, outputURL: outputURL)
     }
 
-    /// Wait for a process to finish (with timeout), then interpret the result.
-    private func awaitProcess(
-        _ process: Process, outputURL: URL, timeout: TimeInterval
-    ) async -> SubprocessResult {
-        // Wait for termination asynchronously.
-        // Foundation guarantees terminationHandler fires even if the process
-        // already exited before the handler was set.
-        typealias TermResult = (Int32, Process.TerminationReason)
-        let termination = await withCheckedContinuation { (continuation: CheckedContinuation<TermResult?, Never>) in
-            // Watchdog: terminate the process if it exceeds the overall timeout
+    // MARK: - Private Helpers
+
+    private func makeWorkerProcess(inputPath: String, outputPath: String) -> Process {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: Self.resolveExecutablePath())
+        process.arguments = [
+            "benchmark-worker",
+            "--input", inputPath,
+            "--output", outputPath,
+        ]
+        process.standardOutput = FileHandle.standardOutput
+        process.standardError = FileHandle.standardError
+        return process
+    }
+
+    /// Set up termination handler + watchdog before launching so that even an
+    /// instant crash (e.g. fatalError during MLX init) is captured reliably.
+    private typealias TermResult = (Int32, Process.TerminationReason)
+
+    private func launchAndAwait(
+        _ process: Process, timeout: TimeInterval
+    ) async throws -> TermResult {
+        try await withCheckedThrowingContinuation { continuation in
             let watchdog = DispatchWorkItem { [process] in
-                if process.isRunning {
-                    process.terminate()
-                }
+                if process.isRunning { process.terminate() }
             }
-            let deadline: DispatchTime = .now() + timeout
-            DispatchQueue.global().asyncAfter(deadline: deadline, execute: watchdog)
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
 
             process.terminationHandler = { proc in
                 watchdog.cancel()
-                continuation.resume(returning: (proc.terminationStatus, proc.terminationReason))
+                continuation.resume(
+                    returning: (proc.terminationStatus, proc.terminationReason)
+                )
+            }
+
+            do {
+                try process.run()
+            } catch {
+                watchdog.cancel()
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
             }
         }
+    }
 
-        guard let (status, reason) = termination else {
-            return .crashed(exitCode: -1, signal: nil)
-        }
-
-        // Check for crash / non-zero exit.
-        // When terminated by a signal, terminationStatus holds the signal number.
+    private func interpretResult(
+        status: Int32, reason: Process.TerminationReason, outputURL: URL
+    ) -> SubprocessResult {
         if reason == .uncaughtSignal {
             return .crashed(exitCode: -1, signal: status)
         }
@@ -115,15 +116,13 @@ public struct SubprocessRunner: Sendable {
             return .crashed(exitCode: status, signal: nil)
         }
 
-        // Read output JSON
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             return .decodingFailed("Worker exited 0 but output file not found")
         }
 
         do {
             let outputData = try Data(contentsOf: outputURL)
-            let decoder = JSONDecoder()
-            let output = try decoder.decode(BenchmarkWorkerOutput.self, from: outputData)
+            let output = try JSONDecoder().decode(BenchmarkWorkerOutput.self, from: outputData)
             return .success(output)
         } catch {
             return .decodingFailed("Failed to decode worker output: \(error.localizedDescription)")

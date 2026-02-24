@@ -41,7 +41,8 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
             ],
-            path: "Sources/DocScanCore"
+            path: "Sources/DocScanCore",
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
 
         // CLI executable
@@ -51,14 +52,16 @@ let package = Package(
                 "DocScanCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/DocScanCLI"
+            path: "Sources/DocScanCLI",
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
 
         // Tests
         .testTarget(
             name: "DocScanCoreTests",
             dependencies: ["DocScanCore"],
-            path: "Tests/DocScanCoreTests"
+            path: "Tests/DocScanCoreTests",
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
     ]
 )

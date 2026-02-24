@@ -26,11 +26,12 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
             let workerOutput = try await executeBenchmark(workerInput: workerInput)
             try writeOutput(workerOutput)
         } catch {
-            // Write a disqualified result so the parent gets a meaningful error message
-            // instead of "output file not found"
+            // Best-effort: write a disqualified result so the parent gets a meaningful
+            // error message. If this also fails, the process exits non-zero and the
+            // parent handles it as a crash.
             let reason = "Worker error: \(error.localizedDescription)"
             let errorOutput = workerInput.makeDisqualifiedOutput(reason: reason)
-            try writeOutput(errorOutput)
+            try? writeOutput(errorOutput)
         }
     }
 

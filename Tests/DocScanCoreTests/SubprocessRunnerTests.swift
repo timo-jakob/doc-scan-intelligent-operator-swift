@@ -130,6 +130,39 @@ final class SubprocessRunnerTests: XCTestCase {
         XCTAssertTrue(largeTimeout > smallTimeout)
     }
 
+    // MARK: - Integration: run() spawns a real subprocess
+
+    /// The test runner binary does not have a `benchmark-worker` subcommand,
+    /// so the spawned process exits non-zero. This exercises the full process
+    /// lifecycle: temp file creation, process launch, termination handling,
+    /// and temp file cleanup.
+    func testRunReturnsNonZeroExitForUnknownSubcommand() async throws {
+        let runner = SubprocessRunner()
+        let input = BenchmarkWorkerInput(
+            phase: .vlm,
+            modelName: "test/model",
+            positivePDFs: [],
+            negativePDFs: [],
+            timeoutSeconds: 10.0,
+            documentType: .invoice,
+            configuration: Configuration.defaultConfiguration,
+            verbose: false
+        )
+
+        let result = try await runner.run(input: input)
+
+        switch result {
+        case let .crashed(exitCode, _):
+            // The test runner exits non-zero when given an unknown subcommand
+            XCTAssertNotEqual(exitCode, 0)
+        case .decodingFailed:
+            // Also acceptable — process may exit 0 but produce no valid output
+            break
+        case .success:
+            XCTFail("Expected crash or decoding failure from test runner binary")
+        }
+    }
+
     // MARK: - makeDisqualifiedOutput
 
     func testMakeDisqualifiedOutputVLM() {
