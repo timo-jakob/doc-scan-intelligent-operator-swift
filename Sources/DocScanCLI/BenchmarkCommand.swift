@@ -240,4 +240,47 @@ struct BenchmarkCommand: AsyncParsableCommand {
         try newConfig.save(to: path)
         print("Configuration saved to \(path)")
     }
+
+    // MARK: - Subprocess Worker Helpers
+
+    /// Run a subprocess worker and extract the phase-specific result, or return a disqualified result.
+    func runWorker<Result>(
+        runner: SubprocessRunner,
+        input: BenchmarkWorkerInput,
+        modelName: String,
+        extractResult: (BenchmarkWorkerOutput) -> Result?,
+        makeDisqualified: (String, String) -> Result
+    ) async -> Result {
+        do {
+            let subprocessResult = try await runner.run(input: input)
+            switch subprocessResult {
+            case let .success(output):
+                return extractResult(output) ?? makeDisqualified(
+                    modelName, "Worker produced no result"
+                )
+            case let .crashed(exitCode, signal):
+                let detail = signal.map { "signal \($0)" } ?? "exit code \(exitCode)"
+                return makeDisqualified(modelName, "Worker crashed (\(detail))")
+            case let .decodingFailed(message):
+                return makeDisqualified(modelName, message)
+            }
+        } catch {
+            return makeDisqualified(
+                modelName, "Failed to spawn worker: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    /// Print a benchmark result summary line (works for any BenchmarkResultProtocol)
+    func printBenchmarkResult(_ result: some BenchmarkResultProtocol) {
+        if result.isDisqualified {
+            print("  DISQUALIFIED: \(result.disqualificationReason ?? "Unknown")")
+        } else {
+            let scoreStr = String(format: "%.1f%%", result.score * 100)
+            let points = "\(result.totalScore)/\(result.maxScore)"
+            let time = String(format: "%.1fs", result.elapsedSeconds)
+            print("  Score: \(scoreStr) (\(points)) in \(time)")
+        }
+        print()
+    }
 }

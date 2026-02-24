@@ -59,26 +59,26 @@ public struct SubprocessRunner: Sendable {
         process.standardOutput = FileHandle.standardOutput
         process.standardError = FileHandle.standardError
 
-        // Wait for termination asynchronously
+        // Launch process — if run() throws, the process never started
+        try process.run()
+
+        // Wait for termination asynchronously.
+        // Foundation guarantees terminationHandler fires even if the process
+        // already exited before the handler was set.
         typealias TermResult = (Int32, Process.TerminationReason)
-        let (exitCode, terminationReason): TermResult = try await withCheckedThrowingContinuation { continuation in
+        let (status, reason) = await withCheckedContinuation { (continuation: CheckedContinuation<TermResult, Never>) in
             process.terminationHandler = { proc in
                 continuation.resume(returning: (proc.terminationStatus, proc.terminationReason))
             }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
-            }
         }
 
-        // Check for crash / non-zero exit
-        if terminationReason == .uncaughtSignal {
-            return .crashed(exitCode: exitCode, signal: exitCode)
+        // Check for crash / non-zero exit.
+        // When terminated by a signal, terminationStatus holds the signal number.
+        if reason == .uncaughtSignal {
+            return .crashed(exitCode: -1, signal: status)
         }
-        if exitCode != 0 {
-            return .crashed(exitCode: exitCode, signal: nil)
+        if status != 0 {
+            return .crashed(exitCode: status, signal: nil)
         }
 
         // Read output JSON
