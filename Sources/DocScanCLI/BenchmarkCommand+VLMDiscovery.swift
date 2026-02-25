@@ -5,33 +5,39 @@ import Foundation
 // MARK: - VLM Discovery & Recommendation
 
 extension BenchmarkCommand {
-    /// Resolve VLM models by querying HuggingFace for the given model family,
-    /// or return a single concrete model if one is specified (contains `/`).
+    /// Resolve VLM models to benchmark. Accepts either a concrete HuggingFace
+    /// model ID (e.g. "mlx-community/Qwen2-VL-2B-Instruct-4bit") or a family
+    /// name (e.g. "Qwen3-VL") that triggers a HuggingFace discovery search.
     /// Uses `--family` if provided, otherwise prompts interactively.
-    func resolveVLMFamily(apiToken: String?) async throws -> [String] {
+    func resolveVLMModels(apiToken: String?) async throws -> [String] {
+        let noInputMessage = "No VLM model or family provided."
         let name: String
         if let family {
             let trimmed = family.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else {
-                print("No model family provided.")
+                print(noInputMessage)
                 throw ExitCode.failure
             }
             name = trimmed
         } else {
-            guard let input = TerminalUtils.prompt(
+            guard let raw = TerminalUtils.prompt(
                 "Enter VLM model family (e.g. Qwen3-VL, FastVLM) or a concrete model:"
-            ), !input.trimmingCharacters(in: .whitespaces).isEmpty else {
-                print("No model family provided.")
+            ) else {
+                print(noInputMessage)
                 throw ExitCode.failure
             }
-            name = input.trimmingCharacters(in: .whitespaces)
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else {
+                print(noInputMessage)
+                throw ExitCode.failure
+            }
+            name = trimmed
         }
 
-        // A concrete model contains a "/" (e.g. "mlx-community/Qwen2-VL-2B-Instruct-4bit")
-        if name.contains("/") {
+        if let resolved = VLMModelResolver.resolveImmediate(name) {
             print("Using concrete model: \(name)")
             print()
-            return [name]
+            return resolved
         }
 
         print("Searching HuggingFace for MLX-compatible VLMs matching \"\(name)\"...")

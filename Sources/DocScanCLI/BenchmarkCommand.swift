@@ -3,7 +3,7 @@ import DocScanCore
 import Foundation
 
 /// Shared context for benchmark phases, grouping the common dependencies.
-struct BenchmarkContext {
+struct BenchmarkContext: Sendable {
     let runner: SubprocessRunner
     let engine: BenchmarkEngine
     let pdfSet: BenchmarkPDFSet
@@ -55,7 +55,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
 
         let timeout = promptTimeoutSelection()
         let apiToken = try promptHuggingFaceCredentials(configuration: configuration)
-        let vlmModels = try await resolveVLMFamily(apiToken: apiToken)
+        let vlmModels = try await resolveVLMModels(apiToken: apiToken)
 
         let runner = SubprocessRunner()
         defer { runner.cleanup() }
