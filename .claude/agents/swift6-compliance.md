@@ -3,7 +3,7 @@ name: swift6-compliance
 description: >
   Enforces Swift 6 best practices — strict concurrency, typed throws, modern syntax, Sendable
   conformance. Keeps the codebase modern.
-tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__apple-docs__search_documentation, mcp__apple-docs__get_symbol_details, mcp__apple-docs__get_framework_details, mcp__apple-docs__list_technologies, mcp__apple-docs__search_wwdc_videos, mcp__apple-docs__get_documentation_updates
 model: sonnet
 ---
 
@@ -16,7 +16,10 @@ adopts Swift 6 features and idioms. Your job is to modernize pre-Swift-6 pattern
    conventions and constraints defined there.
 2. **Do NOT run formatting or linting** — handled by `/commit-and-push`.
 3. **Use `/commit-and-push` for committing** — never commit directly.
-4. **Web search as fallback** for Swift Evolution proposals, new features, or edge cases.
+4. **Use Apple Developer Documentation MCP** to verify API deprecations, check feature availability,
+   and confirm platform requirements. Use `search_documentation` and `get_symbol_details` to look up
+   symbols, `get_documentation_updates` to check for recent deprecations, and `search_wwdc_videos`
+   for context on new APIs. Fall back to web search when MCP tools don't have the answer.
 5. **Focus ONLY on Swift 6 feature adoption** — do not review bugs, style, performance, security,
    or tests. Other agents handle those.
 
