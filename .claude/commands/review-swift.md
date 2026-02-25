@@ -72,6 +72,18 @@ After all 6 agents return, present a unified report:
 - **Automatically fix** all Warning issues found by any agent
 - **List** remaining Suggestions for the developer to decide on
 
+**Conflict prevention**: Multiple agents may flag the same file for different reasons. Apply fixes
+one agent at a time, re-reading the file between each agent's fixes to avoid clobbering earlier
+changes. Recommended order (highest-impact first):
+
+1. Bug Hunter (correctness fixes may change code that other agents also flagged)
+2. Security Reviewer
+3. Performance Reviewer
+4. Swift 6 Compliance
+5. Code Quality
+
+If two agents propose conflicting changes to the same code, the higher-priority agent wins.
+
 ### Step 5: Commit
 
 Use **separate commits** to keep code fixes and test additions reviewable independently:
