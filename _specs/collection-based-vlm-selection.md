@@ -68,6 +68,6 @@ The HuggingFace API returns models sorted by downloads (most popular first). The
 - [ ] `make lint` passes with 0 violations
 
 ## Open Questions
-- Should there be a `--limit` option to cap the number of discovered models (e.g., `--limit 5` to only test the top 5 by downloads)?
-- Should gated models be silently filtered out, or should they appear in the list with a warning that they may fail without a HuggingFace token?
-- Should the search also include the `"mlx-community/"` namespace prefix automatically (e.g., searching "mlx-community Qwen3-VL") to prioritize community-converted MLX models, or rely purely on the `mlx` tag filter?
+- Should there be a `--limit` option to cap the number of discovered models (e.g., `--limit 5` to only test the top 5 by downloads)? yes. default should be 25 to avoid overwhelming users with too many variants, but allow power users to test more if desired.
+- Should gated models be silently filtered out, or should they appear in the list with a warning that they may fail without a HuggingFace token? No. But add a comment that they are gated and would need manual interaction.
+- Should the search also include the `"mlx-community/"` namespace prefix automatically (e.g., searching "mlx-community Qwen3-VL") to prioritize community-converted MLX models, or rely purely on the `mlx` tag filter? No, it should not. Think about FastVLM, which is not in mlx-community and still interesting and MLX compatible. So better rely on the mlx filter tag.
