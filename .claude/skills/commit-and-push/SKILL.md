@@ -237,6 +237,10 @@ git pull --rebase origin $(git branch --show-current)
 git push
 ```
 
+**Branch name already exists on remote**
+
+Pick a more specific name or append a suffix (e.g. `fix/resolve-date-extraction-2`).
+
 **Merge conflict after rebase**
 
 ```bash
