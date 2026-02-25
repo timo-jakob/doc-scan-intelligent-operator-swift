@@ -64,7 +64,10 @@ Verify presence of:
 
 For each test gap found:
 1. **Write the missing test(s)** — follow the project's existing test patterns
-2. **Run `swift test --filter <TestName>`** to verify they pass
+2. **Run tests via xcodebuild** (never `swift test` — see CLAUDE.md) to verify they pass:
+   ```bash
+   xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' test -only-testing:<TestName>
+   ```
 3. **Report**: what was untested, what tests were added, what they verify
 
 ## Output Format
