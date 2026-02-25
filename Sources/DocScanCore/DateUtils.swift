@@ -93,8 +93,12 @@ public enum DateUtils {
 
     /// Cached year regex for German month/year parsing.
     /// NSRegularExpression is used instead of Swift Regex because Regex is not Sendable in Swift 6.
-    private static let yearRegex: NSRegularExpression = // swiftlint:disable:next force_try
-        try! NSRegularExpression(pattern: "\\b(20\\d{2})\\b")
+    private static let yearRegex: NSRegularExpression = {
+        guard let regex = try? NSRegularExpression(pattern: "\\b(20\\d{2})\\b") else {
+            preconditionFailure("Invalid regex pattern for yearRegex")
+        }
+        return regex
+    }()
 
     /// Cached word-boundary regexes for German month name matching (one per month name)
     private static let germanMonthRegexes: [(String, NSRegularExpression)] = germanMonthNames.compactMap { month in
