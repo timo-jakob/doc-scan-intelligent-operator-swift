@@ -5,7 +5,8 @@ import Foundation
 // MARK: - VLM Discovery & Recommendation
 
 extension BenchmarkCommand {
-    /// Resolve VLM models by querying HuggingFace for the given model family.
+    /// Resolve VLM models by querying HuggingFace for the given model family,
+    /// or return a single concrete model if one is specified (contains `/`).
     /// Uses `--family` if provided, otherwise prompts interactively.
     func resolveVLMFamily(apiToken: String?) async throws -> [String] {
         let name: String
@@ -18,12 +19,19 @@ extension BenchmarkCommand {
             name = trimmed
         } else {
             guard let input = TerminalUtils.prompt(
-                "Enter VLM model family (e.g. Qwen3-VL, FastVLM):"
+                "Enter VLM model family (e.g. Qwen3-VL, FastVLM) or a concrete model:"
             ), !input.trimmingCharacters(in: .whitespaces).isEmpty else {
                 print("No model family provided.")
                 throw ExitCode.failure
             }
             name = input.trimmingCharacters(in: .whitespaces)
+        }
+
+        // A concrete model contains a "/" (e.g. "mlx-community/Qwen2-VL-2B-Instruct-4bit")
+        if name.contains("/") {
+            print("Using concrete model: \(name)")
+            print()
+            return [name]
         }
 
         print("Searching HuggingFace for MLX-compatible VLMs matching \"\(name)\"...")

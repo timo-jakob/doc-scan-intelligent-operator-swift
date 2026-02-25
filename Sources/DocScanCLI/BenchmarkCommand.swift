@@ -29,7 +29,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to configuration file")
     var config: String?
 
-    @Option(name: .long, help: "VLM model family to benchmark (e.g. Qwen3-VL, FastVLM)")
+    @Option(name: .long, help: "VLM model family (e.g. Qwen3-VL) or a concrete model ID")
     var family: String?
 
     @Option(name: .long, help: "Maximum number of VLM models to discover (default: 25)")
