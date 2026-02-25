@@ -1,7 +1,7 @@
 # Collection-Based VLM Model Selection
 
 ## Overview
-Replace the hardcoded VLM model list with dynamic discovery from HuggingFace. The user specifies a model family name (e.g., "Qwen3-VL", "FastVLM") and the benchmark automatically discovers all MLX-compatible VLM variants in that family, then benchmarks them. This makes model selection flexible and always up-to-date without maintaining a curated list.
+Replace the hardcoded VLM model list with dynamic discovery from HuggingFace. The user specifies a model family name (e.g., "Qwen3-VL", "FastVLM") either via CLI option or interactively at runtime, and the benchmark automatically discovers all MLX-compatible VLM variants in that family, then benchmarks them. This makes model selection flexible and always up-to-date without maintaining a curated list.
 
 ## Goals
 - Let the user specify a model family/collection name via CLI to control which VLM models are benchmarked
@@ -20,6 +20,7 @@ Replace the hardcoded VLM model list with dynamic discovery from HuggingFace. Th
 - As a developer, I want to benchmark all Qwen3-VL variants by running `docscan benchmark pos/ neg/ --collection Qwen3-VL` so that I can find the best model in that family for my use case.
 - As a developer, I want to benchmark Apple's FastVLM models by specifying `--collection FastVLM` so that I can evaluate a new model family without editing any config files.
 - As a developer, I want the benchmark to automatically find all MLX-compatible VLM variants in a family so that I don't need to manually look up and list model IDs.
+- As a developer, I want to be prompted for a model family interactively when I don't pass `--collection` so that I can start the benchmark quickly and decide the family at runtime.
 
 ## Proposed Solution
 
@@ -36,7 +37,8 @@ Add a new `--collection` CLI option to the benchmark command. When provided, the
 The HuggingFace API returns models sorted by downloads (most popular first). The `pipeline_tag=image-text-to-text` filter ensures only vision-language models are returned. The post-filter on the `"mlx"` tag ensures MLX compatibility since the search query alone may return non-MLX results.
 
 **CLI interface:**
-- `--collection <name>` — required argument specifying the model family (e.g., "Qwen3-VL", "FastVLM", "InternVL2")
+- `--collection <name>` — optional CLI argument specifying the model family (e.g., "Qwen3-VL", "FastVLM", "InternVL2")
+- If `--collection` is omitted, the user is prompted interactively when Phase A begins: `"Enter VLM model family/collection (e.g. Qwen3-VL, FastVLM): "`
 - The existing `--vlm-models` config override is removed along with `DefaultModelLists.vlmModels`
 
 **What gets removed:**
@@ -46,14 +48,16 @@ The HuggingFace API returns models sorted by downloads (most popular first). The
 
 ### Key Decisions
 - Use the HuggingFace model search API (`/api/models?search=...`) rather than the Collections API (`/api/collections/{slug}`) because search is simpler (no collection hex ID needed), works with any keyword, and doesn't require model families to have a curated HuggingFace collection page
-- `--collection` is required for VLM benchmarking (no default fallback) — this makes the user's intent explicit and avoids silently benchmarking a large default set
+- `--collection` is optional on the CLI but the collection name is always required — if omitted, the user is prompted interactively before Phase A starts, keeping the workflow flexible for both scripted and interactive use
 - Filter by both `pipeline_tag=image-text-to-text` (server-side) and `tags` containing `"mlx"` (client-side) for reliable results — the search query alone is not a precise filter
 - Sort by downloads descending so the most popular/tested variants appear first in the benchmark run
 
 ## Acceptance Criteria
 - [ ] `docscan benchmark pos/ neg/ --collection Qwen3-VL` discovers and benchmarks all MLX VLM models matching "Qwen3-VL"
 - [ ] `docscan benchmark pos/ neg/ --collection FastVLM` discovers and benchmarks all MLX VLM models matching "FastVLM"
-- [ ] The `--collection` option is required — omitting it produces a clear error message
+- [ ] If `--collection` is omitted, the user is prompted interactively for a model family name before Phase A begins
+- [ ] The interactive prompt accepts free-text input and trims whitespace
+- [ ] If the user provides empty input at the interactive prompt, the benchmark exits with a clear error
 - [ ] Discovered models are printed before benchmarking starts (so the user sees what will be tested)
 - [ ] If no models are found for the given collection name, the benchmark exits with a clear error
 - [ ] `DefaultModelLists.vlmModels` and the hardcoded VLM model list are removed
