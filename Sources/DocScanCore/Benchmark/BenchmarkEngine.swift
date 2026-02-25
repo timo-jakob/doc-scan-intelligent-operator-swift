@@ -1,4 +1,4 @@
-@preconcurrency import Dispatch // TODO: Remove when DispatchWorkItem is Sendable-annotated
+@preconcurrency import Dispatch // Remove when DispatchWorkItem is Sendable-annotated
 import Foundation
 import MLX
 

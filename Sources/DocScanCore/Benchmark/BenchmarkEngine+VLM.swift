@@ -1,4 +1,4 @@
-@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
 import Foundation
 
 // MARK: - VLM Benchmark
