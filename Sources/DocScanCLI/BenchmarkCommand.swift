@@ -2,6 +2,15 @@ import ArgumentParser
 import DocScanCore
 import Foundation
 
+/// Shared context for benchmark phases, grouping the common dependencies.
+struct BenchmarkContext {
+    let runner: SubprocessRunner
+    let engine: BenchmarkEngine
+    let pdfSet: BenchmarkPDFSet
+    let configuration: Configuration
+    let timeoutSeconds: TimeInterval
+}
+
 struct BenchmarkCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "benchmark",
@@ -20,10 +29,21 @@ struct BenchmarkCommand: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to configuration file")
     var config: String?
 
+    @Option(name: .long, help: "VLM model family to benchmark (e.g. Qwen3-VL, FastVLM)")
+    var family: String?
+
+    @Option(name: .long, help: "Maximum number of VLM models to discover (default: 25)")
+    var limit: Int = 25
+
     @Flag(name: .shortAndLong, help: "Enable verbose output")
     var verbose: Bool = false
 
     func run() async throws {
+        guard limit > 0, limit <= 1000 else {
+            print("Error: --limit must be between 1 and 1000.")
+            throw ExitCode.failure
+        }
+
         let documentType = type
         var configuration = try loadConfiguration()
         configuration.verbose = verbose
@@ -34,20 +54,19 @@ struct BenchmarkCommand: AsyncParsableCommand {
         let pdfSet = try enumerateAndValidate(engine: engine)
 
         let timeout = promptTimeoutSelection()
-        _ = try promptHuggingFaceCredentials(configuration: configuration)
+        let apiToken = try promptHuggingFaceCredentials(configuration: configuration)
+        let vlmModels = try await resolveVLMFamily(apiToken: apiToken)
 
         let runner = SubprocessRunner()
         defer { runner.cleanup() }
 
-        let vlmResults = try await runPhaseA(
+        let context = BenchmarkContext(
             runner: runner, engine: engine, pdfSet: pdfSet,
             configuration: configuration, timeoutSeconds: timeout
         )
 
-        let textLLMResults = try await runPhaseB(
-            runner: runner, engine: engine, pdfSet: pdfSet,
-            configuration: configuration, timeoutSeconds: timeout
-        )
+        let vlmResults = try await runPhaseA(context: context, vlmModels: vlmModels)
+        let textLLMResults = try await runPhaseB(context: context)
 
         try promptRecommendation(
             vlmResults: vlmResults, textLLMResults: textLLMResults, configuration: configuration
@@ -154,71 +173,8 @@ struct BenchmarkCommand: AsyncParsableCommand {
             return stored
         }
 
-        // Not critical for benchmark — models are from hardcoded lists
+        // Not critical — gated models will be annotated but may fail without a token
         return nil
-    }
-
-    /// Prompt to update config with best VLM + best TextLLM
-    private func promptRecommendation(
-        vlmResults: [VLMBenchmarkResult],
-        textLLMResults: [TextLLMBenchmarkResult],
-        configuration: Configuration
-    ) throws {
-        printBenchmarkPhaseHeader("Recommendation", title: "Best Models")
-
-        let bestVLM = bestQualifyingResult(from: vlmResults)
-        let bestTextLLM = bestQualifyingResult(from: textLLMResults)
-
-        printBestModel(label: "VLM", result: bestVLM)
-        printBestModel(label: "TextLLM", result: bestTextLLM)
-        print()
-
-        guard let vlm = bestVLM, let text = bestTextLLM else { return }
-
-        if vlm.modelName == configuration.modelName,
-           text.modelName == configuration.textModelName {
-            print("Current configuration already uses the best models.")
-            return
-        }
-
-        try promptConfigUpdate(
-            bestVLMName: vlm.modelName, bestTextLLMName: text.modelName, configuration: configuration
-        )
-    }
-
-    private func bestQualifyingResult<T: BenchmarkResultProtocol>(from results: [T]) -> T? {
-        results.rankedByScore().first
-    }
-
-    private func printBestModel(label: String, result: (some BenchmarkResultProtocol)?) {
-        if let result {
-            print("Best \(label): \(result.modelName) (\(TerminalUtils.formatPercent(result.score)))")
-        } else {
-            print("Best \(label): No qualifying results")
-        }
-    }
-
-    private func promptConfigUpdate(
-        bestVLMName: String, bestTextLLMName: String, configuration: Configuration
-    ) throws {
-        guard let choice = TerminalUtils.menu(
-            "Would you like to update your configuration?",
-            options: [
-                "Update config to use best VLM + best TextLLM",
-                "Keep current configuration",
-            ]
-        ), choice == 0 else {
-            print("Keeping current configuration.")
-            return
-        }
-
-        var newConfig = configuration
-        newConfig.modelName = bestVLMName
-        newConfig.textModelName = bestTextLLMName
-
-        let path = config ?? Configuration.defaultConfigPath
-        try newConfig.save(to: path)
-        print("Configuration saved to \(path)")
     }
 
     // MARK: - Subprocess Worker Helpers

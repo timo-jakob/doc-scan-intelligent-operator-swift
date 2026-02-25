@@ -56,26 +56,23 @@ public struct OutputSettings: Codable, Equatable, Sendable {
 /// Benchmark-related settings for model evaluation
 ///
 /// - Note: This struct's synthesized `Codable` uses its own property names as keys
-///   (`vlmModels`, `textLLMModels`). When serialized as part of `Configuration`,
+///   (`textLLMModels`). When serialized as part of `Configuration`,
 ///   the parent's custom `encode(to:)`/`init(from:)` maps these to the flat YAML
-///   keys `benchmarkVLMModels` and `benchmarkTextLLMModels` for backward compatibility.
+///   key `benchmarkTextLLMModels` for backward compatibility.
+///   VLM models are discovered dynamically via `--family` (see `HuggingFaceClient`).
+///   Legacy `benchmarkVLMModels` keys in existing YAML files are silently ignored.
 public struct BenchmarkSettings: Codable, Equatable, Sendable {
     /// Hugging Face username (for model discovery)
     public var huggingFaceUsername: String?
-
-    /// Override VLM model list for benchmarking (nil = use DefaultModelLists.vlmModels)
-    public var vlmModels: [String]?
 
     /// Override TextLLM model list for benchmarking (nil = use DefaultModelLists.textLLMModels)
     public var textLLMModels: [String]?
 
     public init(
         huggingFaceUsername: String? = nil,
-        vlmModels: [String]? = nil,
         textLLMModels: [String]? = nil
     ) {
         self.huggingFaceUsername = huggingFaceUsername
-        self.vlmModels = vlmModels
         self.textLLMModels = textLLMModels
     }
 }
@@ -179,7 +176,7 @@ public struct Configuration: Codable, Equatable, Sendable {
         case modelName, textModelName, modelCacheDir
         case maxTokens, temperature, pdfDPI
         case verbose, output, huggingFaceUsername
-        case benchmarkVLMModels, benchmarkTextLLMModels
+        case benchmarkTextLLMModels
     }
 
     public init(from decoder: Decoder) throws {
@@ -201,11 +198,9 @@ public struct Configuration: Codable, Equatable, Sendable {
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
         let hfUsername = try container.decodeIfPresent(String.self, forKey: .huggingFaceUsername)
-        let vlmModels = try container.decodeIfPresent([String].self, forKey: .benchmarkVLMModels)
         let textLLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
         benchmark = BenchmarkSettings(
             huggingFaceUsername: hfUsername,
-            vlmModels: vlmModels,
             textLLMModels: textLLMModels
         )
     }
@@ -221,7 +216,6 @@ public struct Configuration: Codable, Equatable, Sendable {
         try container.encode(verbose, forKey: .verbose)
         try container.encode(output, forKey: .output)
         try container.encodeIfPresent(benchmark.huggingFaceUsername, forKey: .huggingFaceUsername)
-        try container.encodeIfPresent(benchmark.vlmModels, forKey: .benchmarkVLMModels)
         try container.encodeIfPresent(benchmark.textLLMModels, forKey: .benchmarkTextLLMModels)
     }
 

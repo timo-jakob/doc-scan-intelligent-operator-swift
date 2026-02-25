@@ -11,17 +11,19 @@ final class HuggingFaceClientTests: XCTestCase {
 
     // MARK: - URL Construction
 
-    func testSearchRequestUsesCorrectBaseURL() async throws {
-        let models = [MockURLSession.makeModel(id: "test/model")]
+    func testFamilySearchUsesCorrectURL() async throws {
+        let models = [MockURLSession.makeModel(id: "test/model", tags: ["mlx"])]
         try mockSession.setMockModels(models)
 
         let client = HuggingFaceClient(session: mockSession)
-        _ = try await client.searchVLMModels()
+        _ = try await client.searchVLMFamily("Qwen3-VL")
 
         XCTAssertEqual(mockSession.requestHistory.count, 1)
         let url = try XCTUnwrap(mockSession.requestHistory[0].url).absoluteString
         XCTAssertTrue(url.hasPrefix("https://huggingface.co/api/models"))
         XCTAssertTrue(url.contains("sort=downloads"))
+        XCTAssertTrue(url.contains("pipeline_tag=image-text-to-text"))
+        XCTAssertTrue(url.contains("Qwen3-VL"))
     }
 
     // MARK: - Auth Header
@@ -29,7 +31,7 @@ final class HuggingFaceClientTests: XCTestCase {
     func testAuthHeaderWithToken() async throws {
         try mockSession.setMockModels([])
         let client = HuggingFaceClient(session: mockSession, apiToken: "hf_test_token")
-        _ = try await client.searchVLMModels()
+        _ = try await client.searchVLMFamily("test")
 
         let authHeader = mockSession.requestHistory[0].value(forHTTPHeaderField: "Authorization")
         XCTAssertEqual(authHeader, "Bearer hf_test_token")
@@ -38,28 +40,123 @@ final class HuggingFaceClientTests: XCTestCase {
     func testNoAuthHeaderWithoutToken() async throws {
         try mockSession.setMockModels([])
         let client = HuggingFaceClient(session: mockSession, apiToken: nil)
-        _ = try await client.searchVLMModels()
+        _ = try await client.searchVLMFamily("test")
 
         let authHeader = mockSession.requestHistory[0].value(forHTTPHeaderField: "Authorization")
         XCTAssertNil(authHeader)
     }
 
-    // MARK: - VLM Search
+    // MARK: - VLM Family Search
 
-    func testVLMSearchParsesModels() async throws {
+    func testFamilySearchParsesModels() async throws {
         let models = [
-            MockURLSession.makeModel(id: "org/vlm-2b", downloads: 500),
-            MockURLSession.makeModel(id: "org/vlm-7b", downloads: 300),
+            MockURLSession.makeModel(id: "org/vlm-2b", downloads: 500, tags: ["mlx", "image-text-to-text"]),
+            MockURLSession.makeModel(id: "org/vlm-7b", downloads: 300, tags: ["mlx", "image-text-to-text"]),
         ]
         try mockSession.setMockModels(models)
 
         let client = HuggingFaceClient(session: mockSession)
-        let results = try await client.searchVLMModels()
+        let results = try await client.searchVLMFamily("test-vlm")
 
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0].modelId, "org/vlm-2b")
         XCTAssertEqual(results[0].downloads, 500)
         XCTAssertEqual(results[1].modelId, "org/vlm-7b")
+    }
+
+    func testFamilySearchFiltersNonMLXModels() async throws {
+        let models = [
+            MockURLSession.makeModel(id: "org/mlx-model-a", downloads: 500, tags: ["mlx", "image-text-to-text"]),
+            MockURLSession.makeModel(
+                id: "org/non-mlx-model", downloads: 400,
+                tags: ["transformers", "image-text-to-text"]
+            ),
+            MockURLSession.makeModel(id: "org/mlx-model-b", downloads: 300, tags: ["mlx", "safetensors"]),
+        ]
+        try mockSession.setMockModels(models)
+
+        let client = HuggingFaceClient(session: mockSession)
+        let results = try await client.searchVLMFamily("test")
+
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].modelId, "org/mlx-model-a")
+        XCTAssertEqual(results[1].modelId, "org/mlx-model-b")
+    }
+
+    func testFamilySearchFiltersModelsWithNilTags() async throws {
+        let models = [
+            MockURLSession.makeModel(id: "org/tagged-model", downloads: 500, tags: ["mlx"]),
+            MockURLSession.makeModel(id: "org/untagged-model", downloads: 400, tags: nil),
+        ]
+        try mockSession.setMockModels(models)
+
+        let client = HuggingFaceClient(session: mockSession)
+        let results = try await client.searchVLMFamily("test")
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].modelId, "org/tagged-model")
+    }
+
+    func testFamilySearchOverFetchesToCompensateForFiltering() async throws {
+        try mockSession.setMockModels([])
+
+        let client = HuggingFaceClient(session: mockSession)
+        _ = try await client.searchVLMFamily("test", limit: 10)
+
+        // API receives limit * 3 to compensate for client-side MLX filtering
+        let url = try XCTUnwrap(mockSession.requestHistory[0].url).absoluteString
+        XCTAssertTrue(url.contains("limit=30"))
+    }
+
+    func testFamilySearchUsesDefaultLimitOf25() async throws {
+        try mockSession.setMockModels([])
+
+        let client = HuggingFaceClient(session: mockSession)
+        _ = try await client.searchVLMFamily("test")
+
+        // Default limit=25, over-fetched to 75
+        let url = try XCTUnwrap(mockSession.requestHistory[0].url).absoluteString
+        XCTAssertTrue(url.contains("limit=75"))
+    }
+
+    func testFamilySearchTruncatesResultsToRequestedLimit() async throws {
+        let models = (0 ..< 10).map { idx in
+            MockURLSession.makeModel(id: "org/model-\(idx)", downloads: 100 - idx, tags: ["mlx"])
+        }
+        try mockSession.setMockModels(models)
+
+        let client = HuggingFaceClient(session: mockSession)
+        let results = try await client.searchVLMFamily("test", limit: 3)
+
+        XCTAssertEqual(results.count, 3)
+    }
+
+    func testFamilySearchRetainsGatedModelsWithCorrectFlag() async throws {
+        let models = [
+            MockURLSession.makeModel(id: "org/open-model", tags: ["mlx"], gated: .bool(false)),
+            MockURLSession.makeModel(id: "org/gated-model", tags: ["mlx"], gated: .string("auto")),
+        ]
+        try mockSession.setMockModels(models)
+
+        let client = HuggingFaceClient(session: mockSession)
+        let results = try await client.searchVLMFamily("test")
+
+        XCTAssertEqual(results.count, 2)
+        XCTAssertFalse(results[0].isGated)
+        XCTAssertTrue(results[1].isGated)
+    }
+
+    func testFamilySearchWithEmptyStringReturnsResults() async throws {
+        let models = [
+            MockURLSession.makeModel(id: "org/some-model", tags: ["mlx"]),
+        ]
+        try mockSession.setMockModels(models)
+
+        let client = HuggingFaceClient(session: mockSession)
+        let results = try await client.searchVLMFamily("")
+
+        // Empty query is sent to the API; results depend on what the API returns
+        XCTAssertEqual(results.count, 1)
     }
 
     // MARK: - Text Search
@@ -116,7 +213,7 @@ final class HuggingFaceClientTests: XCTestCase {
         let client = HuggingFaceClient(session: mockSession)
 
         do {
-            _ = try await client.searchVLMModels()
+            _ = try await client.searchVLMFamily("test")
             XCTFail("Expected error to be thrown")
         } catch let error as DocScanError {
             if case let .networkError(msg) = error {
@@ -138,7 +235,7 @@ final class HuggingFaceClientTests: XCTestCase {
         let client = HuggingFaceClient(session: mockSession)
 
         do {
-            _ = try await client.searchVLMModels()
+            _ = try await client.searchVLMFamily("test")
             XCTFail("Expected error")
         } catch let error as DocScanError {
             if case let .huggingFaceAPIError(msg) = error {
@@ -158,7 +255,7 @@ final class HuggingFaceClientTests: XCTestCase {
         let client = HuggingFaceClient(session: mockSession)
 
         do {
-            _ = try await client.searchVLMModels()
+            _ = try await client.searchVLMFamily("test")
             XCTFail("Expected error")
         } catch let error as DocScanError {
             if case let .huggingFaceAPIError(msg) = error {
@@ -179,7 +276,7 @@ final class HuggingFaceClientTests: XCTestCase {
         let client = HuggingFaceClient(session: mockSession, retryDelays: [0, 0])
 
         do {
-            _ = try await client.searchVLMModels()
+            _ = try await client.searchVLMFamily("test")
             XCTFail("Expected error")
         } catch let error as DocScanError {
             if case let .huggingFaceAPIError(msg) = error {
@@ -200,7 +297,7 @@ final class HuggingFaceClientTests: XCTestCase {
     func testEmptyResultsDoNotCrash() async throws {
         try mockSession.setMockModels([])
         let client = HuggingFaceClient(session: mockSession)
-        let results = try await client.searchVLMModels()
+        let results = try await client.searchVLMFamily("nonexistent")
         XCTAssertTrue(results.isEmpty)
     }
 

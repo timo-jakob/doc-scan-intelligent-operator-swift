@@ -80,10 +80,18 @@ public final class HuggingFaceClient: Sendable {
         self.retryDelays = retryDelays
     }
 
-    /// Search for VLM models on Hugging Face
-    public func searchVLMModels(limit: Int = 10) async throws -> [HFModel] {
-        let query = "mlx VLM instruct 4bit"
-        return try await searchModels(query: query, limit: limit)
+    /// Discover MLX-compatible VLM models in a model family (e.g. "Qwen3-VL", "FastVLM").
+    ///
+    /// Queries the HuggingFace API with `pipeline_tag=image-text-to-text` and
+    /// post-filters results to those tagged with `"mlx"`. Results are sorted by
+    /// downloads (most popular first).
+    public func searchVLMFamily(_ family: String, limit: Int = 25) async throws -> [HFModel] {
+        // Over-fetch to compensate for client-side MLX filtering
+        let fetchLimit = limit * 3
+        let allModels = try await searchModels(
+            query: family, limit: fetchLimit, pipelineTag: "image-text-to-text"
+        )
+        return Array(allModels.filter { $0.tags?.contains("mlx") == true }.prefix(limit))
     }
 
     /// Search for text LLM models on Hugging Face
@@ -110,10 +118,17 @@ public final class HuggingFaceClient: Sendable {
 
     // MARK: - Private
 
-    private func searchModels(query: String, limit: Int) async throws -> [HFModel] {
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let path = "models?search=\(encodedQuery)&sort=downloads&direction=-1&limit=\(limit)"
-        return try await fetchJSON(path: path)
+    private func searchModels(query: String, limit: Int, pipelineTag: String? = nil) async throws -> [HFModel] {
+        var queryItems = [
+            URLQueryItem(name: "search", value: query),
+            URLQueryItem(name: "sort", value: "downloads"),
+            URLQueryItem(name: "direction", value: "-1"),
+            URLQueryItem(name: "limit", value: "\(limit)"),
+        ]
+        if let tag = pipelineTag {
+            queryItems.append(URLQueryItem(name: "pipeline_tag", value: tag))
+        }
+        return try await fetchJSON(path: "models", queryItems: queryItems)
     }
 
     private func fetchModel(_ modelId: String) async throws -> HFModel {
@@ -121,9 +136,17 @@ public final class HuggingFaceClient: Sendable {
         return try await fetchJSON(path: "models/\(encodedId)")
     }
 
-    private func fetchJSON<T: Decodable>(path: String) async throws -> T {
+    private func fetchJSON<T: Decodable>(
+        path: String, queryItems: [URLQueryItem] = []
+    ) async throws -> T {
         let urlString = "\(baseURL)/\(path)"
-        guard let url = URL(string: urlString) else {
+        guard var components = URLComponents(string: urlString) else {
+            throw DocScanError.huggingFaceAPIError("Invalid URL: \(urlString)")
+        }
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+        guard let url = components.url else {
             throw DocScanError.huggingFaceAPIError("Invalid URL: \(urlString)")
         }
 
