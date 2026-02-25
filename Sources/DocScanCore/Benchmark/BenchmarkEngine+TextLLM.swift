@@ -42,17 +42,11 @@ public extension BenchmarkEngine {
         }
 
         let startTime = Date()
-        var documentResults: [TextLLMDocumentResult] = []
-
-        for pdfPath in positivePDFs {
-            let result = await benchmarkTextLLMDocument(pdfPath: pdfPath, isPositive: true, context: context)
-            documentResults.append(result)
-        }
-
-        for pdfPath in negativePDFs {
-            let result = await benchmarkTextLLMDocument(pdfPath: pdfPath, isPositive: false, context: context)
-            documentResults.append(result)
-        }
+        let documentResults = await processTextLLMDocuments(
+            positivePDFs: positivePDFs,
+            negativePDFs: negativePDFs,
+            context: context
+        )
 
         let elapsedSeconds = Date().timeIntervalSince(startTime)
         await context.textLLMFactory.releaseTextLLM()
@@ -64,6 +58,48 @@ public extension BenchmarkEngine {
 // MARK: - Private Helpers
 
 private extension BenchmarkEngine {
+    /// Process all documents with two-line progress display (categorization + extraction)
+    func processTextLLMDocuments(
+        positivePDFs: [String],
+        negativePDFs: [String],
+        context: TextLLMBenchmarkContext
+    ) async -> [TextLLMDocumentResult] {
+        var results: [TextLLMDocumentResult] = []
+        var extractionBuffer: [Character] = []
+
+        // Pass 1: Categorization line (real-time)
+        print("    Cat: ✓ ", terminator: "")
+        fflush(stdout)
+        for pdfPath in positivePDFs {
+            let result = await benchmarkTextLLMDocument(pdfPath: pdfPath, isPositive: true, context: context)
+            print(result.categorizationCorrect ? "." : "f", terminator: "")
+            fflush(stdout)
+            if !result.categorizationCorrect {
+                extractionBuffer.append("n")
+            } else {
+                extractionBuffer.append(result.extractionCorrect ? "." : "f")
+            }
+            results.append(result)
+        }
+
+        print("  ✗ ", terminator: "")
+        fflush(stdout)
+        for pdfPath in negativePDFs {
+            let result = await benchmarkTextLLMDocument(pdfPath: pdfPath, isPositive: false, context: context)
+            print(result.categorizationCorrect ? "." : "f", terminator: "")
+            fflush(stdout)
+            results.append(result)
+        }
+        print("")
+
+        // Pass 2: Extraction line (from buffer)
+        if !extractionBuffer.isEmpty {
+            print("    Ext: ✓ \(String(extractionBuffer))")
+        }
+
+        return results
+    }
+
     /// Release previous model, check memory, preload new model. Returns a disqualified result on failure.
     func prepareTextLLM(
         modelName: String,
