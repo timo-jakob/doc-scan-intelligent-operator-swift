@@ -29,8 +29,11 @@ Use this skill to wrap up a completed task: format, lint, commit, and push — a
 ### Step 1: Ensure we are on a feature branch (never `main`)
 
 ```bash
+git status
 git branch --show-current
 ```
+
+Review `git status` to surface any ambiguous local state (merge in progress, untracked files, etc.) before proceeding.
 
 **If the output is `main`:** automatically create and switch to a new branch. Determine the branch name from context (what was changed and why):
 
