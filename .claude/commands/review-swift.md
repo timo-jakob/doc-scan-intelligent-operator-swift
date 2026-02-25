@@ -16,7 +16,19 @@ Determine which Swift files to review:
 
 Store the file list — you'll pass it to every agent.
 
-### Step 2: Launch All 6 Agents in Parallel
+### Step 2: Build and Capture Compiler Diagnostics
+
+Run a single build before launching any agents. This avoids parallel xcodebuild race conditions
+(Xcode serializes builds per DerivedData directory, so concurrent builds would fail or return stale
+diagnostics).
+
+```bash
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build 2>&1 | tail -80
+```
+
+Capture the full output — you'll include it in the prompt for Bug Hunter and Swift 6 Compliance.
+
+### Step 3: Launch All 6 Agents in Parallel
 
 Launch all 6 agents simultaneously using the **Task tool**. Each agent gets the same file list.
 Use a **single message** with 6 Task tool calls to ensure true parallelism.
@@ -32,12 +44,17 @@ The agents and their `subagent_type` values:
 | Code Quality | `code-quality` | sonnet | Naming, structure, readability |
 | Test Reviewer | `test-reviewer` | sonnet | Coverage, test quality, spec conformance |
 
-For each agent, the prompt should be:
+For each agent, the prompt should include the file list. For **Bug Hunter** and **Swift 6 Compliance**,
+also include the compiler diagnostics captured in Step 2:
+
 ```
 Review the following Swift files for {agent's focus area}: {file list}
+
+Compiler diagnostics (from xcodebuild):
+{build output from Step 2}
 ```
 
-### Step 3: Collect and Present Results
+### Step 4: Collect and Present Results
 
 After all 6 agents return, present a unified report:
 
@@ -66,7 +83,7 @@ After all 6 agents return, present a unified report:
 - Agents with clean results: (list)
 ```
 
-### Step 4: Fix Critical and Warning Issues
+### Step 5: Fix Critical and Warning Issues
 
 **This step is mandatory — do not stop at reporting.** After presenting the unified report,
 automatically fix every finding labelled Critical or Warning across all agents. This skill is
@@ -99,7 +116,7 @@ xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' bu
 If a fix introduces new compiler errors, resolve them immediately before moving on. If the fix
 cannot be reconciled, revert it and report it as a Suggestion for the developer instead.
 
-### Step 5: Commit
+### Step 6: Commit
 
 Use **separate commits** to keep code fixes and test additions reviewable independently:
 

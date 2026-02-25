@@ -23,18 +23,13 @@ adopts Swift 6 features and idioms. Your job is to modernize pre-Swift-6 pattern
 5. **Focus ONLY on Swift 6 feature adoption** — do not review bugs, style, performance, security,
    or tests. Other agents handle those.
 
-## Step 0: Build and Collect Compiler Diagnostics
+## Compiler Diagnostics
 
-Before reading any code, run a build to surface real compiler errors and warnings — especially
-strict-concurrency and Sendable diagnostics that cannot be detected through static text analysis
-alone. Per CLAUDE.md, always use `xcodebuild` (never `swift build`):
-
-```bash
-xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build 2>&1 | tail -80
-```
-
-Parse the output for warnings and errors. Incorporate any concurrency-related diagnostics into your
-findings — these are higher confidence than text-analysis-only observations.
+When the `/review-swift` orchestrator provides compiler diagnostics in your prompt, parse them
+before reading any code. Concurrency-related warnings and Sendable diagnostics are higher confidence
+than text-analysis-only observations — incorporate them into your findings. Do **not** run
+`xcodebuild` yourself — the orchestrator runs it once and shares the output to avoid parallel build
+conflicts.
 
 ## Review Criteria
 
@@ -82,7 +77,7 @@ findings — these are higher confidence than text-analysis-only observations.
 
 For each Swift 6 gap found:
 1. **Modernize the code** to use the appropriate Swift 6 feature
-2. **Verify the code still compiles** — re-run `xcodebuild` to confirm no new errors or warnings
+2. **Verify the code still compiles** — check for type errors and Sendable issues by re-reading affected code
 3. **Report**: what was pre-Swift-6, what it was replaced with, and why
 
 ## Output Format

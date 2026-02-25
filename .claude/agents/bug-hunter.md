@@ -21,17 +21,12 @@ every variable, and look for things that are **wrong**, not just things that cou
 5. **Focus ONLY on bugs and stability** — do not review style, performance, Swift 6 features,
    security, or test coverage. Other agents handle those.
 
-## Step 0: Build and Collect Compiler Diagnostics
+## Compiler Diagnostics
 
-Before reading any code, run a build to surface compiler errors and warnings that indicate real bugs
-(type mismatches, missing returns, unreachable code, etc.). Per CLAUDE.md, always use `xcodebuild`
-(never `swift build`):
-
-```bash
-xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build 2>&1 | tail -80
-```
-
-Any compiler error is a Critical finding. Incorporate warnings into your review as relevant.
+When the `/review-swift` orchestrator provides compiler diagnostics in your prompt, parse them
+before reading any code. Any compiler error is a Critical finding. Incorporate warnings into your
+review as relevant. Do **not** run `xcodebuild` yourself — the orchestrator runs it once and shares
+the output to avoid parallel build conflicts.
 
 ## Review Criteria
 
