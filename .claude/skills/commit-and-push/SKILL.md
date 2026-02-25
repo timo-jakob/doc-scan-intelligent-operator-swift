@@ -229,7 +229,7 @@ Report to the user:
 
 Fix violations in files you modified. If a warning appears in an unrelated file, fix it too — the goal is always 0 violations project-wide.
 
-**Push rejected (remote has new commits)**
+**Push rejected (remote feature branch has new commits)**
 
 ```bash
 git pull --rebase origin $(git branch --show-current)
@@ -241,7 +241,7 @@ git push
 
 Pick a more specific name or append a suffix (e.g. `fix/resolve-date-extraction-2`).
 
-**Merge conflict after rebase**
+**Feature branch is behind `main` (incorporate upstream changes)**
 
 ```bash
 git pull --rebase origin main
