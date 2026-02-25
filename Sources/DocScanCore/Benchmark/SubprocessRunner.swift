@@ -1,4 +1,4 @@
-@preconcurrency import Foundation // TODO: Remove when Process/DispatchWorkItem are Sendable-annotated
+@preconcurrency import Foundation // Remove when Process/DispatchWorkItem are Sendable-annotated
 
 /// Outcome of a single benchmark worker subprocess
 public enum SubprocessResult: Equatable, Sendable {
