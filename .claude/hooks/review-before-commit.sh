@@ -1,7 +1,8 @@
 #!/bin/bash
 # .claude/hooks/review-before-commit.sh
 #
-# Pre-commit quality gate: triggers the swift-code-reviewer subagent
+# Pre-commit quality gate: triggers the /review-swift command
+# (which launches 6 specialized review agents in parallel)
 # when Claude Code is about to commit Swift files.
 #
 # Hook context is passed as JSON via stdin by Claude Code.
@@ -17,7 +18,7 @@ if echo "$COMMAND" | grep -qE '^\s*git\s+commit'; then
   if [[ -n "$STAGED_SWIFT" ]]; then
     FILE_COUNT=$(echo "$STAGED_SWIFT" | wc -l | tr -d ' ')
     echo "⏸️  PRE-COMMIT REVIEW: ${FILE_COUNT} staged Swift file(s) detected."
-    echo "Before committing, use the swift-code-reviewer subagent to review all staged Swift changes."
+    echo "Before committing, run /review-swift to review all staged Swift changes with 6 specialized agents."
     echo "Only proceed with the commit after all 🔴 Critical issues are resolved."
     echo ""
     echo "Staged Swift files:"

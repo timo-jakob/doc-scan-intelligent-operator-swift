@@ -3,25 +3,75 @@ description: Run the Swift code reviewer on all recent changes
 argument-hint: "[optional: specific file or directory to review]"
 ---
 
-## Swift Code Review
+## Swift Code Review — Parallel Agent Orchestrator
 
-Use the **swift-code-reviewer** subagent to perform a comprehensive review of all Swift files that
-have been modified since the last commit.
+Run 6 specialized review agents in parallel for comprehensive Swift code review.
 
-If an argument is provided, scope the review to that file or directory only.
+### Step 1: Determine Review Scope
 
-### Review scope
+Determine which Swift files to review:
+- If a specific path was provided as argument, review only that path
+- Otherwise, run `git diff --name-only -- '*.swift'` and `git diff --staged --name-only -- '*.swift'`
+- If no git changes are found, review all Swift files in `Sources/`
 
-1. Determine which Swift files to review:
-   - If a specific path was provided as argument, review only that path
-   - Otherwise, review all modified Swift files: `git diff --name-only -- '*.swift'` and
-     `git diff --staged --name-only -- '*.swift'`
-   - If no git changes are found, review all Swift files in `Sources/`
+Store the file list — you'll pass it to every agent.
 
-2. Delegate the full review to the **swift-code-reviewer** subagent.
+### Step 2: Launch All 6 Agents in Parallel
 
-3. After the review completes, summarize the findings and:
-   - **Automatically fix** all 🔴 Critical issues
-   - **Automatically fix** all 🟡 Warning issues
-   - **Automatically fix** all auto-fixable linting/formatting issues (`swiftlint --fix`, `swift-format format`)
-   - **List** remaining 🟢 Suggestions for the developer to decide on
+Launch all 6 agents simultaneously using the **Task tool**. Each agent gets the same file list.
+Use a **single message** with 6 Task tool calls to ensure true parallelism.
+
+The agents and their `subagent_type` values:
+
+| Agent | subagent_type | Model | Focus |
+|-------|--------------|-------|-------|
+| Bug Hunter | `bug-hunter` | opus | Bugs, logic errors, crashes, stability |
+| Security Reviewer | `security-reviewer` | sonnet | Vulnerabilities, injection, secrets |
+| Performance Reviewer | `performance-reviewer` | sonnet | Allocations, complexity, retain cycles |
+| Swift 6 Compliance | `swift6-compliance` | sonnet | Strict concurrency, typed throws, modern syntax |
+| Code Quality | `code-quality` | sonnet | Naming, structure, readability |
+| Test Reviewer | `test-reviewer` | sonnet | Coverage, test quality, spec conformance |
+
+For each agent, the prompt should be:
+```
+Review the following Swift files for {agent's focus area}: {file list}
+```
+
+### Step 3: Collect and Present Results
+
+After all 6 agents return, present a unified report:
+
+```
+============================================================
+  SWIFT CODE REVIEW — UNIFIED REPORT
+============================================================
+
+{Bug Hunter results}
+
+{Security Reviewer results}
+
+{Performance Reviewer results}
+
+{Swift 6 Compliance results}
+
+{Code Quality results}
+
+{Test Reviewer results}
+
+============================================================
+  SUMMARY
+============================================================
+- Total findings: N critical, N warnings, N suggestions
+- Agents that found issues: (list)
+- Agents with clean results: (list)
+```
+
+### Step 4: Fix Issues
+
+- **Automatically fix** all Critical issues found by any agent
+- **Automatically fix** all Warning issues found by any agent
+- **List** remaining Suggestions for the developer to decide on
+
+### Step 5: Commit
+
+After fixes are applied, use `/commit-and-push` to format, lint, commit, and push.
