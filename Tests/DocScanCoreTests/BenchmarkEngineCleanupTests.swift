@@ -76,6 +76,39 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
         XCTAssertEqual(size, 0)
     }
 
+    // MARK: - Path Traversal Guard
+
+    func testCleanupSkipsInvalidModelNames() throws {
+        let hubDir = tempDir.appendingPathComponent("hub")
+        try FileManager.default.createDirectory(at: hubDir, withIntermediateDirectories: true)
+
+        // These names would produce path traversal if not guarded
+        let maliciousNames = [
+            "../../../etc",
+            "no-slash",
+            "",
+            "/leading-slash",
+            "org/sub/extra",
+        ]
+
+        // Also include a valid model that should be deleted normally
+        let validDir = hubDir.appendingPathComponent("models--org--valid-model")
+        try FileManager.default.createDirectory(at: validDir, withIntermediateDirectories: true)
+        try "data".write(to: validDir.appendingPathComponent("model.bin"), atomically: true, encoding: .utf8)
+
+        let allNames = maliciousNames + ["org/valid-model"]
+
+        engine.cleanupBenchmarkedModels(
+            modelNames: allNames,
+            keepModel: nil,
+            cachePath: hubDir.path
+        )
+
+        // The valid model should have been deleted
+        XCTAssertFalse(FileManager.default.fileExists(atPath: validDir.path))
+        // No crash from invalid names — they were skipped
+    }
+
     // MARK: - huggingFaceCachePath
 
     func testHuggingFaceCachePathRespectsEnvOverride() {

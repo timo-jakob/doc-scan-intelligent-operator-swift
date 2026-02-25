@@ -8,12 +8,12 @@ extension BenchmarkCommand {
     /// Resolve VLM models to benchmark. Accepts either a concrete HuggingFace
     /// model ID (e.g. "mlx-community/Qwen2-VL-2B-Instruct-4bit") or a family
     /// name (e.g. "Qwen3-VL") that triggers a HuggingFace discovery search.
-    /// Uses `--family` if provided, otherwise prompts interactively.
+    /// Uses `--model` (or `--family`) if provided, otherwise prompts interactively.
     func resolveVLMModels(apiToken: String?) async throws -> [String] {
         let noInputMessage = "No VLM model or family provided."
         let name: String
-        if let family {
-            let trimmed = family.trimmingCharacters(in: .whitespaces)
+        if let model {
+            let trimmed = model.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else {
                 print(noInputMessage)
                 throw ExitCode.failure

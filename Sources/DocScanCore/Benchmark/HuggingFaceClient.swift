@@ -113,7 +113,7 @@ public final class HuggingFaceClient: Sendable {
         components.scheme = "https"
         components.host = "huggingface.co"
         components.path = "/\(modelId)"
-        return components.url?.absoluteString ?? "https://huggingface.co/\(modelId)"
+        return components.url?.absoluteString ?? "https://huggingface.co"
     }
 
     // MARK: - Private

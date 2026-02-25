@@ -28,6 +28,10 @@ public extension BenchmarkEngine {
         let hubCache = cachePath ?? Self.huggingFaceCachePath()
 
         for modelName in toDelete.sorted() {
+            guard VLMModelResolver.isConcreteModel(modelName) else {
+                print("  Skipping invalid model name: \(modelName)")
+                continue
+            }
             // mlx-community/Qwen2-VL-2B-Instruct-4bit → models--mlx-community--Qwen2-VL-2B-Instruct-4bit
             let dirName = "models--" + modelName.replacingOccurrences(of: "/", with: "--")
             let fullPath = (hubCache as NSString).appendingPathComponent(dirName)

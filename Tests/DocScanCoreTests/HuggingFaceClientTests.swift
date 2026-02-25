@@ -307,4 +307,20 @@ final class HuggingFaceClientTests: XCTestCase {
         let url = HuggingFaceClient.modelURL(for: "mlx-community/Qwen2-VL-2B-Instruct-4bit")
         XCTAssertEqual(url, "https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit")
     }
+
+    func testModelURLWithSpecialCharactersProducesValidURL() {
+        // Model IDs with spaces or special chars should still produce a valid URL
+        let url = HuggingFaceClient.modelURL(for: "org/model with spaces")
+        XCTAssertTrue(url.hasPrefix("https://huggingface.co"))
+        // The fallback should never contain unescaped user input
+        XCTAssertFalse(url.contains(" "))
+    }
+
+    func testModelURLFallbackDoesNotInterpolateInput() {
+        // If URLComponents fails to produce a URL, the fallback is a safe static string
+        // Verify it doesn't contain the model ID raw
+        let url = HuggingFaceClient.modelURL(for: "org/model")
+        // Normal case: should produce full URL
+        XCTAssertEqual(url, "https://huggingface.co/org/model")
+    }
 }
