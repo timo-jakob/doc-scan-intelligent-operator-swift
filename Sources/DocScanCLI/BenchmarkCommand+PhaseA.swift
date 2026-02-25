@@ -6,16 +6,15 @@ import Foundation
 extension BenchmarkCommand {
     /// Phase A: Run each VLM model against all documents for categorization scoring.
     /// Each model runs in a subprocess so that MLX fatal errors are contained.
-    func runPhaseA(
+    func runPhaseA( // swiftlint:disable:this function_parameter_count
         runner: SubprocessRunner,
         engine: BenchmarkEngine,
         pdfSet: BenchmarkPDFSet,
+        vlmModels: [String],
         configuration: Configuration,
         timeoutSeconds: TimeInterval
     ) async throws -> [VLMBenchmarkResult] {
         printBenchmarkPhaseHeader("A", title: "VLM Categorization Benchmark")
-
-        let vlmModels = configuration.benchmark.vlmModels ?? DefaultModelLists.vlmModels
         print("Evaluating \(vlmModels.count) VLM model(s)")
         print("Documents: \(pdfSet.positivePDFs.count) positive, \(pdfSet.negativePDFs.count) negative")
         print("Timeout: \(Int(timeoutSeconds))s per inference")

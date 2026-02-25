@@ -21,6 +21,7 @@ extension BenchmarkCommand {
             engine: engine, pdfSet: pdfSet
         )
 
+        // TextLLM models use config or curated defaults (not dynamic discovery like VLM Phase A)
         let textLLMModels = configuration.benchmark.textLLMModels ?? DefaultModelLists.textLLMModels
         print("Evaluating \(textLLMModels.count) TextLLM model(s)")
         print("Documents: \(pdfSet.positivePDFs.count) positive, \(pdfSet.negativePDFs.count) negative")

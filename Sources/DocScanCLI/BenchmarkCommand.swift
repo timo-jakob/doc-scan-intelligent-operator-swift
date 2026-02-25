@@ -20,10 +20,21 @@ struct BenchmarkCommand: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Path to configuration file")
     var config: String?
 
+    @Option(name: .long, help: "VLM model family to benchmark (e.g. Qwen3-VL, FastVLM)")
+    var family: String?
+
+    @Option(name: .long, help: "Maximum number of VLM models to discover (default: 25)")
+    var limit: Int = 25
+
     @Flag(name: .shortAndLong, help: "Enable verbose output")
     var verbose: Bool = false
 
     func run() async throws {
+        guard limit > 0 else {
+            print("Error: --limit must be a positive integer.")
+            throw ExitCode.failure
+        }
+
         let documentType = type
         var configuration = try loadConfiguration()
         configuration.verbose = verbose
@@ -34,13 +45,15 @@ struct BenchmarkCommand: AsyncParsableCommand {
         let pdfSet = try enumerateAndValidate(engine: engine)
 
         let timeout = promptTimeoutSelection()
-        _ = try promptHuggingFaceCredentials(configuration: configuration)
+        let apiToken = try promptHuggingFaceCredentials(configuration: configuration)
+        let vlmModels = try await resolveVLMFamily(apiToken: apiToken)
 
         let runner = SubprocessRunner()
         defer { runner.cleanup() }
 
         let vlmResults = try await runPhaseA(
             runner: runner, engine: engine, pdfSet: pdfSet,
+            vlmModels: vlmModels,
             configuration: configuration, timeoutSeconds: timeout
         )
 
@@ -154,8 +167,43 @@ struct BenchmarkCommand: AsyncParsableCommand {
             return stored
         }
 
-        // Not critical for benchmark — models are from hardcoded lists
+        // Not critical — gated models will be annotated but may fail without a token
         return nil
+    }
+
+    /// Resolve VLM models by querying HuggingFace for the given model family.
+    /// Uses `--family` if provided, otherwise prompts interactively.
+    private func resolveVLMFamily(apiToken: String?) async throws -> [String] {
+        let name: String
+        if let family {
+            name = family
+        } else {
+            guard let input = TerminalUtils.prompt(
+                "Enter VLM model family (e.g. Qwen3-VL, FastVLM):"
+            ), !input.isEmpty else {
+                print("No model family provided.")
+                throw ExitCode.failure
+            }
+            name = input
+        }
+
+        print("Searching HuggingFace for MLX-compatible VLMs matching \"\(name)\"...")
+        let client = HuggingFaceClient(apiToken: apiToken)
+        let models = try await client.searchVLMFamily(name, limit: limit)
+
+        guard !models.isEmpty else {
+            print("No MLX-compatible VLM models found for \"\(name)\".")
+            throw ExitCode.failure
+        }
+
+        print("Found \(models.count) model(s):")
+        for (index, model) in models.enumerated() {
+            let gatedLabel = model.isGated ? " (gated)" : ""
+            print("  \(index + 1). \(model.modelId)\(gatedLabel)")
+        }
+        print()
+
+        return models.map(\.modelId)
     }
 
     /// Prompt to update config with best VLM + best TextLLM

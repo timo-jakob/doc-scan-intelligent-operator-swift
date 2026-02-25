@@ -114,8 +114,8 @@ extension ConfigurationTests {
     // MARK: - BenchmarkSettings
 
     func testBenchmarkSettingsEquatable() {
-        let settings1 = BenchmarkSettings(huggingFaceUsername: "user", vlmModels: ["m1"])
-        let settings2 = BenchmarkSettings(huggingFaceUsername: "user", vlmModels: ["m1"])
+        let settings1 = BenchmarkSettings(huggingFaceUsername: "user", textLLMModels: ["m1"])
+        let settings2 = BenchmarkSettings(huggingFaceUsername: "user", textLLMModels: ["m1"])
         let settings3 = BenchmarkSettings(huggingFaceUsername: "other")
 
         XCTAssertEqual(settings1, settings2)
@@ -133,15 +133,6 @@ extension ConfigurationTests {
         XCTAssertEqual(config.benchmark.huggingFaceUsername, "new-user")
     }
 
-    func testBenchmarkVLMModelsSetter() {
-        var config = Configuration()
-        XCTAssertNil(config.benchmark.vlmModels)
-
-        config.benchmark.vlmModels = ["model/a", "model/b"]
-
-        XCTAssertEqual(config.benchmark.vlmModels, ["model/a", "model/b"])
-    }
-
     func testBenchmarkTextLLMModelsSetter() {
         var config = Configuration()
         XCTAssertNil(config.benchmark.textLLMModels)
@@ -153,19 +144,16 @@ extension ConfigurationTests {
 
     // MARK: - Benchmark Model Lists
 
-    func testDefaultBenchmarkModelListsAreNil() {
+    func testDefaultBenchmarkTextLLMModelsIsNil() {
         let config = Configuration.defaultConfiguration
-        XCTAssertNil(config.benchmark.vlmModels)
         XCTAssertNil(config.benchmark.textLLMModels)
     }
 
-    func testCustomBenchmarkModelLists() {
-        let vlmModels = ["model/vlm-a", "model/vlm-b"]
+    func testCustomBenchmarkTextLLMModelList() {
         let textModels = ["model/text-a", "model/text-b"]
         let config = Configuration(
-            benchmark: BenchmarkSettings(vlmModels: vlmModels, textLLMModels: textModels)
+            benchmark: BenchmarkSettings(textLLMModels: textModels)
         )
-        XCTAssertEqual(config.benchmark.vlmModels, vlmModels)
         XCTAssertEqual(config.benchmark.textLLMModels, textModels)
     }
 
@@ -187,20 +175,18 @@ extension ConfigurationTests {
         try yamlContent.write(toFile: configPath, atomically: true, encoding: .utf8)
 
         let config = try Configuration.load(from: configPath)
-        XCTAssertNil(config.benchmark.vlmModels)
         XCTAssertNil(config.benchmark.textLLMModels)
     }
 
     func testYAMLRoundTripWithBenchmarkModels() throws {
         let config = Configuration(
-            benchmark: BenchmarkSettings(vlmModels: ["vlm/a", "vlm/b"], textLLMModels: ["text/a"])
+            benchmark: BenchmarkSettings(textLLMModels: ["text/a"])
         )
 
         let savePath = tempDirectory.appendingPathComponent("benchmark_models.yaml").path
         try config.save(to: savePath)
         let loaded = try Configuration.load(from: savePath)
 
-        XCTAssertEqual(loaded.benchmark.vlmModels, ["vlm/a", "vlm/b"])
         XCTAssertEqual(loaded.benchmark.textLLMModels, ["text/a"])
     }
 
@@ -208,7 +194,6 @@ extension ConfigurationTests {
         let config = Configuration(
             benchmark: BenchmarkSettings(
                 huggingFaceUsername: "user123",
-                vlmModels: ["vlm/x"],
                 textLLMModels: ["text/y", "text/z"]
             )
         )
@@ -218,7 +203,6 @@ extension ConfigurationTests {
         let loaded = try Configuration.load(from: path)
 
         XCTAssertEqual(loaded.benchmark.huggingFaceUsername, "user123")
-        XCTAssertEqual(loaded.benchmark.vlmModels, ["vlm/x"])
         XCTAssertEqual(loaded.benchmark.textLLMModels, ["text/y", "text/z"])
     }
 }
