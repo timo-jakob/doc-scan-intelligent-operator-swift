@@ -66,15 +66,20 @@ After all 6 agents return, present a unified report:
 - Agents with clean results: (list)
 ```
 
-### Step 4: Fix Issues
+### Step 4: Fix Critical and Warning Issues
+
+**This step is mandatory — do not stop at reporting.** After presenting the unified report,
+automatically fix every finding labelled Critical or Warning across all agents. This skill is
+fix-and-report, not report-only.
 
 - **Automatically fix** all Critical issues found by any agent
 - **Automatically fix** all Warning issues found by any agent
-- **List** remaining Suggestions for the developer to decide on
+- After each fix, re-read the affected file and its callers to check for ripple effects
+- **List** remaining Suggestions for the developer to decide on — do not fix these without approval
 
 **Conflict prevention**: Multiple agents may flag the same file for different reasons. Apply fixes
 one agent at a time, re-reading the file between each agent's fixes to avoid clobbering earlier
-changes. Recommended order (highest-impact first):
+changes. Priority order (highest-impact first):
 
 1. Bug Hunter (correctness fixes may change code that other agents also flagged)
 2. Security Reviewer
