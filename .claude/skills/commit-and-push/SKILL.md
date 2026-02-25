@@ -19,7 +19,7 @@ Use this skill to wrap up a completed task: format, lint, commit, and push — a
 4. **Fix ALL lint violations before staging** — both errors and warnings (`line_length`, `type_body_length`, `function_body_length`, `file_length`, etc.) must be resolved to achieve zero violations
 5. **Never use `git add -A` or `git add .`** — always stage specific files by name to avoid accidentally including build artifacts or credentials
 6. **Always include the co-authorship footer** in every commit message
-7. **Do NOT ask for approval** — generate the commit message, commit, and push directly
+7. **Do NOT ask for approval** — this skill is designed for end-of-task automation; the commit message is generated and the push happens immediately. If the user needs to review the message first, they should use a plain `git commit` instead.
 8. **Always push after a successful commit** — the branch must be up to date on the remote so the work is reviewable
 
 ---
