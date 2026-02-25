@@ -252,3 +252,18 @@ git pull --rebase origin main
 git rebase --continue
 git push
 ```
+
+**Accidentally committed to `main`**
+
+Move the commit(s) to a new feature branch and reset `main` to match the remote:
+
+```bash
+# Create a branch from the current (wrong) main
+git switch -c <prefix>/<short-description>
+# Switch back to main and reset it
+git switch main
+git reset --hard origin/main
+# Switch to the new branch and push
+git switch <prefix>/<short-description>
+git push -u origin $(git branch --show-current)
+```
