@@ -3,7 +3,7 @@ name: bug-hunter
 description: >
   Traces code paths to find bugs, logic errors, crashes, data races, and incorrect behavior.
   The most critical reviewer — catches what ships broken. Merges bug detection and stability review.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: opus
 ---
 

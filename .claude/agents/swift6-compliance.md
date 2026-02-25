@@ -3,7 +3,7 @@ name: swift6-compliance
 description: >
   Enforces Swift 6 best practices — strict concurrency, typed throws, modern syntax, Sendable
   conformance. Keeps the codebase modern.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 

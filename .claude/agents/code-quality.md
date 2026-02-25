@@ -3,7 +3,7 @@ name: code-quality
 description: >
   Reviews naming, structure, readability, and idiomatic Swift patterns. Ensures code is clean,
   maintainable, and follows Swift API Design Guidelines.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 

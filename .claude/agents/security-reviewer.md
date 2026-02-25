@@ -3,7 +3,7 @@ name: security-reviewer
 description: >
   Scans for security vulnerabilities — injection, hardcoded secrets, unsafe crypto, missing input
   validation. Catches what attackers exploit.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 

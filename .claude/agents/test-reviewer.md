@@ -3,7 +3,7 @@ name: test-reviewer
 description: >
   Checks test coverage, test quality, spec conformance, and missing test cases. Writes tests to
   fill gaps. Ensures the test suite catches regressions.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 

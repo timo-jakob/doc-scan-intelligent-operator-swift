@@ -3,7 +3,7 @@ name: performance-reviewer
 description: >
   Identifies performance issues — unnecessary allocations, O(n^2) algorithms, retain cycles,
   blocking async calls. Keeps the code fast.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 
