@@ -74,4 +74,9 @@ After all 6 agents return, present a unified report:
 
 ### Step 5: Commit
 
-After fixes are applied, use `/commit-and-push` to format, lint, commit, and push.
+Use **separate commits** to keep code fixes and test additions reviewable independently:
+
+1. **Code fixes first** — stage and commit all source code fixes (from bug-hunter, security, performance, swift6, code-quality agents) via `/commit-and-push`
+2. **Test additions second** — stage and commit new/modified test files (from test-reviewer) via `/commit-and-push`
+
+If only one category has changes, a single commit is fine.
