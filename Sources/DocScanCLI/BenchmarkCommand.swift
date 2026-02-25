@@ -30,8 +30,8 @@ struct BenchmarkCommand: AsyncParsableCommand {
     var verbose: Bool = false
 
     func run() async throws {
-        guard limit > 0 else {
-            print("Error: --limit must be a positive integer.")
+        guard limit > 0, limit <= 1000 else {
+            print("Error: --limit must be between 1 and 1000.")
             throw ExitCode.failure
         }
 
