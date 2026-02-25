@@ -8,44 +8,36 @@ import Foundation
 extension BenchmarkCommand {
     /// Phase B: Run each TextLLM model against all documents for categorization + extraction scoring.
     /// Each model runs in a subprocess so that MLX fatal errors are contained.
-    func runPhaseB(
-        runner: SubprocessRunner,
-        engine: BenchmarkEngine,
-        pdfSet: BenchmarkPDFSet,
-        configuration: Configuration,
-        timeoutSeconds: TimeInterval
-    ) async throws -> [TextLLMBenchmarkResult] {
+    func runPhaseB(context: BenchmarkContext) async throws -> [TextLLMBenchmarkResult] {
         printBenchmarkPhaseHeader("B", title: "TextLLM Categorization + Extraction Benchmark")
 
-        let (groundTruths, ocrTexts) = try await prepareTextLLMData(
-            engine: engine, pdfSet: pdfSet
-        )
+        let (groundTruths, ocrTexts) = try await prepareTextLLMData(context: context)
 
         // TextLLM models use config or curated defaults (not dynamic discovery like VLM Phase A)
-        let textLLMModels = configuration.benchmark.textLLMModels ?? DefaultModelLists.textLLMModels
+        let textLLMModels = context.configuration.benchmark.textLLMModels ?? DefaultModelLists.textLLMModels
         print("Evaluating \(textLLMModels.count) TextLLM model(s)")
-        print("Documents: \(pdfSet.positivePDFs.count) positive, \(pdfSet.negativePDFs.count) negative")
-        print("Timeout: \(Int(timeoutSeconds))s per inference")
+        print("Documents: \(context.pdfSet.positivePDFs.count) positive, \(context.pdfSet.negativePDFs.count) negative")
+        print("Timeout: \(Int(context.timeoutSeconds))s per inference")
         print()
         var results: [TextLLMBenchmarkResult] = []
 
         for (index, modelName) in textLLMModels.enumerated() {
             print("[\(index + 1)/\(textLLMModels.count)] \(modelName)")
 
-            var workerConfig = configuration
+            var workerConfig = context.configuration
             workerConfig.verbose = verbose
             let input = BenchmarkWorkerInput(
                 phase: .textLLM,
                 modelName: modelName,
-                pdfSet: pdfSet,
-                timeoutSeconds: timeoutSeconds,
-                documentType: engine.documentType,
+                pdfSet: context.pdfSet,
+                timeoutSeconds: context.timeoutSeconds,
+                documentType: context.engine.documentType,
                 configuration: workerConfig,
                 textLLMData: TextLLMInputData(ocrTexts: ocrTexts, groundTruths: groundTruths)
             )
 
             let result: TextLLMBenchmarkResult = await runWorker(
-                runner: runner, input: input, modelName: modelName,
+                runner: context.runner, input: input, modelName: modelName,
                 extractResult: { $0.textLLMResult },
                 makeDisqualified: TextLLMBenchmarkResult.disqualified
             )
@@ -59,12 +51,11 @@ extension BenchmarkCommand {
     }
 
     private func prepareTextLLMData(
-        engine: BenchmarkEngine,
-        pdfSet: BenchmarkPDFSet
+        context: BenchmarkContext
     ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]) {
         let (groundTruths, cachedOCRTexts) = try await manageGroundTruths(
-            engine: engine,
-            pdfSet: pdfSet,
+            engine: context.engine,
+            pdfSet: context.pdfSet,
             positiveDir: PathUtils.resolvePath(positiveDir),
             negativeDir: PathUtils.resolvePath(negativeDir)
         )
@@ -75,8 +66,8 @@ extension BenchmarkCommand {
             print("Reusing OCR text extracted during ground truth generation (\(ocrTexts.count) document(s))")
         } else {
             print("Pre-extracting OCR text from all documents...")
-            ocrTexts = await engine.preExtractOCRTexts(
-                positivePDFs: pdfSet.positivePDFs, negativePDFs: pdfSet.negativePDFs
+            ocrTexts = await context.engine.preExtractOCRTexts(
+                positivePDFs: context.pdfSet.positivePDFs, negativePDFs: context.pdfSet.negativePDFs
             )
             print("  Extracted text from \(ocrTexts.count) document(s)")
         }

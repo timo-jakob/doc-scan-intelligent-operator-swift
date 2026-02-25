@@ -2,6 +2,15 @@ import ArgumentParser
 import DocScanCore
 import Foundation
 
+/// Shared context for benchmark phases, grouping the common dependencies.
+struct BenchmarkContext {
+    let runner: SubprocessRunner
+    let engine: BenchmarkEngine
+    let pdfSet: BenchmarkPDFSet
+    let configuration: Configuration
+    let timeoutSeconds: TimeInterval
+}
+
 struct BenchmarkCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "benchmark",
@@ -51,16 +60,13 @@ struct BenchmarkCommand: AsyncParsableCommand {
         let runner = SubprocessRunner()
         defer { runner.cleanup() }
 
-        let vlmResults = try await runPhaseA(
+        let context = BenchmarkContext(
             runner: runner, engine: engine, pdfSet: pdfSet,
-            vlmModels: vlmModels,
             configuration: configuration, timeoutSeconds: timeout
         )
 
-        let textLLMResults = try await runPhaseB(
-            runner: runner, engine: engine, pdfSet: pdfSet,
-            configuration: configuration, timeoutSeconds: timeout
-        )
+        let vlmResults = try await runPhaseA(context: context, vlmModels: vlmModels)
+        let textLLMResults = try await runPhaseB(context: context)
 
         try promptRecommendation(
             vlmResults: vlmResults, textLLMResults: textLLMResults, configuration: configuration

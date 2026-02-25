@@ -6,37 +6,32 @@ import Foundation
 extension BenchmarkCommand {
     /// Phase A: Run each VLM model against all documents for categorization scoring.
     /// Each model runs in a subprocess so that MLX fatal errors are contained.
-    func runPhaseA( // swiftlint:disable:this function_parameter_count
-        runner: SubprocessRunner,
-        engine: BenchmarkEngine,
-        pdfSet: BenchmarkPDFSet,
-        vlmModels: [String],
-        configuration: Configuration,
-        timeoutSeconds: TimeInterval
+    func runPhaseA(
+        context: BenchmarkContext, vlmModels: [String]
     ) async throws -> [VLMBenchmarkResult] {
         printBenchmarkPhaseHeader("A", title: "VLM Categorization Benchmark")
         print("Evaluating \(vlmModels.count) VLM model(s)")
-        print("Documents: \(pdfSet.positivePDFs.count) positive, \(pdfSet.negativePDFs.count) negative")
-        print("Timeout: \(Int(timeoutSeconds))s per inference")
+        print("Documents: \(context.pdfSet.positivePDFs.count) positive, \(context.pdfSet.negativePDFs.count) negative")
+        print("Timeout: \(Int(context.timeoutSeconds))s per inference")
         print()
         var results: [VLMBenchmarkResult] = []
 
         for (index, modelName) in vlmModels.enumerated() {
             print("[\(index + 1)/\(vlmModels.count)] \(modelName)")
 
-            var workerConfig = configuration
+            var workerConfig = context.configuration
             workerConfig.verbose = verbose
             let input = BenchmarkWorkerInput(
                 phase: .vlm,
                 modelName: modelName,
-                pdfSet: pdfSet,
-                timeoutSeconds: timeoutSeconds,
-                documentType: engine.documentType,
+                pdfSet: context.pdfSet,
+                timeoutSeconds: context.timeoutSeconds,
+                documentType: context.engine.documentType,
                 configuration: workerConfig
             )
 
             let result: VLMBenchmarkResult = await runWorker(
-                runner: runner, input: input, modelName: modelName,
+                runner: context.runner, input: input, modelName: modelName,
                 extractResult: { $0.vlmResult },
                 makeDisqualified: VLMBenchmarkResult.disqualified
             )
