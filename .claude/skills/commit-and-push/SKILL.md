@@ -3,7 +3,7 @@ name: commit-and-push
 description: End-of-task skill that formats, lints, commits, and pushes changes on the current feature branch. Use when a task is finished locally and looks good — "commit this", "commit and push", "ship it", "done, commit", "commit the current status", "commit local changes", or similar. Enforces branch-based workflow — automatically creates a feature branch if on main. Runs SwiftFormat → SwiftLint → stage → commit → push so the work is reviewable on the remote immediately.
 metadata:
   author: doc-scan-intelligent-operator-swift
-  version: 4.0.0
+  version: 2.0.0
   category: workflow
 ---
 
