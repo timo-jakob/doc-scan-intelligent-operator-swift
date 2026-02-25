@@ -89,6 +89,16 @@ changes. Priority order (highest-impact first):
 
 If two agents propose conflicting changes to the same code, the higher-priority agent wins.
 
+**Build verification**: After applying each agent's fixes, run a build to confirm the project still
+compiles before proceeding to the next agent:
+
+```bash
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build 2>&1 | tail -40
+```
+
+If a fix introduces new compiler errors, resolve them immediately before moving on. If the fix
+cannot be reconciled, revert it and report it as a Suggestion for the developer instead.
+
 ### Step 5: Commit
 
 Use **separate commits** to keep code fixes and test additions reviewable independently:
