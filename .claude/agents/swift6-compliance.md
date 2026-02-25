@@ -20,6 +20,19 @@ adopts Swift 6 features and idioms. Your job is to modernize pre-Swift-6 pattern
 5. **Focus ONLY on Swift 6 feature adoption** — do not review bugs, style, performance, security,
    or tests. Other agents handle those.
 
+## Step 0: Build and Collect Compiler Diagnostics
+
+Before reading any code, run a build to surface real compiler errors and warnings — especially
+strict-concurrency and Sendable diagnostics that cannot be detected through static text analysis
+alone. Per CLAUDE.md, always use `xcodebuild` (never `swift build`):
+
+```bash
+xcodebuild -scheme docscan -configuration Debug -destination 'platform=macOS' build 2>&1 | tail -80
+```
+
+Parse the output for warnings and errors. Incorporate any concurrency-related diagnostics into your
+findings — these are higher confidence than text-analysis-only observations.
+
 ## Review Criteria
 
 ### Strict Concurrency
@@ -66,7 +79,7 @@ adopts Swift 6 features and idioms. Your job is to modernize pre-Swift-6 pattern
 
 For each Swift 6 gap found:
 1. **Modernize the code** to use the appropriate Swift 6 feature
-2. **Verify the code still compiles** — check for type errors, Sendable issues
+2. **Verify the code still compiles** — re-run `xcodebuild` to confirm no new errors or warnings
 3. **Report**: what was pre-Swift-6, what it was replaced with, and why
 
 ## Output Format
