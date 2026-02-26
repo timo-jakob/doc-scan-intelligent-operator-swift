@@ -113,7 +113,14 @@ public final class HuggingFaceClient: Sendable {
         components.scheme = "https"
         components.host = "huggingface.co"
         components.path = "/\(modelId)"
-        return components.url?.absoluteString ?? "https://huggingface.co/\(modelId)"
+        return components.url?.absoluteString ?? fallbackModelURL(for: modelId)
+    }
+
+    /// Percent-encodes `modelId` into a fallback URL string.
+    /// Visible for testing — called only when `URLComponents` fails to produce a URL.
+    static func fallbackModelURL(for modelId: String) -> String {
+        let encoded = modelId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
+        return "https://huggingface.co/\(encoded)"
     }
 
     // MARK: - Private

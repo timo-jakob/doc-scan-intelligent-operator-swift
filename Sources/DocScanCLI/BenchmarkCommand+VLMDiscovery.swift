@@ -5,25 +5,39 @@ import Foundation
 // MARK: - VLM Discovery & Recommendation
 
 extension BenchmarkCommand {
-    /// Resolve VLM models by querying HuggingFace for the given model family.
-    /// Uses `--family` if provided, otherwise prompts interactively.
-    func resolveVLMFamily(apiToken: String?) async throws -> [String] {
+    /// Resolve VLM models to benchmark. Accepts either a concrete HuggingFace
+    /// model ID (e.g. "mlx-community/Qwen2-VL-2B-Instruct-4bit") or a family
+    /// name (e.g. "Qwen3-VL") that triggers a HuggingFace discovery search.
+    /// Uses `--model` (or `--family`) if provided, otherwise prompts interactively.
+    func resolveVLMModels(apiToken: String?) async throws -> [String] {
+        let noInputMessage = "No VLM model or family provided."
         let name: String
-        if let family {
-            let trimmed = family.trimmingCharacters(in: .whitespaces)
+        if let model {
+            let trimmed = model.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else {
-                print("No model family provided.")
+                print(noInputMessage)
                 throw ExitCode.failure
             }
             name = trimmed
         } else {
-            guard let input = TerminalUtils.prompt(
-                "Enter VLM model family (e.g. Qwen3-VL, FastVLM):"
-            ), !input.trimmingCharacters(in: .whitespaces).isEmpty else {
-                print("No model family provided.")
+            guard let raw = TerminalUtils.prompt(
+                "Enter VLM model family (e.g. Qwen3-VL, FastVLM) or a concrete model:"
+            ) else {
+                print(noInputMessage)
                 throw ExitCode.failure
             }
-            name = input.trimmingCharacters(in: .whitespaces)
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else {
+                print(noInputMessage)
+                throw ExitCode.failure
+            }
+            name = trimmed
+        }
+
+        if let resolved = VLMModelResolver.resolveImmediate(name) {
+            print("Using concrete model: \(name)")
+            print()
+            return resolved
         }
 
         print("Searching HuggingFace for MLX-compatible VLMs matching \"\(name)\"...")

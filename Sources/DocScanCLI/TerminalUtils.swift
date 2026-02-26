@@ -70,7 +70,21 @@ enum TerminalUtils {
         lines.append(title)
         lines.append(String(repeating: "═", count: title.count))
 
-        let qualifying = results.rankedByScore()
+        var qualifying: [T] = []
+        var disqualified: [T] = []
+        for result in results {
+            if result.isDisqualified {
+                disqualified.append(result)
+            } else {
+                qualifying.append(result)
+            }
+        }
+        qualifying.sort { lhs, rhs in
+            let lhsCross = lhs.totalScore * rhs.maxScore
+            let rhsCross = rhs.totalScore * lhs.maxScore
+            if lhsCross != rhsCross { return lhsCross > rhsCross }
+            return lhs.elapsedSeconds < rhs.elapsedSeconds
+        }
 
         if qualifying.isEmpty {
             lines.append("  No qualifying results.")
@@ -83,16 +97,15 @@ enum TerminalUtils {
 
             for (index, result) in qualifying.enumerated() {
                 let rankStr = String(index + 1).leftPadded(toLength: 3)
-                let model = result.modelName.padding(toLength: modelWidth, withPad: " ", startingAt: 0)
+                let modelCol = result.modelName.padding(toLength: modelWidth, withPad: " ", startingAt: 0)
                 let score = formatPercent(result.score)
                 let points = "\(result.totalScore)/\(result.maxScore)".leftPadded(toLength: 6)
                 let extra = rowFormatter(result)
                 let time = formatTime(result.elapsedSeconds)
-                lines.append("  \(rankStr)  \(model)  \(score)  \(points)  \(extra)  \(time)  OK")
+                lines.append("  \(rankStr)  \(modelCol)  \(score)  \(points)  \(extra)  \(time)  OK")
             }
         }
 
-        let disqualified = results.filter(\.isDisqualified)
         if !disqualified.isEmpty {
             lines.append("")
             for result in disqualified {

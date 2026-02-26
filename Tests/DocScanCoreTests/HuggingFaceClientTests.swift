@@ -307,4 +307,29 @@ final class HuggingFaceClientTests: XCTestCase {
         let url = HuggingFaceClient.modelURL(for: "mlx-community/Qwen2-VL-2B-Instruct-4bit")
         XCTAssertEqual(url, "https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit")
     }
+
+    func testModelURLPercentEncodesSpaces() {
+        // URLComponents handles the encoding; spaces must not appear in the result
+        let url = HuggingFaceClient.modelURL(for: "org/model with spaces")
+        XCTAssertEqual(url, "https://huggingface.co/org/model%20with%20spaces")
+    }
+
+    // MARK: - Fallback path (tested via the extracted helper)
+
+    func testFallbackModelURLPreservesModelId() {
+        let url = HuggingFaceClient.fallbackModelURL(for: "org/model")
+        XCTAssertEqual(url, "https://huggingface.co/org/model")
+    }
+
+    func testFallbackModelURLPercentEncodesUnsafeCharacters() {
+        let url = HuggingFaceClient.fallbackModelURL(for: "org/model with spaces")
+        // .urlPathAllowed preserves '/' but encodes spaces
+        XCTAssertEqual(url, "https://huggingface.co/org/model%20with%20spaces")
+        XCTAssertFalse(url.contains(" "))
+    }
+
+    func testFallbackModelURLHandlesEmptyString() {
+        let url = HuggingFaceClient.fallbackModelURL(for: "")
+        XCTAssertEqual(url, "https://huggingface.co/")
+    }
 }
