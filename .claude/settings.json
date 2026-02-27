@@ -1,6 +1,7 @@
 {
   "enabledPlugins": {
-    "code-review-swift@claude-code-plugins": true
+    "dev-swift@claude-code-plugins": true,
+    "development@claude-code-plugins": true
   },
   "extraKnownMarketplaces": {
     "claude-code-plugins": {
