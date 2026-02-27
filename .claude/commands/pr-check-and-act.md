@@ -225,7 +225,7 @@ Fix in this priority order:
 
 ## Step 5: Commit the fixes
 
-After all changes are made, run `make format` then `make lint`, then commit inline (do **not** invoke the `/commit-and-push` skill — it interrupts the remediation loop):
+After all changes are made, run `make format` then `make lint`, then commit inline (do **not** invoke the `/commit` skill — it interrupts the remediation loop):
 
 ```bash
 make format

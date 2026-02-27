@@ -1,15 +1,13 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/review-before-commit.sh"
-          }
-        ]
+  "enabledPlugins": {
+    "code-review-swift@claude-code-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-code-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "timo-jakob/claude-code-plugins"
       }
-    ]
+    }
   }
 }
