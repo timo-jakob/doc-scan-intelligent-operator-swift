@@ -20,7 +20,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.30.6"),
+        .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.31.3"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.1"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.8"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "2.30.6"),
