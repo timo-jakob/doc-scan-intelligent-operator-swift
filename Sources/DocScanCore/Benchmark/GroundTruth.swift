@@ -29,19 +29,20 @@ public struct GroundTruthMetadata: Codable, Equatable, Sendable {
 
 /// Ground truth for a single document, stored as a JSON sidecar file
 public struct GroundTruth: Codable, Equatable, Sendable {
-    /// Cached coders for repeated load/save operations during benchmarking
-    private static let jsonDecoder: JSONDecoder = {
+    /// Create a configured JSON decoder for ground truth files
+    private static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
-    }()
+    }
 
-    private static let jsonEncoder: JSONEncoder = {
+    /// Create a configured JSON encoder for ground truth files
+    private static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         return encoder
-    }()
+    }
 
     /// Whether this document matches the target document type
     public var isMatch: Bool
@@ -95,7 +96,7 @@ public struct GroundTruth: Codable, Equatable, Sendable {
             throw DocScanError.fileOperationFailed("Failed to read ground truth: \(error.localizedDescription)")
         }
         do {
-            return try Self.jsonDecoder.decode(GroundTruth.self, from: data)
+            return try Self.makeDecoder().decode(GroundTruth.self, from: data)
         } catch {
             throw DocScanError.benchmarkError("Failed to decode ground truth: \(error.localizedDescription)")
         }
@@ -105,7 +106,7 @@ public struct GroundTruth: Codable, Equatable, Sendable {
     public func save(to path: String) throws(DocScanError) {
         let data: Data
         do {
-            data = try Self.jsonEncoder.encode(self)
+            data = try Self.makeEncoder().encode(self)
         } catch {
             throw DocScanError.benchmarkError("Failed to encode ground truth: \(error.localizedDescription)")
         }

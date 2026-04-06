@@ -35,12 +35,14 @@ public enum StringUtils {
     /// - Returns: A sanitized string with just the name, safe for use in filenames
     public static func sanitizeDoctorName(_ name: String) -> String {
         var cleaned = name
+        var lowered = cleaned.lowercased()
         var didStrip = true
         while didStrip {
             didStrip = false
-            for title in doctorTitles where cleaned.lowercased().hasPrefix(title) {
+            for title in doctorTitles where lowered.hasPrefix(title) {
                 cleaned = String(cleaned.dropFirst(title.count))
                     .trimmingCharacters(in: .whitespaces)
+                lowered = cleaned.lowercased()
                 didStrip = true
                 break
             }

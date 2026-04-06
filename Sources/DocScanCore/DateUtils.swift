@@ -147,7 +147,11 @@ public enum DateUtils {
     private static func parseGermanMonthYear(_ text: String) -> Date? {
         let lowercased = text.lowercased()
 
-        for (monthName, monthNumber) in germanMonths where lowercased.contains(monthName) {
+        // Iterate ordered array (longest first) to avoid non-deterministic dictionary ordering
+        for monthName in germanMonthNames {
+            guard lowercased.contains(monthName),
+                  let monthNumber = germanMonths[monthName]
+            else { continue }
             // Extract year (4 digits) using cached regex
             guard let match = yearRegex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
                   let range = Range(match.range(at: 1), in: text)

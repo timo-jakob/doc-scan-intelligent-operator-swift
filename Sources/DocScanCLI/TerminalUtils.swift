@@ -79,12 +79,8 @@ enum TerminalUtils {
                 qualifying.append(result)
             }
         }
-        qualifying.sort { lhs, rhs in
-            let lhsCross = lhs.totalScore * rhs.maxScore
-            let rhsCross = rhs.totalScore * lhs.maxScore
-            if lhsCross != rhsCross { return lhsCross > rhsCross }
-            return lhs.elapsedSeconds < rhs.elapsedSeconds
-        }
+        // Use the canonical rankedByScore() implementation (single source of truth)
+        qualifying = qualifying.rankedByScore()
 
         if qualifying.isEmpty {
             lines.append("  No qualifying results.")

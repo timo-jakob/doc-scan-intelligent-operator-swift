@@ -95,6 +95,9 @@ public actor TextLLMManager: TextLLMProviding {
         return parsed
     }
 
+    /// Sentinel values returned by the LLM when a field is not found
+    private static let sentinelValues: Set<String> = ["UNKNOWN", "NOT_FOUND"]
+
     /// Parse an LLM response into an ExtractionResult.
     /// Internal access for testability.
     func parseExtractionResponse(
@@ -116,20 +119,20 @@ public actor TextLLMManager: TextLLMProviding {
             if trimmed.hasPrefix("DATE:") {
                 let value = String(trimmed.dropFirst("DATE:".count))
                     .trimmingCharacters(in: .whitespaces)
-                if value != "UNKNOWN", value != "NOT_FOUND" {
+                if !Self.sentinelValues.contains(value) {
                     date = DateUtils.parseDate(value)
                 }
             } else if trimmed.hasPrefix(secondaryPrefix) {
                 let value = String(trimmed.dropFirst(secondaryPrefix.count))
                     .trimmingCharacters(in: .whitespaces)
-                if value != "UNKNOWN", value != "NOT_FOUND" {
+                if !Self.sentinelValues.contains(value) {
                     secondaryField = documentType.sanitizeSecondaryField(value)
                 }
             } else if trimmed.hasPrefix("PATIENT:"),
                       documentType == .prescription {
                 let value = String(trimmed.dropFirst("PATIENT:".count))
                     .trimmingCharacters(in: .whitespaces)
-                if value != "UNKNOWN", value != "NOT_FOUND" {
+                if !Self.sentinelValues.contains(value) {
                     patientName = StringUtils.sanitizePatientName(value)
                 }
             }
@@ -220,10 +223,11 @@ extension TextLLMManager {
         }
 
         // Load model using LLMModelFactory
+        let isVerboseLoad = config.verbose
         modelContainer = try await LLMModelFactory.shared.loadContainer(
             configuration: .init(id: config.textModelName),
-        ) { [self] progress in
-            if config.verbose {
+        ) { progress in
+            if isVerboseLoad {
                 let percent = Int(progress.fractionCompleted * 100)
                 print("Downloading model: \(percent)%")
             }

@@ -189,10 +189,11 @@ public actor ModelManager: VLMProvider {
             }
 
             // Load VLM using loadModel (recommended approach for VLMs)
+            let isVerboseLoad = config.verbose
             let model = try await loadModel(
                 id: modelName,
-            ) { [self] progress in
-                if config.verbose {
+            ) { progress in
+                if isVerboseLoad {
                     let percent = Int(progress.fractionCompleted * 100)
                     print("Downloading VLM: \(percent)%")
                 }

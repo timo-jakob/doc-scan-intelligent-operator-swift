@@ -24,8 +24,8 @@ public struct FileRenamer: Sendable {
         // Validate target stays within source directory (prevent path traversal via symlinks)
         let resolvedTarget = targetURL.standardized.resolvingSymlinksInPath()
         let resolvedSource = sourceDirectory.standardized.resolvingSymlinksInPath()
-        let sourcePath = resolvedSource.path.hasSuffix("/") ? resolvedSource.path : resolvedSource.path + "/"
-        guard resolvedTarget.path.hasPrefix(sourcePath) || resolvedTarget.path == resolvedSource.path else {
+        let sourceDirPath = resolvedSource.path.hasSuffix("/") ? resolvedSource.path : resolvedSource.path + "/"
+        guard resolvedTarget.path.hasPrefix(sourceDirPath) || resolvedTarget.path == resolvedSource.path else {
             throw DocScanError.fileOperationFailed(
                 "Target filename would escape source directory: \(targetFilename)",
             )

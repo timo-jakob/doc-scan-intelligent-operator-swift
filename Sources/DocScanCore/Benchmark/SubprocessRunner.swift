@@ -21,8 +21,7 @@ public enum SubprocessResult: Equatable, Sendable {
 public final class SubprocessRunner: Sendable {
     /// Dedicated temp directory for all worker handover files.
     /// Created on init, removed by ``cleanup()``.
-    let workDir: URL
-    private let decoder = JSONDecoder()
+    private let workDir: URL
 
     public init() {
         let dir = FileManager.default.temporaryDirectory
@@ -178,10 +177,12 @@ public final class SubprocessRunner: Sendable {
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             return .decodingFailed("Worker exited 0 but output file not found")
         }
+        // Restrict output file permissions — may contain OCR text with PII
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outputURL.path)
 
         do {
             let outputData = try Data(contentsOf: outputURL)
-            let output = try decoder.decode(BenchmarkWorkerOutput.self, from: outputData)
+            let output = try JSONDecoder().decode(BenchmarkWorkerOutput.self, from: outputData)
             return .success(output)
         } catch {
             return .decodingFailed("Failed to decode worker output: \(error.localizedDescription)")

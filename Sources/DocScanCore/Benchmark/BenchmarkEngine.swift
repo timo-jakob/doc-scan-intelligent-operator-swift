@@ -191,12 +191,18 @@ public struct BenchmarkEngine: Sendable {
         let config = configuration
         let isVerbose = verbose
 
+        let ocrEngine = OCREngine(config: config)
+
         return await withTaskGroup(of: (String, String?).self) { group in
+            var ocrTexts: [String: String] = [:]
             // Limit concurrency to avoid memory pressure from parallel PDF rasterization
             var inflight = 0
             for pdfPath in allPDFs {
                 if inflight >= Self.maxConcurrentOCR {
-                    _ = await group.next()
+                    // Collect the completed result before adding a new task
+                    if let (path, text) = await group.next() {
+                        if let text { ocrTexts[path] = text }
+                    }
                     inflight -= 1
                 }
                 inflight += 1
@@ -213,7 +219,6 @@ public struct BenchmarkEngine: Sendable {
                     }
 
                     // Fall back to Vision OCR
-                    let ocrEngine = OCREngine(config: config)
                     do {
                         let image = try PDFUtils.pdfToImage(
                             at: pdfPath,
@@ -231,7 +236,7 @@ public struct BenchmarkEngine: Sendable {
                 }
             }
 
-            var ocrTexts: [String: String] = [:]
+            // Collect remaining results
             for await (path, text) in group {
                 if let text { ocrTexts[path] = text }
             }
