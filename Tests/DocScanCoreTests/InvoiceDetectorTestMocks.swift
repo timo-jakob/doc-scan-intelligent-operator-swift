@@ -21,7 +21,7 @@ final class MockVLMProvider: VLMProvider, @unchecked Sendable {
     func generateFromImage(
         _ image: NSImage,
         prompt: String,
-        modelName _: String?
+        modelName _: String?,
     ) async throws -> String {
         generateFromImageCallCount += 1
         lastPrompt = prompt
@@ -62,7 +62,7 @@ final class MockTextLLMProvider: TextLLMProviding, @unchecked Sendable {
 
     func extractData(
         for _: DocumentType,
-        from _: String
+        from _: String,
     ) async throws -> ExtractionResult {
         if shouldThrowError {
             throw errorToThrow
@@ -70,14 +70,14 @@ final class MockTextLLMProvider: TextLLMProviding, @unchecked Sendable {
         return ExtractionResult(
             date: mockDate,
             secondaryField: mockSecondaryField,
-            patientName: mockPatientName
+            patientName: mockPatientName,
         )
     }
 
     func generate(
         systemPrompt _: String,
         userPrompt _: String,
-        maxTokens _: Int
+        maxTokens _: Int,
     ) async throws -> String {
         if shouldThrowError {
             throw errorToThrow

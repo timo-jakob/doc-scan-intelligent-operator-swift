@@ -52,7 +52,7 @@ extension OCREngineTests {
             XCTAssertFalse(result.isMatch, "Should not detect invoice in: \(text)")
             XCTAssertEqual(
                 result.confidence, .high,
-                "Should have high confidence it's NOT an invoice for: \(text)"
+                "Should have high confidence it's NOT an invoice for: \(text)",
             )
             XCTAssertEqual(result.reason, "No invoice keywords found")
         }
@@ -154,7 +154,7 @@ extension OCREngineTests {
             if let company {
                 XCTAssertTrue(
                     company.contains(expectedContains),
-                    "Company '\(company)' should contain '\(expectedContains)'"
+                    "Company '\(company)' should contain '\(expectedContains)'",
                 )
             }
         }

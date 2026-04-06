@@ -19,6 +19,6 @@ struct DocScanRoot: AsyncParsableCommand {
         """,
         version: "2.0.0",
         subcommands: [ScanCommand.self, BenchmarkCommand.self, BenchmarkWorkerCommand.self],
-        defaultSubcommand: ScanCommand.self
+        defaultSubcommand: ScanCommand.self,
     )
 }

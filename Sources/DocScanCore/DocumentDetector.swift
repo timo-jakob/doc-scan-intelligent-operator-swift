@@ -32,7 +32,7 @@ public struct CategorizationResult: Equatable, Sendable {
         isMatch: Bool,
         confidence: ConfidenceLevel = .high,
         method: CategorizationMethod,
-        reason: String? = nil
+        reason: String? = nil,
     ) {
         self.isMatch = isMatch
         self.confidence = confidence
@@ -110,7 +110,7 @@ public actor DocumentDetector {
         config: Configuration,
         documentType: DocumentType = .invoice,
         vlmProvider: (any VLMProvider)? = nil,
-        textLLM: (any TextLLMProviding)? = nil
+        textLLM: (any TextLLMProviding)? = nil,
     ) {
         self.config = config
         self.documentType = documentType
@@ -136,7 +136,7 @@ extension DocumentDetector {
 
         if config.verbose { print("Converting PDF to image...") }
         let image = try PDFUtils.pdfToImage(
-            at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose
+            at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose,
         )
 
         if config.verbose {
@@ -151,11 +151,11 @@ extension DocumentDetector {
 
         // Run VLM and OCR truly in parallel (nonisolated static methods avoid actor hop)
         async let vlmResult = Self.performVLMCategorization(
-            image: image, vlmProvider: vlmProv, documentType: docType, config: cfg
+            image: image, vlmProvider: vlmProv, documentType: docType, config: cfg,
         )
         async let ocrResult = Self.performOCRCategorization(
             image: image, directText: directText, ocrEngine: ocrEng,
-            documentType: docType, config: cfg
+            documentType: docType, config: cfg,
         )
 
         let vlm = await vlmResult
@@ -174,7 +174,7 @@ extension DocumentDetector {
     /// Try direct PDF text extraction (faster for searchable PDFs)
     private nonisolated static func tryDirectTextExtraction(
         from pdfPath: String,
-        config: Configuration
+        config: Configuration,
     ) -> String? {
         if config.verbose { print("Checking for extractable text in PDF...") }
 
@@ -195,7 +195,7 @@ extension DocumentDetector {
         image: NSImage,
         vlmProvider: any VLMProvider,
         documentType: DocumentType,
-        config: Configuration
+        config: Configuration,
     ) async -> CategorizationResult {
         do {
             return try await TimeoutError.withTimeout(seconds: categorizationTimeoutSeconds) {
@@ -205,7 +205,7 @@ extension DocumentDetector {
                 }
 
                 let response = try await vlmProvider.generateFromImage(
-                    image, prompt: documentType.vlmPrompt
+                    image, prompt: documentType.vlmPrompt,
                 )
                 if config.verbose { print("VLM response: \(response)") }
 
@@ -223,7 +223,7 @@ extension DocumentDetector {
 
                 return CategorizationResult(
                     isMatch: isMatch, confidence: confidence,
-                    method: .vlm, reason: response
+                    method: .vlm, reason: response,
                 )
             }
         } catch is TimeoutError {
@@ -232,13 +232,13 @@ extension DocumentDetector {
             }
             return CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: .vlmTimeout, reason: "Timed out"
+                method: .vlmTimeout, reason: "Timed out",
             )
         } catch {
             if config.verbose { print("VLM categorization failed: \(error)") }
             return CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: .vlmError, reason: error.localizedDescription
+                method: .vlmError, reason: error.localizedDescription,
             )
         }
     }
@@ -250,7 +250,7 @@ extension DocumentDetector {
         directText: String?,
         ocrEngine: OCREngine,
         documentType: DocumentType,
-        config: Configuration
+        config: Configuration,
     ) async throws -> (CategorizationResult, String?) {
         do {
             return try await TimeoutError.withTimeout(seconds: categorizationTimeoutSeconds) {
@@ -264,7 +264,7 @@ extension DocumentDetector {
                     }
                     return (CategorizationResult(
                         isMatch: result.isMatch, confidence: result.confidence,
-                        method: .pdf, reason: result.reason
+                        method: .pdf, reason: result.reason,
                     ), nil)
                 } else {
                     if config.verbose { print("OCR: Starting Vision OCR (scanned document)...") }
@@ -279,7 +279,7 @@ extension DocumentDetector {
                     }
                     return (CategorizationResult(
                         isMatch: result.isMatch, confidence: result.confidence,
-                        method: .ocr, reason: result.reason
+                        method: .ocr, reason: result.reason,
                     ), text)
                 }
             }
@@ -289,7 +289,7 @@ extension DocumentDetector {
             }
             return (CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: .ocrTimeout, reason: "Timed out"
+                method: .ocrTimeout, reason: "Timed out",
             ), nil)
         }
     }
@@ -338,7 +338,7 @@ extension DocumentDetector {
         return ExtractionResult(
             date: result.date,
             secondaryField: result.secondaryField,
-            patientName: result.patientName
+            patientName: result.patientName,
         )
     }
 
@@ -372,7 +372,7 @@ extension DocumentDetector {
         }
         return CategorizationResult(
             isMatch: result.isMatch, confidence: result.confidence,
-            method: .pdf, reason: result.reason
+            method: .pdf, reason: result.reason,
         )
     }
 }

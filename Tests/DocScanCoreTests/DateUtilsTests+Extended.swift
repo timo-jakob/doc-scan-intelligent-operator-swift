@@ -87,7 +87,7 @@ final class DateUtilsPatternTests: XCTestCase {
                 XCTAssertEqual(
                     components.month,
                     expectedMonth,
-                    "Month mismatch for: \(text)"
+                    "Month mismatch for: \(text)",
                 )
             }
         }
@@ -117,7 +117,7 @@ final class DateUtilsPatternTests: XCTestCase {
                 XCTAssertEqual(
                     components.month,
                     expectedMonth,
-                    "Month mismatch for: \(text)"
+                    "Month mismatch for: \(text)",
                 )
             }
         }

@@ -18,7 +18,7 @@ public enum KeychainManager {
             nil,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
             .userPresence,
-            &accessError
+            &accessError,
         ) else {
             let message = accessError?.takeRetainedValue().localizedDescription ?? "unknown error"
             throw DocScanError.keychainError("Failed to create access control: \(message)")
@@ -35,7 +35,7 @@ public enum KeychainManager {
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess || status == errSecDuplicateItem else {
             throw DocScanError.keychainError(
-                "Failed to store token: \(keychainErrorMessage(status))"
+                "Failed to store token: \(keychainErrorMessage(status))",
             )
         }
         return status
@@ -60,7 +60,7 @@ public enum KeychainManager {
 
         guard status == errSecSuccess else {
             throw DocScanError.keychainError(
-                "Failed to retrieve token: \(keychainErrorMessage(status))"
+                "Failed to retrieve token: \(keychainErrorMessage(status))",
             )
         }
 
@@ -92,7 +92,7 @@ public enum KeychainManager {
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         guard status == errSecSuccess else {
             throw DocScanError.keychainError(
-                "Failed to update token: \(keychainErrorMessage(status))"
+                "Failed to update token: \(keychainErrorMessage(status))",
             )
         }
     }
@@ -108,7 +108,7 @@ public enum KeychainManager {
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw DocScanError.keychainError(
-                "Failed to delete token: \(keychainErrorMessage(status))"
+                "Failed to delete token: \(keychainErrorMessage(status))",
             )
         }
     }

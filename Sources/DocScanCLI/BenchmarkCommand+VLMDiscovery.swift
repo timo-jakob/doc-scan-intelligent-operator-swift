@@ -21,7 +21,7 @@ extension BenchmarkCommand {
             name = trimmed
         } else {
             guard let raw = TerminalUtils.prompt(
-                "Enter VLM model family (e.g. Qwen3-VL, FastVLM) or a concrete model:"
+                "Enter VLM model family (e.g. Qwen3-VL, FastVLM) or a concrete model:",
             ) else {
                 print(noInputMessage)
                 throw ExitCode.failure
@@ -63,7 +63,7 @@ extension BenchmarkCommand {
     func promptRecommendation(
         vlmResults: [VLMBenchmarkResult],
         textLLMResults: [TextLLMBenchmarkResult],
-        configuration: Configuration
+        configuration: Configuration,
     ) throws {
         printBenchmarkPhaseHeader("Recommendation", title: "Best Models")
 
@@ -83,7 +83,7 @@ extension BenchmarkCommand {
         }
 
         try promptConfigUpdate(
-            bestVLMName: vlm.modelName, bestTextLLMName: text.modelName, configuration: configuration
+            bestVLMName: vlm.modelName, bestTextLLMName: text.modelName, configuration: configuration,
         )
     }
 
@@ -100,14 +100,14 @@ extension BenchmarkCommand {
     }
 
     private func promptConfigUpdate(
-        bestVLMName: String, bestTextLLMName: String, configuration: Configuration
+        bestVLMName: String, bestTextLLMName: String, configuration: Configuration,
     ) throws {
         guard let choice = TerminalUtils.menu(
             "Would you like to update your configuration?",
             options: [
                 "Update config to use best VLM + best TextLLM",
                 "Keep current configuration",
-            ]
+            ],
         ), choice == 0 else {
             print("Keeping current configuration.")
             return

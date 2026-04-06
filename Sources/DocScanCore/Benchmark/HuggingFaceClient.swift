@@ -72,7 +72,7 @@ public final class HuggingFaceClient: Sendable {
         session: URLSessionProtocol = URLSession.shared,
         apiToken: String? = nil,
         baseURL: String = HuggingFaceClient.defaultBaseURL,
-        retryDelays: [UInt64] = [2, 5, 10]
+        retryDelays: [UInt64] = [2, 5, 10],
     ) {
         self.session = session
         self.apiToken = apiToken
@@ -89,7 +89,7 @@ public final class HuggingFaceClient: Sendable {
         // Over-fetch to compensate for client-side MLX filtering
         let fetchLimit = limit * 3
         let allModels = try await searchModels(
-            query: family, limit: fetchLimit, pipelineTag: "image-text-to-text"
+            query: family, limit: fetchLimit, pipelineTag: "image-text-to-text",
         )
         return Array(allModels.filter { $0.tags?.contains("mlx") == true }.prefix(limit))
     }
@@ -144,7 +144,7 @@ public final class HuggingFaceClient: Sendable {
     }
 
     private func fetchJSON<T: Decodable>(
-        path: String, queryItems: [URLQueryItem] = []
+        path: String, queryItems: [URLQueryItem] = [],
     ) async throws -> T {
         let urlString = "\(baseURL)/\(path)"
         guard var components = URLComponents(string: urlString) else {

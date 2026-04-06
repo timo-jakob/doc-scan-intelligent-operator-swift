@@ -42,7 +42,7 @@ public struct DocumentData: Equatable, Sendable {
         date: Date?,
         secondaryField: String?,
         patientName: String? = nil,
-        categorization: CategorizationVerification? = nil
+        categorization: CategorizationVerification? = nil,
     ) {
         self.documentType = documentType
         self.isMatch = isMatch

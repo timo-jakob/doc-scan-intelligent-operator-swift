@@ -10,7 +10,7 @@ public extension BenchmarkEngine {
         positivePDFs: [String],
         negativePDFs: [String],
         timeoutSeconds: TimeInterval,
-        vlmFactory: VLMOnlyFactory
+        vlmFactory: VLMOnlyFactory,
     ) async -> VLMBenchmarkResult {
         // Release GPU resources from previous model
         await vlmFactory.releaseVLM()
@@ -24,7 +24,7 @@ public extension BenchmarkEngine {
             }
             return .disqualified(
                 modelName: modelName,
-                reason: "Insufficient memory (~\(estimatedMB) MB needed, \(availableMB) MB available)"
+                reason: "Insufficient memory (~\(estimatedMB) MB needed, \(availableMB) MB available)",
             )
         }
 
@@ -35,7 +35,7 @@ public extension BenchmarkEngine {
             await vlmFactory.releaseVLM()
             return .disqualified(
                 modelName: modelName,
-                reason: "Failed to load model: \(error.localizedDescription)"
+                reason: "Failed to load model: \(error.localizedDescription)",
             )
         }
 
@@ -44,7 +44,7 @@ public extension BenchmarkEngine {
             positivePDFs: positivePDFs,
             negativePDFs: negativePDFs,
             timeoutSeconds: timeoutSeconds,
-            vlmFactory: vlmFactory
+            vlmFactory: vlmFactory,
         )
         let elapsedSeconds = Date().timeIntervalSince(startTime)
         await vlmFactory.releaseVLM()
@@ -52,7 +52,7 @@ public extension BenchmarkEngine {
         return .from(
             modelName: modelName,
             documentResults: documentResults,
-            elapsedSeconds: elapsedSeconds
+            elapsedSeconds: elapsedSeconds,
         )
     }
 
@@ -61,7 +61,7 @@ public extension BenchmarkEngine {
         positivePDFs: [String],
         negativePDFs: [String],
         timeoutSeconds: TimeInterval,
-        vlmFactory: VLMOnlyFactory
+        vlmFactory: VLMOnlyFactory,
     ) async -> [VLMDocumentResult] {
         var results: [VLMDocumentResult] = []
 
@@ -70,7 +70,7 @@ public extension BenchmarkEngine {
         for pdfPath in positivePDFs {
             let result = await benchmarkVLMDocument(
                 pdfPath: pdfPath, isPositive: true,
-                timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory
+                timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory,
             )
             print(result.correct ? "." : "f", terminator: "")
             fflush(stdout)
@@ -82,7 +82,7 @@ public extension BenchmarkEngine {
         for pdfPath in negativePDFs {
             let result = await benchmarkVLMDocument(
                 pdfPath: pdfPath, isPositive: false,
-                timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory
+                timeoutSeconds: timeoutSeconds, vlmFactory: vlmFactory,
             )
             print(result.correct ? "." : "f", terminator: "")
             fflush(stdout)
@@ -98,7 +98,7 @@ public extension BenchmarkEngine {
         pdfPath: String,
         isPositive: Bool,
         timeoutSeconds: TimeInterval,
-        vlmFactory: VLMOnlyFactory
+        vlmFactory: VLMOnlyFactory,
     ) async -> VLMDocumentResult {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
 
@@ -110,7 +110,7 @@ public extension BenchmarkEngine {
                 return VLMDocumentResult(
                     filename: filename,
                     isPositiveSample: isPositive,
-                    predictedIsMatch: false
+                    predictedIsMatch: false,
                 )
             }
 
@@ -128,21 +128,21 @@ public extension BenchmarkEngine {
             return VLMDocumentResult(
                 filename: filename,
                 isPositiveSample: isPositive,
-                predictedIsMatch: predictedIsMatch
+                predictedIsMatch: predictedIsMatch,
             )
         } catch is TimeoutError {
             // Timeout scores 0 (does NOT disqualify the model)
             return VLMDocumentResult(
                 filename: filename,
                 isPositiveSample: isPositive,
-                predictedIsMatch: !isPositive // Wrong answer = 0 points
+                predictedIsMatch: !isPositive, // Wrong answer = 0 points
             )
         } catch {
             // Error = 0 points (force incorrect prediction regardless of polarity)
             return VLMDocumentResult(
                 filename: filename,
                 isPositiveSample: isPositive,
-                predictedIsMatch: !isPositive
+                predictedIsMatch: !isPositive,
             )
         }
     }

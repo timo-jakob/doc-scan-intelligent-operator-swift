@@ -71,7 +71,7 @@ public struct BenchmarkWorkerInput: Codable, Sendable {
         timeoutSeconds: TimeInterval,
         documentType: DocumentType,
         configuration: Configuration,
-        textLLMData: TextLLMInputData? = nil
+        textLLMData: TextLLMInputData? = nil,
     ) {
         self.phase = phase
         self.modelName = modelName

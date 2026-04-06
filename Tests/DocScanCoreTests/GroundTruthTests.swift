@@ -10,7 +10,7 @@ final class GroundTruthTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(
             at: tempDirectory,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
         )
     }
 
@@ -44,8 +44,8 @@ final class GroundTruthTests: XCTestCase {
                 vlmModel: "mlx-community/Qwen2-VL-2B-Instruct-4bit",
                 textModel: "mlx-community/Qwen2.5-7B-Instruct-4bit",
                 generatedAt: Date(timeIntervalSince1970: 1_750_000_000),
-                verified: true
-            )
+                verified: true,
+            ),
         )
 
         let encoder = JSONEncoder()
@@ -66,7 +66,7 @@ final class GroundTruthTests: XCTestCase {
             date: nil,
             secondaryField: nil,
             patientName: nil,
-            metadata: GroundTruthMetadata()
+            metadata: GroundTruthMetadata(),
         )
 
         let encoder = JSONEncoder()
@@ -94,8 +94,8 @@ final class GroundTruthTests: XCTestCase {
             metadata: GroundTruthMetadata(
                 vlmModel: "test-vlm",
                 textModel: "test-text",
-                verified: false
-            )
+                verified: false,
+            ),
         )
 
         let path = tempDirectory.appendingPathComponent("test.pdf.json").path
@@ -117,7 +117,7 @@ final class GroundTruthTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
-            secondaryField: "Test_Company"
+            secondaryField: "Test_Company",
         )
 
         let path = tempDirectory.appendingPathComponent("pretty.pdf.json").path
@@ -186,19 +186,19 @@ final class GroundTruthTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-01-01",
-            secondaryField: "Company"
+            secondaryField: "Company",
         )
         let gt2 = GroundTruth(
             isMatch: true,
             documentType: .invoice,
             date: "2025-01-01",
-            secondaryField: "Company"
+            secondaryField: "Company",
         )
         let gt3 = GroundTruth(
             isMatch: false,
             documentType: .invoice,
             date: "2025-01-01",
-            secondaryField: "Company"
+            secondaryField: "Company",
         )
 
         XCTAssertEqual(gt1, gt2)
@@ -219,7 +219,7 @@ final class GroundTruthTests: XCTestCase {
             documentType: .prescription,
             date: "2025-04-08",
             secondaryField: "Gesine_Kaiser",
-            patientName: "Penelope"
+            patientName: "Penelope",
         )
 
         let path = tempDirectory.appendingPathComponent("rx.pdf.json").path

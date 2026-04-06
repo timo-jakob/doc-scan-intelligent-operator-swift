@@ -14,7 +14,7 @@ extension ScanCommand {
 
     func displayCategorizationResults(
         _ categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) {
         print("╔══════════════════════════════════════════════════╗")
         print("║         Categorization Results                   ║")
@@ -22,13 +22,13 @@ extension ScanCommand {
         let vlmLine = "║ \(categorization.vlmResult.displayLabel):"
         print(vlmLine.padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
         displayCategorizationResult(
-            categorization.vlmResult, prefix: "║   ", documentType: documentType
+            categorization.vlmResult, prefix: "║   ", documentType: documentType,
         )
         print("║                                                  ║")
         let ocrLine = "║ \(categorization.ocrResult.displayLabel):"
         print(ocrLine.padding(toLength: 51, withPad: " ", startingAt: 0) + "║")
         displayCategorizationResult(
-            categorization.ocrResult, prefix: "║   ", documentType: documentType
+            categorization.ocrResult, prefix: "║   ", documentType: documentType,
         )
         print("╚══════════════════════════════════════════════════╝")
         print()
@@ -37,7 +37,7 @@ extension ScanCommand {
     private func displayCategorizationResult(
         _ result: CategorizationResult,
         prefix: String,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) {
         let typeName = documentType.displayName
         let matchStatus = result.isMatch ? "✅ \(typeName)" : "❌ Not \(typeName)"
@@ -49,7 +49,7 @@ extension ScanCommand {
 
     func determineIsMatchVerbose(
         _ categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Bool {
         let vlmTimedOut = categorization.vlmResult.isTimedOut
         let ocrTimedOut = categorization.ocrResult.isTimedOut
@@ -76,13 +76,13 @@ extension ScanCommand {
             return isMatch
         }
         return try resolveCategorizationVerbose(
-            categorization, documentType: documentType
+            categorization, documentType: documentType,
         )
     }
 
     private func resolveCategorizationVerbose(
         _ categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Bool {
         let vlmLabel = categorization.vlmResult.shortDisplayLabel
         let textLabel = categorization.ocrResult.shortDisplayLabel
@@ -100,18 +100,18 @@ extension ScanCommand {
             return try applyAutoResolveVerbose(
                 autoResolveMode,
                 categorization: categorization,
-                documentType: documentType
+                documentType: documentType,
             )
         }
         return try interactiveResolveVerbose(
-            categorization, documentType: documentType
+            categorization, documentType: documentType,
         )
     }
 
     private func applyAutoResolveVerbose(
         _ mode: String,
         categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Bool {
         let normalizedMode = mode.lowercased()
         guard ["vlm", "ocr"].contains(normalizedMode) else {
@@ -130,7 +130,7 @@ extension ScanCommand {
 
     private func interactiveResolveVerbose(
         _ categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Bool {
         let vlmLabel = categorization.vlmResult.shortDisplayLabel
         let textLabel = categorization.ocrResult.shortDisplayLabel
@@ -158,7 +158,7 @@ extension ScanCommand {
 extension ScanCommand {
     func determineIsMatchCompact(
         _ categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Bool {
         let vlmTimedOut = categorization.vlmResult.isTimedOut
         let ocrTimedOut = categorization.ocrResult.isTimedOut
@@ -196,7 +196,7 @@ extension ScanCommand {
             categorization,
             documentType: documentType,
             vlmConf: vlmConf,
-            ocrConf: ocrConf
+            ocrConf: ocrConf,
         )
     }
 
@@ -204,7 +204,7 @@ extension ScanCommand {
         _ categorization: CategorizationVerification,
         documentType: DocumentType,
         vlmConf: ConfidenceLevel,
-        ocrConf: ConfidenceLevel
+        ocrConf: ConfidenceLevel,
     ) throws -> Bool {
         let vlmYN = categorization.vlmResult.isMatch ? "YES" : "NO"
         let ocrYN = categorization.ocrResult.isMatch ? "YES" : "NO"

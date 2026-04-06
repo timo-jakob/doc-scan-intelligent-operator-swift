@@ -12,11 +12,11 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             modelName: "mlx-community/Qwen2-VL-2B-Instruct-4bit",
             pdfSet: BenchmarkPDFSet(
                 positivePDFs: ["/path/to/invoice1.pdf", "/path/to/invoice2.pdf"],
-                negativePDFs: ["/path/to/not_invoice.pdf"]
+                negativePDFs: ["/path/to/not_invoice.pdf"],
             ),
             timeoutSeconds: 30.0,
             documentType: .invoice,
-            configuration: config
+            configuration: config,
         )
 
         let data = try JSONEncoder().encode(input)
@@ -39,7 +39,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-01-15",
-            secondaryField: "Test_Company"
+            secondaryField: "Test_Company",
         )
 
         let input = BenchmarkWorkerInput(
@@ -47,15 +47,15 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             modelName: "mlx-community/Qwen2.5-7B-Instruct-4bit",
             pdfSet: BenchmarkPDFSet(
                 positivePDFs: ["/path/to/invoice.pdf"],
-                negativePDFs: ["/path/to/other.pdf"]
+                negativePDFs: ["/path/to/other.pdf"],
             ),
             timeoutSeconds: 60.0,
             documentType: .invoice,
             configuration: Configuration.defaultConfiguration,
             textLLMData: TextLLMInputData(
                 ocrTexts: ["/path/to/invoice.pdf": "Rechnung Nr. 12345"],
-                groundTruths: ["/path/to/invoice.pdf": groundTruth]
-            )
+                groundTruths: ["/path/to/invoice.pdf": groundTruth],
+            ),
         )
 
         let data = try JSONEncoder().encode(input)
@@ -77,7 +77,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
                 VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true),
                 VLMDocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: false),
             ],
-            elapsedSeconds: 5.0
+            elapsedSeconds: 5.0,
         )
         let output = BenchmarkWorkerOutput.vlm(vlmResult)
 
@@ -101,10 +101,10 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             documentResults: [
                 TextLLMDocumentResult(
                     filename: "a.pdf", isPositiveSample: true,
-                    categorizationCorrect: true, extractionCorrect: true
+                    categorizationCorrect: true, extractionCorrect: true,
                 ),
             ],
-            elapsedSeconds: 12.0
+            elapsedSeconds: 12.0,
         )
         let output = BenchmarkWorkerOutput.textLLM(textResult)
 
@@ -122,7 +122,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
 
     func testDisqualifiedOutputCodableRoundTrip() throws {
         let vlmResult = VLMBenchmarkResult.disqualified(
-            modelName: "bad/model", reason: "Worker crashed (signal 6)"
+            modelName: "bad/model", reason: "Worker crashed (signal 6)",
         )
         let output = BenchmarkWorkerOutput.vlm(vlmResult)
 
@@ -152,7 +152,7 @@ final class BenchmarkWorkerIOTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: ["/rx.pdf"], negativePDFs: []),
             timeoutSeconds: 10.0,
             documentType: .prescription,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let data = try JSONEncoder().encode(input)

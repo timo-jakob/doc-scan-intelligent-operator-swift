@@ -9,7 +9,7 @@ final class VerificationTests: XCTestCase {
             isMatch: true,
             confidence: .high,
             method: .vlm,
-            reason: "Contains invoice keywords"
+            reason: "Contains invoice keywords",
         )
 
         XCTAssertTrue(result.isMatch)
@@ -21,7 +21,7 @@ final class VerificationTests: XCTestCase {
     func testCategorizationResultDefaultConfidence() {
         let result = CategorizationResult(
             isMatch: false,
-            method: .ocr
+            method: .ocr,
         )
 
         XCTAssertFalse(result.isMatch)
@@ -299,7 +299,7 @@ extension VerificationTests {
             documentType: .invoice,
             isMatch: true,
             date: date,
-            secondaryField: "Acme Corp"
+            secondaryField: "Acme Corp",
         )
 
         XCTAssertTrue(documentData.isMatch)
@@ -319,7 +319,7 @@ extension VerificationTests {
             isMatch: true,
             date: date,
             secondaryField: "Test Corp",
-            categorization: categorization
+            categorization: categorization,
         )
 
         XCTAssertTrue(documentData.isMatch)
@@ -334,7 +334,7 @@ extension VerificationTests {
             documentType: .invoice,
             isMatch: false,
             date: nil,
-            secondaryField: nil
+            secondaryField: nil,
         )
 
         XCTAssertFalse(documentData.isMatch)

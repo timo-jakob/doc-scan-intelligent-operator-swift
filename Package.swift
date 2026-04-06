@@ -11,11 +11,11 @@ let package = Package(
     products: [
         .executable(
             name: "docscan",
-            targets: ["DocScanCLI"]
+            targets: ["DocScanCLI"],
         ),
         .library(
             name: "DocScanCore",
-            targets: ["DocScanCore"]
+            targets: ["DocScanCore"],
         ),
     ],
     dependencies: [
@@ -41,7 +41,7 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
             ],
-            path: "Sources/DocScanCore"
+            path: "Sources/DocScanCore",
         ),
 
         // CLI executable
@@ -51,14 +51,14 @@ let package = Package(
                 "DocScanCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/DocScanCLI"
+            path: "Sources/DocScanCLI",
         ),
 
         // Tests
         .testTarget(
             name: "DocScanCoreTests",
             dependencies: ["DocScanCore"],
-            path: "Tests/DocScanCoreTests"
+            path: "Tests/DocScanCoreTests",
         ),
-    ]
+    ],
 )

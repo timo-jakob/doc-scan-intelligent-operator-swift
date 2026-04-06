@@ -11,7 +11,7 @@ final class FileRenamerTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(
             at: tempDirectory,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
         )
         renamer = FileRenamer(verbose: false)
     }
@@ -30,7 +30,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "renamed.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("renamed.txt").path
@@ -48,7 +48,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "renamed.txt",
-            dryRun: true
+            dryRun: true,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("renamed.txt").path
@@ -71,7 +71,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "target.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("target_1.txt").path
@@ -90,7 +90,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "same.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         XCTAssertEqual(newPath, sourceFile.path)
@@ -101,7 +101,7 @@ final class FileRenamerTests: XCTestCase {
         let nonExistentFile = tempDirectory.appendingPathComponent("nonexistent.txt").path
 
         XCTAssertThrowsError(
-            try renamer.rename(from: nonExistentFile, to: "new.txt", dryRun: false)
+            try renamer.rename(from: nonExistentFile, to: "new.txt", dryRun: false),
         ) { error in
             XCTAssertTrue(error is DocScanError)
         }
@@ -123,7 +123,7 @@ final class FileRenamerTests: XCTestCase {
             from: sourceFile.path,
             to: targetDir.path,
             filename: "moved.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = targetDir.appendingPathComponent("moved.txt").path
@@ -144,7 +144,7 @@ final class FileRenamerTests: XCTestCase {
             from: sourceFile.path,
             to: targetDir.path,
             filename: "moved.txt",
-            dryRun: true
+            dryRun: true,
         )
 
         let expectedPath = targetDir.appendingPathComponent("moved.txt").path
@@ -169,7 +169,7 @@ final class FileRenamerTests: XCTestCase {
             from: sourceFile.path,
             to: targetDir.path,
             filename: "moved.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: targetDir.path))
@@ -192,7 +192,7 @@ final class FileRenamerTests: XCTestCase {
             from: sourceFile.path,
             to: targetDir.path,
             filename: "target.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = targetDir.appendingPathComponent("target_1.txt").path
@@ -210,8 +210,8 @@ final class FileRenamerTests: XCTestCase {
                 from: nonExistentFile,
                 to: targetDir,
                 filename: "new.txt",
-                dryRun: false
-            )
+                dryRun: false,
+            ),
         ) { error in
             guard let docScanError = error as? DocScanError else {
                 XCTFail("Expected DocScanError")
@@ -245,7 +245,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "target.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("target_3.txt").path
@@ -266,7 +266,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try verboseRenamer.rename(
             from: sourceFile.path,
             to: "renamed.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: newPath))
@@ -283,7 +283,7 @@ final class FileRenamerTests: XCTestCase {
         _ = try verboseRenamer.rename(
             from: sourceFile.path,
             to: "renamed.txt",
-            dryRun: true
+            dryRun: true,
         )
 
         // Original file should still exist
@@ -304,7 +304,7 @@ final class FileRenamerTests: XCTestCase {
         let newPath = try verboseRenamer.rename(
             from: sourceFile.path,
             to: "target.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("target_1.txt").path
@@ -323,7 +323,7 @@ extension FileRenamerTests {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "renamed",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("renamed").path
@@ -342,7 +342,7 @@ extension FileRenamerTests {
         let newPath = try renamer.rename(
             from: sourceFile.path,
             to: "target",
-            dryRun: false
+            dryRun: false,
         )
 
         let expectedPath = tempDirectory.appendingPathComponent("target_1").path
@@ -365,7 +365,7 @@ extension FileRenamerTests {
             from: sourceFile.path,
             to: targetDir.path,
             filename: "moved.txt",
-            dryRun: false
+            dryRun: false,
         )
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: newPath))
@@ -385,7 +385,7 @@ extension FileRenamerTests {
             from: sourceFile.path,
             to: targetDir.path,
             filename: "moved.txt",
-            dryRun: true
+            dryRun: true,
         )
 
         // Original file should still exist

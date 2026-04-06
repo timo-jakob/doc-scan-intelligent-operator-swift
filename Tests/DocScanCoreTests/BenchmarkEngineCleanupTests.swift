@@ -9,7 +9,7 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice
+            documentType: .invoice,
         )
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("BenchmarkCleanupTests-\(UUID().uuidString)")
@@ -46,7 +46,7 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
         engine.cleanupBenchmarkedModels(
             modelNames: ["org/keep-model", "org/delete-model"],
             keepModel: "org/keep-model",
-            cachePath: hubDir.path
+            cachePath: hubDir.path,
         )
 
         // The kept model dir should still exist
@@ -101,7 +101,7 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
         engine.cleanupBenchmarkedModels(
             modelNames: allNames,
             keepModel: nil,
-            cachePath: hubDir.path
+            cachePath: hubDir.path,
         )
 
         // The valid model should have been deleted

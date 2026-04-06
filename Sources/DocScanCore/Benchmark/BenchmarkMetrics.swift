@@ -55,7 +55,7 @@ public struct VLMDocumentResult: Codable, Equatable, Sendable {
     public init(
         filename: String,
         isPositiveSample: Bool,
-        predictedIsMatch: Bool
+        predictedIsMatch: Bool,
     ) {
         self.filename = filename
         self.isPositiveSample = isPositiveSample
@@ -118,7 +118,7 @@ public struct VLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkResultP
         documentResults: [VLMDocumentResult],
         elapsedSeconds: TimeInterval,
         isDisqualified: Bool = false,
-        disqualificationReason: String? = nil
+        disqualificationReason: String? = nil,
     ) {
         self.modelName = modelName
         self.totalScore = totalScore
@@ -133,7 +133,7 @@ public struct VLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkResultP
     public static func from(
         modelName: String,
         documentResults: [VLMDocumentResult],
-        elapsedSeconds: TimeInterval
+        elapsedSeconds: TimeInterval,
     ) -> VLMBenchmarkResult {
         let totalScore = documentResults.reduce(0) { $0 + $1.score }
         return VLMBenchmarkResult(
@@ -141,14 +141,14 @@ public struct VLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkResultP
             totalScore: totalScore,
             maxScore: documentResults.count,
             documentResults: documentResults,
-            elapsedSeconds: elapsedSeconds
+            elapsedSeconds: elapsedSeconds,
         )
     }
 
     /// Create a disqualified result
     public static func disqualified(
         modelName: String,
-        reason: String
+        reason: String,
     ) -> VLMBenchmarkResult {
         VLMBenchmarkResult(
             modelName: modelName,
@@ -157,7 +157,7 @@ public struct VLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkResultP
             documentResults: [],
             elapsedSeconds: 0,
             isDisqualified: true,
-            disqualificationReason: reason
+            disqualificationReason: reason,
         )
     }
 }
@@ -187,7 +187,7 @@ public struct TextLLMDocumentResult: Codable, Equatable, Sendable {
         filename: String,
         isPositiveSample: Bool,
         categorizationCorrect: Bool,
-        extractionCorrect: Bool
+        extractionCorrect: Bool,
     ) {
         self.filename = filename
         self.isPositiveSample = isPositiveSample
@@ -246,7 +246,7 @@ public struct TextLLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkRes
         documentResults: [TextLLMDocumentResult],
         elapsedSeconds: TimeInterval,
         isDisqualified: Bool = false,
-        disqualificationReason: String? = nil
+        disqualificationReason: String? = nil,
     ) {
         self.modelName = modelName
         self.totalScore = totalScore
@@ -261,7 +261,7 @@ public struct TextLLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkRes
     public static func from(
         modelName: String,
         documentResults: [TextLLMDocumentResult],
-        elapsedSeconds: TimeInterval
+        elapsedSeconds: TimeInterval,
     ) -> TextLLMBenchmarkResult {
         let totalScore = documentResults.reduce(0) { $0 + $1.score }
         return TextLLMBenchmarkResult(
@@ -269,14 +269,14 @@ public struct TextLLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkRes
             totalScore: totalScore,
             maxScore: 2 * documentResults.count,
             documentResults: documentResults,
-            elapsedSeconds: elapsedSeconds
+            elapsedSeconds: elapsedSeconds,
         )
     }
 
     /// Create a disqualified result
     public static func disqualified(
         modelName: String,
-        reason: String
+        reason: String,
     ) -> TextLLMBenchmarkResult {
         TextLLMBenchmarkResult(
             modelName: modelName,
@@ -285,7 +285,7 @@ public struct TextLLMBenchmarkResult: Codable, Equatable, Sendable, BenchmarkRes
             documentResults: [],
             elapsedSeconds: 0,
             isDisqualified: true,
-            disqualificationReason: reason
+            disqualificationReason: reason,
         )
     }
 }

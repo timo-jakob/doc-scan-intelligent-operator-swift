@@ -9,7 +9,7 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "benchmark-worker",
         abstract: "Run a single model benchmark in an isolated subprocess",
-        shouldDisplay: false
+        shouldDisplay: false,
     )
 
     @Option(name: .long, help: "Path to input JSON file")
@@ -36,13 +36,13 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
     }
 
     private func executeBenchmark(
-        workerInput: BenchmarkWorkerInput
+        workerInput: BenchmarkWorkerInput,
     ) async throws -> BenchmarkWorkerOutput {
         BenchmarkEngine.configureMLXMemoryBudget()
 
         let engine = BenchmarkEngine(
             configuration: workerInput.configuration,
-            documentType: workerInput.documentType
+            documentType: workerInput.documentType,
         )
 
         return switch workerInput.phase {
@@ -62,7 +62,7 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
 
     private func runVLMBenchmark(
         engine: BenchmarkEngine,
-        input workerInput: BenchmarkWorkerInput
+        input workerInput: BenchmarkWorkerInput,
     ) async -> BenchmarkWorkerOutput {
         let vlmFactory = DefaultVLMOnlyFactory()
         let result = await engine.benchmarkVLM(
@@ -70,14 +70,14 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
             positivePDFs: workerInput.pdfSet.positivePDFs,
             negativePDFs: workerInput.pdfSet.negativePDFs,
             timeoutSeconds: workerInput.timeoutSeconds,
-            vlmFactory: vlmFactory
+            vlmFactory: vlmFactory,
         )
         return .vlm(result)
     }
 
     private func runTextLLMBenchmark(
         engine: BenchmarkEngine,
-        input workerInput: BenchmarkWorkerInput
+        input workerInput: BenchmarkWorkerInput,
     ) async -> BenchmarkWorkerOutput {
         guard let textLLMData = workerInput.textLLMData else {
             preconditionFailure("textLLMData must be set for the TextLLM phase")
@@ -86,14 +86,14 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
             ocrTexts: textLLMData.ocrTexts,
             groundTruths: textLLMData.groundTruths,
             timeoutSeconds: workerInput.timeoutSeconds,
-            textLLMFactory: DefaultTextLLMOnlyFactory()
+            textLLMFactory: DefaultTextLLMOnlyFactory(),
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: workerInput.modelName,
             positivePDFs: workerInput.pdfSet.positivePDFs,
             negativePDFs: workerInput.pdfSet.negativePDFs,
-            context: context
+            context: context,
         )
         return .textLLM(result)
     }

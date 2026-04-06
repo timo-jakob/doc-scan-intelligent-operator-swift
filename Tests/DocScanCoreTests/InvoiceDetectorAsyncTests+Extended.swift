@@ -18,7 +18,7 @@ extension InvoiceDetectorAsyncTests {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let pdfPath = try createSearchablePDF()
@@ -44,7 +44,7 @@ extension InvoiceDetectorAsyncTests {
             config: verboseConfig,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let pdfPath = try createSearchablePDF()
@@ -70,7 +70,7 @@ extension InvoiceDetectorAsyncTests {
             config: verboseConfig,
             documentType: .prescription,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let pdfPath = try createSearchablePDF()
@@ -92,7 +92,7 @@ extension InvoiceDetectorAsyncTests {
             config: verboseConfig,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let pdfPath = try createSearchablePDF()

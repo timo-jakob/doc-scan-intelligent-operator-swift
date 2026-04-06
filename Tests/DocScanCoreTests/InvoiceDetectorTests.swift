@@ -52,7 +52,7 @@ final class InvoiceDetectorTests: XCTestCase {
         let pdfPath = tempDirectory.appendingPathComponent("test_invoice.pdf").path
         guard let pdfData = Data(
             base64Encoded: Self.sharedSearchablePDFBase64,
-            options: .ignoreUnknownCharacters
+            options: .ignoreUnknownCharacters,
         ) else {
             throw NSError(domain: "TestError", code: 1)
         }
@@ -77,7 +77,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: Date(),
-            secondaryField: "Test Corp"
+            secondaryField: "Test Corp",
         )
 
         XCTAssertTrue(data.isMatch)
@@ -90,7 +90,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: false,
             date: nil,
-            secondaryField: nil
+            secondaryField: nil,
         )
 
         XCTAssertFalse(data.isMatch)
@@ -107,7 +107,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: date,
-            secondaryField: "Acme_Corp"
+            secondaryField: "Acme_Corp",
         )
         let filename = detector.generateFilename(from: data)
 
@@ -119,7 +119,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: false,
             date: nil,
-            secondaryField: nil
+            secondaryField: nil,
         )
         let filename = detector.generateFilename(from: data)
 
@@ -131,7 +131,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: Date(),
-            secondaryField: nil
+            secondaryField: nil,
         )
         let filename1 = detector.generateFilename(from: data1)
         XCTAssertNil(filename1)
@@ -140,7 +140,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: nil,
-            secondaryField: "Test"
+            secondaryField: "Test",
         )
         let filename2 = detector.generateFilename(from: data2)
         XCTAssertNil(filename2)
@@ -160,7 +160,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: date,
-            secondaryField: "TestCo"
+            secondaryField: "TestCo",
         )
         let filename = customDetector.generateFilename(from: data)
 
@@ -169,7 +169,7 @@ final class InvoiceDetectorTests: XCTestCase {
 
     func testCustomDateFormat() throws {
         let customConfig = Configuration(
-            output: OutputSettings(dateFormat: "dd.MM.yyyy")
+            output: OutputSettings(dateFormat: "dd.MM.yyyy"),
         )
         let customDetector = DocumentDetector(config: customConfig, documentType: .invoice)
 
@@ -181,7 +181,7 @@ final class InvoiceDetectorTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: date,
-            secondaryField: "TestCo"
+            secondaryField: "TestCo",
         )
         let filename = customDetector.generateFilename(from: data)
 
@@ -198,7 +198,7 @@ extension InvoiceDetectorTests {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: textLLM
+            textLLM: textLLM,
         )
 
         XCTAssertEqual(detectorWithTextLLM.documentType, .invoice)
@@ -210,7 +210,7 @@ extension InvoiceDetectorTests {
             config: config,
             documentType: .prescription,
             vlmProvider: mockVLM,
-            textLLM: textLLM
+            textLLM: textLLM,
         )
 
         XCTAssertEqual(detectorWithTextLLM.documentType, .prescription)
@@ -222,7 +222,7 @@ extension InvoiceDetectorTests {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: textLLM
+            textLLM: textLLM,
         )
 
         let dateFormatter = DateFormatter()
@@ -232,7 +232,7 @@ extension InvoiceDetectorTests {
             documentType: .invoice,
             isMatch: true,
             date: date,
-            secondaryField: "Test_Corp"
+            secondaryField: "Test_Corp",
         )
         let filename = detectorWithTextLLM.generateFilename(from: data)
         XCTAssertEqual(filename, "2025-01-15_Rechnung_Test_Corp.pdf")

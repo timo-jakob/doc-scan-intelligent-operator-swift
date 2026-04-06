@@ -18,7 +18,7 @@ public struct GroundTruthMetadata: Codable, Equatable, Sendable {
         vlmModel: String? = nil,
         textModel: String? = nil,
         generatedAt: Date? = nil,
-        verified: Bool = false
+        verified: Bool = false,
     ) {
         self.vlmModel = vlmModel
         self.textModel = textModel
@@ -53,7 +53,7 @@ public struct GroundTruth: Codable, Equatable, Sendable {
         date: String? = nil,
         secondaryField: String? = nil,
         patientName: String? = nil,
-        metadata: GroundTruthMetadata = GroundTruthMetadata()
+        metadata: GroundTruthMetadata = GroundTruthMetadata(),
     ) {
         self.isMatch = isMatch
         self.documentType = documentType

@@ -110,7 +110,7 @@ public struct BenchmarkEngine: Sendable {
 
     public init(
         configuration: Configuration,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) {
         self.configuration = configuration
         self.documentType = documentType
@@ -171,7 +171,7 @@ public struct BenchmarkEngine: Sendable {
             let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
             guard FileManager.default.fileExists(atPath: sidecarPath) else {
                 throw DocScanError.benchmarkError(
-                    "Missing ground truth sidecar for: \(URL(fileURLWithPath: pdfPath).lastPathComponent)"
+                    "Missing ground truth sidecar for: \(URL(fileURLWithPath: pdfPath).lastPathComponent)",
                 )
             }
             groundTruths[pdfPath] = try GroundTruth.load(from: sidecarPath)
@@ -207,7 +207,7 @@ public struct BenchmarkEngine: Sendable {
                     do {
                         let image = try PDFUtils.pdfToImage(
                             at: pdfPath,
-                            dpi: config.pdfDPI
+                            dpi: config.pdfDPI,
                         )
                         let text = try await ocrEngine.extractText(from: image)
                         if isVerbose {
@@ -237,7 +237,7 @@ public struct BenchmarkEngine: Sendable {
         positivePDFs: [String],
         negativePDFs: [String],
         ocrTexts: [String: String],
-        skipExisting: Bool = false
+        skipExisting: Bool = false,
     ) async throws -> [String: GroundTruth] {
         var groundTruths: [String: GroundTruth] = [:]
 
@@ -249,14 +249,14 @@ public struct BenchmarkEngine: Sendable {
         for pdfPath in positivePDFs {
             let groundTruth = try await generatePositiveGroundTruth(
                 pdfPath: pdfPath, ocrTexts: ocrTexts, textLLM: &textLLM,
-                skipExisting: skipExisting
+                skipExisting: skipExisting,
             )
             groundTruths[pdfPath] = groundTruth
         }
 
         for pdfPath in negativePDFs {
             let groundTruth = try generateNegativeGroundTruth(
-                pdfPath: pdfPath, skipExisting: skipExisting
+                pdfPath: pdfPath, skipExisting: skipExisting,
             )
             groundTruths[pdfPath] = groundTruth
         }
@@ -268,7 +268,7 @@ public struct BenchmarkEngine: Sendable {
         pdfPath: String,
         ocrTexts: [String: String],
         textLLM: inout (any TextLLMProviding)?,
-        skipExisting: Bool
+        skipExisting: Bool,
     ) async throws -> GroundTruth {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
         let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
@@ -284,7 +284,7 @@ public struct BenchmarkEngine: Sendable {
             try await manager.preload { progress in
                 print(
                     "\r  Loading TextLLM for ground truth generation (\(Int(progress * 100))%)...",
-                    terminator: ""
+                    terminator: "",
                 )
                 fflush(stdout)
             }
@@ -318,7 +318,7 @@ public struct BenchmarkEngine: Sendable {
             date: date,
             secondaryField: secondaryField,
             patientName: patientName,
-            metadata: makeGroundTruthMetadata()
+            metadata: makeGroundTruthMetadata(),
         )
 
         try groundTruth.save(to: sidecarPath)
@@ -328,7 +328,7 @@ public struct BenchmarkEngine: Sendable {
 
     private func generateNegativeGroundTruth(
         pdfPath: String,
-        skipExisting: Bool
+        skipExisting: Bool,
     ) throws -> GroundTruth {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
         let sidecarPath = GroundTruth.sidecarPath(for: pdfPath)
@@ -343,7 +343,7 @@ public struct BenchmarkEngine: Sendable {
         let groundTruth = GroundTruth(
             isMatch: false,
             documentType: documentType,
-            metadata: makeGroundTruthMetadata()
+            metadata: makeGroundTruthMetadata(),
         )
 
         try groundTruth.save(to: sidecarPath)
@@ -355,7 +355,7 @@ public struct BenchmarkEngine: Sendable {
             vlmModel: configuration.modelName,
             textModel: configuration.textModelName,
             generatedAt: Date(),
-            verified: false
+            verified: false,
         )
     }
 }
@@ -372,7 +372,7 @@ extension BenchmarkEngine {
     /// ignores Swift task cancellation.
     static func withHardTimeout<T: Sendable>(
         seconds: TimeInterval,
-        operation: @Sendable () async throws -> T
+        operation: @Sendable () async throws -> T,
     ) async throws -> T {
         let watchdog = DispatchWorkItem {
             fputs("HARD TIMEOUT: inference exceeded \(Int(seconds))s — terminating worker\n", stderr)

@@ -23,7 +23,7 @@ final class BenchmarkMockTextLLMProvider: TextLLMProviding, @unchecked Sendable 
 
     func extractData(
         for _: DocumentType,
-        from _: String
+        from _: String,
     ) async throws -> ExtractionResult {
         mockExtractionResult
     }
@@ -31,7 +31,7 @@ final class BenchmarkMockTextLLMProvider: TextLLMProviding, @unchecked Sendable 
     func generate(
         systemPrompt _: String,
         userPrompt _: String,
-        maxTokens _: Int
+        maxTokens _: Int,
     ) async throws -> String {
         if let error = generateError {
             throw error
@@ -85,7 +85,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice
+            documentType: .invoice,
         )
     }
 
@@ -96,7 +96,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: true,
-            extractionCorrect: true
+            extractionCorrect: true,
         )
         XCTAssertEqual(result.score, 2)
     }
@@ -106,7 +106,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: true,
-            extractionCorrect: false
+            extractionCorrect: false,
         )
         XCTAssertEqual(result.score, 1)
     }
@@ -116,7 +116,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: false,
-            extractionCorrect: false
+            extractionCorrect: false,
         )
         XCTAssertEqual(result.score, 0)
     }
@@ -127,7 +127,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             filename: "letter.pdf",
             isPositiveSample: false,
             categorizationCorrect: true,
-            extractionCorrect: true
+            extractionCorrect: true,
         )
         XCTAssertEqual(result.score, 2)
     }
@@ -138,7 +138,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             filename: "letter.pdf",
             isPositiveSample: false,
             categorizationCorrect: false,
-            extractionCorrect: false
+            extractionCorrect: false,
         )
         XCTAssertEqual(result.score, 0)
     }
@@ -157,7 +157,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         let benchmark = TextLLMBenchmarkResult.from(
             modelName: "test/text",
             documentResults: results,
-            elapsedSeconds: 20.0
+            elapsedSeconds: 20.0,
         )
 
         XCTAssertEqual(benchmark.fullyCorrectCount, 1) // score == 2
@@ -173,13 +173,13 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: [:], groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
         let result = await engine.benchmarkTextLLM(
             modelName: "test/model",
             positivePDFs: [],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertTrue(result.isDisqualified)
@@ -194,7 +194,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         let benchmark = TextLLMBenchmarkResult.from(
             modelName: "test/text",
             documentResults: results,
-            elapsedSeconds: 33.7
+            elapsedSeconds: 33.7,
         )
         XCTAssertEqual(benchmark.elapsedSeconds, 33.7)
     }
@@ -205,14 +205,14 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         let factory = MockTextLLMOnlyFactory()
         let context = TextLLMBenchmarkContext(
             ocrTexts: [:], groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: [],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -233,14 +233,14 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             ocrTexts: [:], // No OCR text for any document
             groundTruths: [:],
             timeoutSeconds: 10,
-            textLLMFactory: factory
+            textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -258,14 +258,14 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             ocrTexts: ["/fake/invoice.pdf": "Some invoice text with Rechnung"],
             groundTruths: [:],
             timeoutSeconds: 10,
-            textLLMFactory: factory
+            textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -283,14 +283,14 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             ocrTexts: ["/fake/letter.pdf": "Some random text about weather"],
             groundTruths: [:],
             timeoutSeconds: 10,
-            textLLMFactory: factory
+            textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: [],
             negativePDFs: ["/fake/letter.pdf"],
-            context: context
+            context: context,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -308,14 +308,14 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             ocrTexts: ["/fake/invoice.pdf": ""], // Empty string
             groundTruths: [:],
             timeoutSeconds: 10,
-            textLLMFactory: factory
+            textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -331,7 +331,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
         let factory = MockTextLLMOnlyFactory()
         let context = TextLLMBenchmarkContext(
             ocrTexts: [:], groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         // Use an absurdly large model name to trigger memory check
@@ -339,7 +339,7 @@ final class BenchmarkEngineTextLLMTests: XCTestCase {
             modelName: "org/Model-999999B-4bit",
             positivePDFs: [],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertTrue(result.isDisqualified)

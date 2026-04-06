@@ -15,7 +15,7 @@ public protocol VLMProvider: Sendable {
     func generateFromImage(
         _ image: NSImage,
         prompt: String,
-        modelName: String?
+        modelName: String?,
     ) async throws -> String
 }
 
@@ -44,13 +44,13 @@ public actor ModelManager: VLMProvider {
     /// - temperature: 0 (deterministic output)
     private static let classificationParams = GenerateParameters(
         maxTokens: 8,
-        temperature: 0.0
+        temperature: 0.0,
     )
 
     /// Image processing that preserves A4 portrait aspect ratio (1:√2).
     /// The default 512×512 squashes A4 documents; 448×632 keeps layout readable.
     private static let a4Processing = UserInput.Processing(
-        resize: CGSize(width: 448, height: 632)
+        resize: CGSize(width: 448, height: 632),
     )
 
     // Chat session for VLM (lazy loaded)
@@ -67,7 +67,7 @@ public actor ModelManager: VLMProvider {
     public func generateFromImage(
         _ image: NSImage,
         prompt: String,
-        modelName: String? = nil
+        modelName: String? = nil,
     ) async throws -> String {
         guard !isGenerating else {
             throw DocScanError.inferenceError("VLM generation already in progress")
@@ -108,7 +108,7 @@ public actor ModelManager: VLMProvider {
         nonisolated(unsafe) let sendableSession = session
         let response = try await sendableSession.respond(
             to: prompt,
-            image: .url(tempURL)
+            image: .url(tempURL),
         )
 
         if config.verbose {
@@ -142,7 +142,7 @@ public actor ModelManager: VLMProvider {
             model,
             instructions: Self.classifierInstructions,
             generateParameters: Self.classificationParams,
-            processing: Self.a4Processing
+            processing: Self.a4Processing,
         )
     }
 
@@ -158,7 +158,7 @@ public actor ModelManager: VLMProvider {
 
             // Load VLM using loadModel (recommended approach for VLMs)
             let model = try await loadModel(
-                id: modelName
+                id: modelName,
             ) { [self] progress in
                 if config.verbose {
                     let percent = Int(progress.fractionCompleted * 100)
@@ -188,7 +188,7 @@ public actor ModelManager: VLMProvider {
     /// If the model is already cached locally the handler is never called.
     public func preload(
         modelName: String,
-        progressHandler: @escaping @Sendable (Double) -> Void
+        progressHandler: @escaping @Sendable (Double) -> Void,
     ) async throws {
         guard loadedModel == nil || currentModelName != modelName else { return }
 

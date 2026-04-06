@@ -64,7 +64,7 @@ enum TerminalUtils {
         title: String,
         results: [T],
         headerSuffix: String,
-        rowFormatter: (T) -> String
+        rowFormatter: (T) -> String,
     ) -> String {
         var lines: [String] = []
         lines.append(title)
@@ -124,7 +124,7 @@ enum TerminalUtils {
         formatLeaderboard(
             title: "VLM Leaderboard: Categorization",
             results: results,
-            headerSuffix: "TP  TN  FP  FN"
+            headerSuffix: "TP  TN  FP  FN",
         ) { result in
             let truePos = String(result.truePositives).leftPadded(toLength: 3)
             let trueNeg = String(result.trueNegatives).leftPadded(toLength: 3)
@@ -141,7 +141,7 @@ enum TerminalUtils {
         formatLeaderboard(
             title: "TextLLM Leaderboard: Categorization + Extraction",
             results: results,
-            headerSuffix: "2s  1s  0s"
+            headerSuffix: "2s  1s  0s",
         ) { result in
             let twos = String(result.fullyCorrectCount).leftPadded(toLength: 3)
             let ones = String(result.partiallyCorrectCount).leftPadded(toLength: 3)

@@ -38,7 +38,7 @@ extension InvoiceDetectorIntegrationTests {
             isMatch: true,
             date: date,
             secondaryField: "Gesine_Kaiser",
-            patientName: "Penelope"
+            patientName: "Penelope",
         )
         let filename = prescriptionDetector.generateFilename(from: data)
 
@@ -58,7 +58,7 @@ extension InvoiceDetectorIntegrationTests {
             isMatch: true,
             date: date,
             secondaryField: "Gesine_Kaiser",
-            patientName: nil
+            patientName: nil,
         )
         let filename = prescriptionDetector.generateFilename(from: data)
 
@@ -78,7 +78,7 @@ extension InvoiceDetectorIntegrationTests {
             isMatch: true,
             date: date,
             secondaryField: nil,
-            patientName: "Penelope"
+            patientName: "Penelope",
         )
         let filename = prescriptionDetector.generateFilename(from: data)
 
@@ -98,7 +98,7 @@ extension InvoiceDetectorIntegrationTests {
             isMatch: true,
             date: date,
             secondaryField: nil,
-            patientName: nil
+            patientName: nil,
         )
         let filename = prescriptionDetector.generateFilename(from: data)
 
@@ -110,7 +110,7 @@ extension InvoiceDetectorIntegrationTests {
             documentType: .prescription,
             isMatch: true,
             date: Date(),
-            secondaryField: "Gesine Kaiser"
+            secondaryField: "Gesine Kaiser",
         )
 
         XCTAssertEqual(data.documentType, .prescription)

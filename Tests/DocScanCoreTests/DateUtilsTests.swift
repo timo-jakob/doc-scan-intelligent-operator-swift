@@ -39,7 +39,7 @@ final class DateUtilsTests: XCTestCase {
             let year = Calendar.current.component(.year, from: date)
             XCTAssertFalse(
                 DateUtils.isValidDate(date),
-                "Date in \(year) should be invalid (before 2000)"
+                "Date in \(year) should be invalid (before 2000)",
             )
         }
     }
@@ -50,7 +50,7 @@ final class DateUtilsTests: XCTestCase {
         let upperBoundaryDate = createDate(year: currentYear + 2, month: 6, day: 15)
         XCTAssertTrue(
             DateUtils.isValidDate(upperBoundaryDate),
-            "Year \(currentYear + 2) should be valid (upper boundary)"
+            "Year \(currentYear + 2) should be valid (upper boundary)",
         )
 
         let endOfUpperBoundary = createDate(year: currentYear + 2, month: 12, day: 31)
@@ -71,7 +71,7 @@ final class DateUtilsTests: XCTestCase {
             let year = Calendar.current.component(.year, from: date)
             XCTAssertFalse(
                 DateUtils.isValidDate(date),
-                "Date in \(year) should be invalid (more than 2 years in future)"
+                "Date in \(year) should be invalid (more than 2 years in future)",
             )
         }
     }
@@ -103,7 +103,7 @@ final class DateUtilsTests: XCTestCase {
         for dateString in invalidDateStrings {
             XCTAssertNil(
                 DateUtils.parseDate(dateString),
-                "Date string '\(dateString)' should be rejected by validation"
+                "Date string '\(dateString)' should be rejected by validation",
             )
         }
     }

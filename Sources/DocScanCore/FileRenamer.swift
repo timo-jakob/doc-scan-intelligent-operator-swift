@@ -12,7 +12,7 @@ public struct FileRenamer: Sendable {
     public func rename(
         from sourcePath: String,
         to targetFilename: String,
-        dryRun: Bool = false
+        dryRun: Bool = false,
     ) throws(DocScanError) -> String {
         let sourceURL = URL(fileURLWithPath: sourcePath)
         let sourceDirectory = sourceURL.deletingLastPathComponent()
@@ -22,7 +22,7 @@ public struct FileRenamer: Sendable {
         let resolvedTarget = targetURL.standardized
         guard resolvedTarget.path.hasPrefix(sourceDirectory.standardized.path) else {
             throw DocScanError.fileOperationFailed(
-                "Target filename would escape source directory: \(targetFilename)"
+                "Target filename would escape source directory: \(targetFilename)",
             )
         }
 
@@ -123,7 +123,7 @@ public struct FileRenamer: Sendable {
         from sourcePath: String,
         to targetDirectory: String,
         filename: String,
-        dryRun: Bool = false
+        dryRun: Bool = false,
     ) throws(DocScanError) -> String {
         let sourceURL = URL(fileURLWithPath: sourcePath)
 
@@ -133,11 +133,11 @@ public struct FileRenamer: Sendable {
                 try FileManager.default.createDirectory(
                     atPath: targetDirectory,
                     withIntermediateDirectories: true,
-                    attributes: nil
+                    attributes: nil,
                 )
             } catch {
                 throw DocScanError.fileOperationFailed(
-                    "Failed to create directory: \(error.localizedDescription)"
+                    "Failed to create directory: \(error.localizedDescription)",
                 )
             }
         }

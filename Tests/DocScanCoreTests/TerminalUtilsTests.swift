@@ -76,7 +76,7 @@ final class TerminalUtilsTests: XCTestCase {
             VLMDocumentResult(filename: "d.pdf", isPositiveSample: true, predictedIsMatch: false), // FN
         ]
         let result = VLMBenchmarkResult.from(
-            modelName: "test/vlm", documentResults: docResults, elapsedSeconds: 5
+            modelName: "test/vlm", documentResults: docResults, elapsedSeconds: 5,
         )
 
         XCTAssertEqual(result.truePositives, 1)
@@ -97,7 +97,7 @@ final class TerminalUtilsTests: XCTestCase {
                                   categorizationCorrect: false, extractionCorrect: false), // 0
         ]
         let result = TextLLMBenchmarkResult.from(
-            modelName: "test/text", documentResults: docResults, elapsedSeconds: 10
+            modelName: "test/text", documentResults: docResults, elapsedSeconds: 10,
         )
 
         XCTAssertEqual(result.fullyCorrectCount, 1)
@@ -111,12 +111,12 @@ final class TerminalUtilsTests: XCTestCase {
 
     func testElapsedTimePreserved() {
         let vlmResult = VLMBenchmarkResult.from(
-            modelName: "vlm", documentResults: [], elapsedSeconds: 42.5
+            modelName: "vlm", documentResults: [], elapsedSeconds: 42.5,
         )
         XCTAssertEqual(vlmResult.elapsedSeconds, 42.5)
 
         let textResult = TextLLMBenchmarkResult.from(
-            modelName: "text", documentResults: [], elapsedSeconds: 99.9
+            modelName: "text", documentResults: [], elapsedSeconds: 99.9,
         )
         XCTAssertEqual(textResult.elapsedSeconds, 99.9)
     }
@@ -133,14 +133,14 @@ final class TerminalUtilsTests: XCTestCase {
             results.append(VLMDocumentResult(
                 filename: "\(index).pdf",
                 isPositiveSample: true,
-                predictedIsMatch: predictCorrect
+                predictedIsMatch: predictCorrect,
             ))
         }
 
         return VLMBenchmarkResult.from(
             modelName: model,
             documentResults: results,
-            elapsedSeconds: elapsed
+            elapsedSeconds: elapsed,
         )
     }
 
@@ -166,14 +166,14 @@ final class TerminalUtilsTests: XCTestCase {
                 filename: "\(index).pdf",
                 isPositiveSample: true,
                 categorizationCorrect: docScore >= 1,
-                extractionCorrect: docScore >= 2
+                extractionCorrect: docScore >= 2,
             ))
         }
 
         return TextLLMBenchmarkResult.from(
             modelName: model,
             documentResults: results,
-            elapsedSeconds: elapsed
+            elapsedSeconds: elapsed,
         )
     }
 }

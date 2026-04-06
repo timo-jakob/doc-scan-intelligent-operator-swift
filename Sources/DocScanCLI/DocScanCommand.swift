@@ -7,7 +7,7 @@ import os
 struct ScanCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "scan",
-        abstract: "Scan and rename a single PDF document"
+        abstract: "Scan and rename a single PDF document",
     )
 
     @Argument(help: "Path to the PDF file to analyze")
@@ -52,7 +52,7 @@ struct ScanCommand: AsyncParsableCommand {
 
         let finalPdfPath = try validateAndResolvePath()
         let detector = try await createDetector(
-            configuration: configuration, documentType: documentType
+            configuration: configuration, documentType: documentType,
         )
 
         if verbose {
@@ -61,7 +61,7 @@ struct ScanCommand: AsyncParsableCommand {
 
         let (categorization, context) = try await detector.categorize(pdfPath: finalPdfPath)
         let isMatch = try executePhase1Display(
-            categorization: categorization, documentType: documentType
+            categorization: categorization, documentType: documentType,
         )
 
         guard isMatch else {
@@ -77,13 +77,13 @@ struct ScanCommand: AsyncParsableCommand {
             context: context,
             pdfPath: finalPdfPath,
             documentType: documentType,
-            categorization: categorization
+            categorization: categorization,
         )
     }
 
     private func createDetector(
         configuration: Configuration,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) async throws -> DocumentDetector {
         let vlmManager = ModelManager(config: configuration)
         let textManager = TextLLMManager(config: configuration)
@@ -91,19 +91,19 @@ struct ScanCommand: AsyncParsableCommand {
             vlmManager: vlmManager,
             textManager: textManager,
             vlmModelName: configuration.modelName,
-            textModelName: textManager.modelName
+            textModelName: textManager.modelName,
         )
         return DocumentDetector(
             config: configuration,
             documentType: documentType,
             vlmProvider: vlmManager,
-            textLLM: textManager
+            textLLM: textManager,
         )
     }
 
     private func executePhase1Display(
         categorization: CategorizationVerification,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Bool {
         if verbose {
             displayCategorizationResults(categorization, documentType: documentType)
@@ -120,7 +120,7 @@ struct ScanCommand: AsyncParsableCommand {
         context: CategorizationContext,
         pdfPath: String,
         documentType: DocumentType,
-        categorization: CategorizationVerification
+        categorization: CategorizationVerification,
     ) async throws {
         if verbose {
             printPhaseHeader(number: 2, title: "Data Extraction (OCR + TextLLM)")
@@ -141,7 +141,7 @@ struct ScanCommand: AsyncParsableCommand {
             date: date,
             secondaryField: extraction.secondaryField,
             patientName: extraction.patientName,
-            categorization: categorization
+            categorization: categorization,
         )
 
         guard let newFilename = detector.generateFilename(from: finalData) else {
@@ -152,7 +152,7 @@ struct ScanCommand: AsyncParsableCommand {
         let originalFilename = URL(fileURLWithPath: pdfPath).lastPathComponent
         let renamer = FileRenamer(verbose: verbose)
         let newPath = try renamer.rename(
-            from: pdfPath, to: newFilename, dryRun: dryRun
+            from: pdfPath, to: newFilename, dryRun: dryRun,
         )
 
         if verbose {
@@ -195,7 +195,7 @@ extension ScanCommand {
     private func validateAndResolvePath() throws -> String {
         guard !pdfPath.isEmpty else {
             throw DocScanError.invalidInput(
-                "PDF path cannot be empty. Use '.' to refer to the current directory."
+                "PDF path cannot be empty. Use '.' to refer to the current directory.",
             )
         }
         let resolved = PathUtils.resolvePath(pdfPath)
@@ -215,18 +215,18 @@ extension ScanCommand {
         vlmManager: ModelManager,
         textManager: TextLLMManager,
         vlmModelName: String,
-        textModelName: String
+        textModelName: String,
     ) async throws {
         let tty = isInteractiveTerminal
 
         try await preloadModel(
-            emoji: "🤖", label: "VLM    ", modelName: vlmModelName, tty: tty
+            emoji: "🤖", label: "VLM    ", modelName: vlmModelName, tty: tty,
         ) { handler in
             try await vlmManager.preload(modelName: vlmModelName, progressHandler: handler)
         }
 
         try await preloadModel(
-            emoji: "📝", label: "Text   ", modelName: textModelName, tty: tty
+            emoji: "📝", label: "Text   ", modelName: textModelName, tty: tty,
         ) { handler in
             try await textManager.preload(progressHandler: handler)
         }
@@ -239,7 +239,7 @@ extension ScanCommand {
         label: String,
         modelName: String,
         tty: Bool,
-        load: (@escaping @Sendable (Double) -> Void) async throws -> Void
+        load: (@escaping @Sendable (Double) -> Void) async throws -> Void,
     ) async throws {
         if tty { writeStdout("\(emoji) \(label)\(modelName)") }
         let downloading = OSAllocatedUnfairLock(initialState: false)
@@ -249,7 +249,7 @@ extension ScanCommand {
             let bar = Self.progressBar(fraction: fraction)
             let pct = String(format: "%3d", Int(fraction * 100))
             FileHandle.standardOutput.write(
-                Data("\r\(emoji) \(label)\(modelName)  ⬇️  \(bar) \(pct)%".utf8)
+                Data("\r\(emoji) \(label)\(modelName)  ⬇️  \(bar) \(pct)%".utf8),
             )
         }
         let wasDownloading = downloading.withLock { $0 }

@@ -9,7 +9,7 @@ final class BenchmarkEngineTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice
+            documentType: .invoice,
         )
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("BenchmarkEngineTests-\(UUID().uuidString)")
@@ -84,7 +84,7 @@ final class BenchmarkEngineTests: XCTestCase {
 
         let result = try engine.checkExistingSidecars(
             positiveDir: posDir.path,
-            negativeDir: negDir.path
+            negativeDir: negDir.path,
         )
 
         XCTAssertEqual(result.count, 3)
@@ -107,7 +107,7 @@ final class BenchmarkEngineTests: XCTestCase {
 
         let result = try engine.checkExistingSidecars(
             positiveDir: posDir.path,
-            negativeDir: negDir.path
+            negativeDir: negDir.path,
         )
         XCTAssertEqual(result, [:])
     }
@@ -167,7 +167,7 @@ final class BenchmarkEngineTests: XCTestCase {
 
         let ocrTexts = await engine.preExtractOCRTexts(
             positivePDFs: [pdfPath],
-            negativePDFs: []
+            negativePDFs: [],
         )
 
         // The blank PDF should either not appear (OCR finds nothing) or have very short text
@@ -190,7 +190,7 @@ final class BenchmarkEngineTests: XCTestCase {
             documentType: .invoice,
             date: "2025-06-01",
             secondaryField: "Verified_Corp",
-            metadata: GroundTruthMetadata(verified: true)
+            metadata: GroundTruthMetadata(verified: true),
         )
         try existing.save(to: GroundTruth.sidecarPath(for: pdfPath))
 
@@ -199,7 +199,7 @@ final class BenchmarkEngineTests: XCTestCase {
             positivePDFs: [pdfPath],
             negativePDFs: [],
             ocrTexts: [:],
-            skipExisting: true
+            skipExisting: true,
         )
 
         let loaded = results[pdfPath]
@@ -216,7 +216,7 @@ final class BenchmarkEngineTests: XCTestCase {
         let existing = GroundTruth(
             isMatch: false,
             documentType: .invoice,
-            metadata: GroundTruthMetadata(vlmModel: "old-model", verified: true)
+            metadata: GroundTruthMetadata(vlmModel: "old-model", verified: true),
         )
         try existing.save(to: GroundTruth.sidecarPath(for: negPath))
 
@@ -225,7 +225,7 @@ final class BenchmarkEngineTests: XCTestCase {
             positivePDFs: [],
             negativePDFs: [negPath],
             ocrTexts: [:],
-            skipExisting: false
+            skipExisting: false,
         )
 
         let loaded = results[negPath]
@@ -238,14 +238,14 @@ final class BenchmarkEngineTests: XCTestCase {
         verboseConfig.verbose = true
         let verboseEngine = BenchmarkEngine(
             configuration: verboseConfig,
-            documentType: .invoice
+            documentType: .invoice,
         )
         try? createMinimalPDF(at: tempDir.appendingPathComponent("verbose.pdf"))
         let pdfPath = tempDir.appendingPathComponent("verbose.pdf").path
 
         let ocrTexts = await verboseEngine.preExtractOCRTexts(
             positivePDFs: [pdfPath],
-            negativePDFs: []
+            negativePDFs: [],
         )
 
         // Just verify it completes without crash — verbose output goes to stdout
@@ -255,7 +255,7 @@ final class BenchmarkEngineTests: XCTestCase {
     func testPreExtractOCRTextsEmptyInput() async {
         let ocrTexts = await engine.preExtractOCRTexts(
             positivePDFs: [],
-            negativePDFs: []
+            negativePDFs: [],
         )
         XCTAssertEqual(ocrTexts, [:])
     }

@@ -9,7 +9,7 @@ final class BenchmarkRankingTests: XCTestCase {
                 VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: false),
                 VLMDocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: false),
             ],
-            elapsedSeconds: 5.0
+            elapsedSeconds: 5.0,
         ) // 1/2 = 50%
         let high = VLMBenchmarkResult.from(
             modelName: "high",
@@ -17,7 +17,7 @@ final class BenchmarkRankingTests: XCTestCase {
                 VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true),
                 VLMDocumentResult(filename: "b.pdf", isPositiveSample: false, predictedIsMatch: false),
             ],
-            elapsedSeconds: 10.0
+            elapsedSeconds: 10.0,
         ) // 2/2 = 100%
 
         let ranked = [low, high].rankedByScore()
@@ -31,14 +31,14 @@ final class BenchmarkRankingTests: XCTestCase {
             documentResults: [
                 VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true),
             ],
-            elapsedSeconds: 10.0
+            elapsedSeconds: 10.0,
         )
         let fast = VLMBenchmarkResult.from(
             modelName: "fast",
             documentResults: [
                 VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true),
             ],
-            elapsedSeconds: 2.0
+            elapsedSeconds: 2.0,
         )
 
         let ranked = [slow, fast].rankedByScore()
@@ -52,10 +52,10 @@ final class BenchmarkRankingTests: XCTestCase {
             documentResults: [
                 VLMDocumentResult(filename: "a.pdf", isPositiveSample: true, predictedIsMatch: true),
             ],
-            elapsedSeconds: 5.0
+            elapsedSeconds: 5.0,
         )
         let disqualified = VLMBenchmarkResult.disqualified(
-            modelName: "bad", reason: "crashed"
+            modelName: "bad", reason: "crashed",
         )
 
         let ranked = [disqualified, good].rankedByScore()

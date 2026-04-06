@@ -54,7 +54,7 @@ extension PathUtilsTests {
         let symlinkFile = subdir.appendingPathComponent("link.pdf")
         try FileManager.default.createSymbolicLink(
             atPath: symlinkFile.path,
-            withDestinationPath: "../actual.pdf"
+            withDestinationPath: "../actual.pdf",
         )
 
         // Change to temp directory

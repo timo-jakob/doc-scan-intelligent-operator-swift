@@ -3,7 +3,7 @@ import DocScanCore
 import Foundation
 
 /// Shared context for benchmark phases, grouping the common dependencies.
-struct BenchmarkContext: Sendable {
+struct BenchmarkContext {
     let runner: SubprocessRunner
     let engine: BenchmarkEngine
     let pdfSet: BenchmarkPDFSet
@@ -14,7 +14,7 @@ struct BenchmarkContext: Sendable {
 struct BenchmarkCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "benchmark",
-        abstract: "Evaluate VLMs and TextLLMs independently against labeled documents"
+        abstract: "Evaluate VLMs and TextLLMs independently against labeled documents",
     )
 
     @Argument(help: "Directory containing positive sample PDFs (documents that match the type)")
@@ -62,14 +62,14 @@ struct BenchmarkCommand: AsyncParsableCommand {
 
         let context = BenchmarkContext(
             runner: runner, engine: engine, pdfSet: pdfSet,
-            configuration: configuration, timeoutSeconds: timeout
+            configuration: configuration, timeoutSeconds: timeout,
         )
 
         let vlmResults = try await runPhaseA(context: context, vlmModels: vlmModels)
         let textLLMResults = try await runPhaseB(context: context)
 
         try promptRecommendation(
-            vlmResults: vlmResults, textLLMResults: textLLMResults, configuration: configuration
+            vlmResults: vlmResults, textLLMResults: textLLMResults, configuration: configuration,
         )
 
         cleanupModelCaches(engine: engine, vlmResults: vlmResults, textLLMResults: textLLMResults)
@@ -80,10 +80,10 @@ struct BenchmarkCommand: AsyncParsableCommand {
     // MARK: - Setup Helpers
 
     private func prepareEngine(
-        configuration: Configuration, documentType: DocumentType
+        configuration: Configuration, documentType: DocumentType,
     ) -> BenchmarkEngine {
         BenchmarkEngine(
-            configuration: configuration, documentType: documentType
+            configuration: configuration, documentType: documentType,
         )
     }
 
@@ -110,7 +110,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
     private func cleanupModelCaches(
         engine: BenchmarkEngine,
         vlmResults: [VLMBenchmarkResult],
-        textLLMResults: [TextLLMBenchmarkResult]
+        textLLMResults: [TextLLMBenchmarkResult],
     ) {
         printBenchmarkPhaseHeader("Cleanup", title: "Model Cache Cleanup")
         let bestVLM = vlmResults.filter { !$0.isDisqualified }
@@ -160,7 +160,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
                 "10 seconds (strict)",
                 "30 seconds (recommended)",
                 "60 seconds (lenient)",
-            ]
+            ],
         ) else {
             print("Using default: 30 seconds")
             return 30
@@ -195,14 +195,14 @@ struct BenchmarkCommand: AsyncParsableCommand {
         input: BenchmarkWorkerInput,
         modelName: String,
         extractResult: (BenchmarkWorkerOutput) -> Result?,
-        makeDisqualified: (String, String) -> Result
+        makeDisqualified: (String, String) -> Result,
     ) async -> Result {
         do {
             let subprocessResult = try await runner.run(input: input)
             switch subprocessResult {
             case let .success(output):
                 return extractResult(output) ?? makeDisqualified(
-                    modelName, "Worker produced no result"
+                    modelName, "Worker produced no result",
                 )
             case let .crashed(exitCode, signal):
                 let detail = signal.map { "signal \($0)" } ?? "exit code \(exitCode)"
@@ -212,7 +212,7 @@ struct BenchmarkCommand: AsyncParsableCommand {
             }
         } catch {
             return makeDisqualified(
-                modelName, "Failed to spawn worker: \(error.localizedDescription)"
+                modelName, "Failed to spawn worker: \(error.localizedDescription)",
             )
         }
     }

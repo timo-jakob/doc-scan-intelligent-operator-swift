@@ -78,7 +78,7 @@ public enum PDFUtils {
 
     /// Convert the first page of a PDF to an NSImage at specified DPI
     public static func pdfToImage(
-        at path: String, dpi: Int = 150, verbose: Bool = false
+        at path: String, dpi: Int = 150, verbose: Bool = false,
     ) throws(DocScanError) -> NSImage {
         let url = URL(fileURLWithPath: path)
 
@@ -95,7 +95,7 @@ public enum PDFUtils {
         let scale = CGFloat(dpi) / 72.0 // 72 DPI is the default
         let scaledSize = CGSize(
             width: pageRect.width * scale,
-            height: pageRect.height * scale
+            height: pageRect.height * scale,
         )
 
         if verbose {
@@ -114,7 +114,7 @@ public enum PDFUtils {
             isPlanar: false,
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            bitsPerPixel: 0,
         ) else {
             throw DocScanError.pdfConversionFailed("Unable to create bitmap representation")
         }

@@ -127,7 +127,7 @@ public struct OCREngine: Sendable {
     /// Returns whether the text matches the document type, confidence level, and reason
     public static func detectKeywords(
         for documentType: DocumentType,
-        from text: String
+        from text: String,
     ) -> KeywordResult {
         let lowercased = text.lowercased()
 
@@ -157,7 +157,7 @@ public struct OCREngine: Sendable {
             return KeywordResult(
                 isMatch: false,
                 confidence: .high,
-                reason: "No \(typeName) keywords found"
+                reason: "No \(typeName) keywords found",
             )
         }
     }
@@ -165,7 +165,7 @@ public struct OCREngine: Sendable {
     /// Instance method for generic keyword detection
     public func detectKeywords(
         for documentType: DocumentType,
-        from text: String
+        from text: String,
     ) -> KeywordResult {
         Self.detectKeywords(for: documentType, from: text)
     }
