@@ -52,8 +52,8 @@ final class BenchmarkMemoryTests: XCTestCase {
 
     func testEstimateMemoryBothModels() {
         let mb = BenchmarkEngine.estimateMemoryMB(vlm: "Qwen2-VL-2B-Instruct-4bit", text: "Qwen2.5-7B-Instruct-4bit")
-        // (2 + 7) * 0.5 * 1.2 * 1_000_000_000 / 1_000_000 = 5400 MB
-        XCTAssertEqual(mb, 5400)
+        // (2 + 7) * 0.5 * 1.2 * 1_000_000_000 / 1_000_000 ≈ 5399 MB (floating-point rounding)
+        XCTAssertEqual(mb, 5399)
     }
 
     func testEstimateMemoryVLMOnly() {
