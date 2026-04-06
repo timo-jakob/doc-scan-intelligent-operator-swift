@@ -13,33 +13,11 @@ public enum PDFUtils {
     /// Returns nil if the PDF has no embedded text (e.g., scanned documents)
     public static func extractText(from path: String, verbose: Bool = false) -> String? {
         let url = URL(fileURLWithPath: path)
-
         guard let document = PDFDocument(url: url) else {
-            if verbose {
-                print("PDF: Could not open document")
-            }
+            if verbose { print("PDF: Could not open document") }
             return nil
         }
-
-        guard let page = document.page(at: 0) else {
-            if verbose {
-                print("PDF: Could not get first page")
-            }
-            return nil
-        }
-
-        guard let text = page.string, !text.isEmpty else {
-            if verbose {
-                print("PDF: No embedded text found (scanned document?)")
-            }
-            return nil
-        }
-
-        if verbose {
-            print("PDF: Extracted \(text.count) characters directly from PDF")
-        }
-
-        return text
+        return extractText(from: document, verbose: verbose)
     }
 
     /// Check if a PDF has sufficient embedded text for direct extraction
@@ -59,33 +37,45 @@ public enum PDFUtils {
         return hasSufficientText
     }
 
-    /// Validate that a file is a valid PDF
-    public static func validatePDF(at path: String) throws(DocScanError) {
-        let url = URL(fileURLWithPath: path)
-
+    /// Open and validate a PDF file, returning the in-memory document.
+    /// Use this to open the PDF once and pass it to other methods.
+    public static func openPDF(at path: String) throws(DocScanError) -> PDFDocument {
         guard FileManager.default.fileExists(atPath: path) else {
             throw DocScanError.fileNotFound(path)
         }
-
+        let url = URL(fileURLWithPath: path)
         guard let document = PDFDocument(url: url) else {
             throw DocScanError.invalidPDF("Unable to open PDF document")
         }
-
         guard document.pageCount > 0 else {
             throw DocScanError.invalidPDF("PDF has no pages")
         }
+        return document
     }
 
-    /// Convert the first page of a PDF to an NSImage at specified DPI
-    public static func pdfToImage(
-        at path: String, dpi: Int = 150, verbose: Bool = false,
-    ) throws(DocScanError) -> NSImage {
-        let url = URL(fileURLWithPath: path)
+    /// Validate that a file is a valid PDF
+    public static func validatePDF(at path: String) throws(DocScanError) {
+        _ = try openPDF(at: path)
+    }
 
-        guard let document = PDFDocument(url: url) else {
-            throw DocScanError.pdfConversionFailed("Unable to open PDF document")
+    /// Extract text directly from a pre-opened PDFDocument
+    public static func extractText(from document: PDFDocument, verbose: Bool = false) -> String? {
+        guard let page = document.page(at: 0) else {
+            if verbose { print("PDF: Could not get first page") }
+            return nil
         }
+        guard let text = page.string, !text.isEmpty else {
+            if verbose { print("PDF: No embedded text found (scanned document?)") }
+            return nil
+        }
+        if verbose { print("PDF: Extracted \(text.count) characters directly from PDF") }
+        return text
+    }
 
+    /// Convert the first page of a pre-opened PDFDocument to an NSImage at specified DPI
+    public static func pdfToImage(
+        from document: PDFDocument, dpi: Int = 150, verbose: Bool = false,
+    ) throws(DocScanError) -> NSImage {
         guard let page = document.page(at: 0) else {
             throw DocScanError.pdfConversionFailed("Unable to get first page")
         }
@@ -139,6 +129,15 @@ public enum PDFUtils {
         image.addRepresentation(bitmap)
 
         return image
+    }
+
+    /// Convenience: convert first page of a PDF file to NSImage (opens the file).
+    /// Prefer `pdfToImage(from:dpi:verbose:)` when you already have an open `PDFDocument`.
+    public static func pdfToImage(
+        at path: String, dpi: Int = 150, verbose: Bool = false,
+    ) throws(DocScanError) -> NSImage {
+        let document = try openPDF(at: path)
+        return try pdfToImage(from: document, dpi: dpi, verbose: verbose)
     }
 
     /// Convert NSImage to PNG data for MLX Vision models

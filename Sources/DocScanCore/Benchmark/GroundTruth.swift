@@ -29,6 +29,21 @@ public struct GroundTruthMetadata: Codable, Equatable, Sendable {
 
 /// Ground truth for a single document, stored as a JSON sidecar file
 public struct GroundTruth: Codable, Equatable, Sendable {
+    /// Create a configured JSON decoder for ground truth files
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    /// Create a configured JSON encoder for ground truth files
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
     /// Whether this document matches the target document type
     public var isMatch: Bool
 
@@ -81,9 +96,7 @@ public struct GroundTruth: Codable, Equatable, Sendable {
             throw DocScanError.fileOperationFailed("Failed to read ground truth: \(error.localizedDescription)")
         }
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(GroundTruth.self, from: data)
+            return try Self.makeDecoder().decode(GroundTruth.self, from: data)
         } catch {
             throw DocScanError.benchmarkError("Failed to decode ground truth: \(error.localizedDescription)")
         }
@@ -91,18 +104,17 @@ public struct GroundTruth: Codable, Equatable, Sendable {
 
     /// Save ground truth to a JSON sidecar file (pretty-printed, sorted keys)
     public func save(to path: String) throws(DocScanError) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
         let data: Data
         do {
-            data = try encoder.encode(self)
+            data = try Self.makeEncoder().encode(self)
         } catch {
             throw DocScanError.benchmarkError("Failed to encode ground truth: \(error.localizedDescription)")
         }
         do {
             let url = URL(fileURLWithPath: path)
-            try data.write(to: url)
+            try data.write(to: url, options: .atomic)
+            // Restrict permissions — sidecars may contain patient PII
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         } catch {
             throw DocScanError.fileOperationFailed("Failed to write ground truth: \(error.localizedDescription)")
         }

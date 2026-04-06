@@ -1,4 +1,4 @@
-@preconcurrency import Foundation // Remove when Process/DispatchWorkItem are Sendable-annotated
+@preconcurrency import Foundation // TODO: Remove when Process/DispatchWorkItem are Sendable-annotated (audit periodically)
 
 /// Outcome of a single benchmark worker subprocess
 public enum SubprocessResult: Equatable, Sendable {
@@ -21,13 +21,17 @@ public enum SubprocessResult: Equatable, Sendable {
 public final class SubprocessRunner: Sendable {
     /// Dedicated temp directory for all worker handover files.
     /// Created on init, removed by ``cleanup()``.
-    let workDir: URL
+    private let workDir: URL
 
     public init() {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("docscan-benchmark-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         workDir = dir
+    }
+
+    deinit {
+        cleanup()
     }
 
     /// Remove the dedicated temp directory and all handover files inside it.
@@ -42,8 +46,12 @@ public final class SubprocessRunner: Sendable {
     /// because `argv[0]` is relative to the real CWD set by the wrapper script,
     /// not the user's original directory.
     public static func resolveExecutablePath() -> String {
-        let arg0 = CommandLine.arguments[0]
+        // Prefer the OS-resolved executable path over argv[0]
+        if let execPath = Bundle.main.executableURL?.resolvingSymlinksInPath().path {
+            return execPath
+        }
 
+        let arg0 = CommandLine.arguments[0]
         if arg0.hasPrefix("/") {
             return URL(fileURLWithPath: arg0).standardized.resolvingSymlinksInPath().path
         }
@@ -84,6 +92,8 @@ public final class SubprocessRunner: Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(input).write(to: inputURL)
+        // Restrict permissions — IPC files may contain OCR text with PII
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: inputURL.path)
 
         let process = makeWorkerProcess(inputPath: inputURL.path, outputPath: outputURL.path)
         let timeout = Self.overallTimeout(for: input)
@@ -125,31 +135,32 @@ public final class SubprocessRunner: Sendable {
     private func launchAndAwait(
         _ process: Process, timeout: TimeInterval,
     ) async throws -> TermResult {
-        try await withCheckedThrowingContinuation { continuation in
-            let watchdog = DispatchWorkItem { [process] in
-                guard process.isRunning else { return }
-                process.terminate()
-                Self.escalateToKill(process)
-            }
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let watchdog = DispatchWorkItem { [process] in
+                    guard process.isRunning else { return }
+                    process.terminate()
+                    Self.escalateToKill(process)
+                }
+                DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
 
-            // Ordering guarantee: the watchdog calls process.terminate(), which
-            // triggers the terminationHandler. Since terminate() on an already-
-            // terminated process is a no-op, at most one path resumes the continuation.
-            process.terminationHandler = { proc in
-                watchdog.cancel()
-                continuation.resume(
-                    returning: (proc.terminationStatus, proc.terminationReason),
-                )
-            }
+                process.terminationHandler = { proc in
+                    watchdog.cancel()
+                    continuation.resume(
+                        returning: (proc.terminationStatus, proc.terminationReason),
+                    )
+                }
 
-            do {
-                try process.run()
-            } catch {
-                watchdog.cancel()
-                process.terminationHandler = nil
-                continuation.resume(throwing: error)
+                do {
+                    try process.run()
+                } catch {
+                    watchdog.cancel()
+                    process.terminationHandler = nil
+                    continuation.resume(throwing: error)
+                }
             }
+        } onCancel: {
+            process.terminate()
         }
     }
 
@@ -166,6 +177,8 @@ public final class SubprocessRunner: Sendable {
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             return .decodingFailed("Worker exited 0 but output file not found")
         }
+        // Restrict output file permissions — may contain OCR text with PII
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outputURL.path)
 
         do {
             let outputData = try Data(contentsOf: outputURL)

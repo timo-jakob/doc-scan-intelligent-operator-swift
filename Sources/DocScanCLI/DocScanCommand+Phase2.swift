@@ -15,11 +15,11 @@ extension ScanCommand {
             print("   Date: ❌ Not found")
             throw ExitCode.failure
         }
-        // Company is required for invoice filenames; doctor is optional for prescriptions
-        if documentType == .invoice, extraction.secondaryField == nil {
-            print("⚠️  Could not extract company from invoice")
+        // Secondary field required for some document types (e.g., company for invoices)
+        if documentType.isSecondaryFieldRequired, extraction.secondaryField == nil {
+            print("⚠️  Could not extract \(documentType.secondaryFieldLabel.lowercased()) from \(typeName)")
             print("   Date: \(formatDate(date))")
-            print("   Company: ❌ Not found")
+            print("   \(documentType.secondaryFieldLabel): ❌ Not found")
             throw ExitCode.failure
         }
         return date
@@ -30,18 +30,18 @@ extension ScanCommand {
         date: Date,
         documentType: DocumentType,
     ) {
-        let fieldName = documentType == .invoice ? "Company" : "Doctor"
-        let fieldEmoji = documentType == .invoice ? "🏢" : "👨‍⚕️"
+        let fieldName = documentType.secondaryFieldLabel
+        let fieldEmoji = documentType.secondaryFieldEmoji
         print("Extracted data:")
         print("   📅 Date: \(formatDate(date))")
         if let field = extraction.secondaryField {
             print("   \(fieldEmoji) \(fieldName): \(field)")
-        } else if documentType == .prescription {
+        } else if !documentType.isSecondaryFieldRequired {
             print("   \(fieldEmoji) \(fieldName): Not found (will be excluded from filename)")
         }
-        if documentType == .prescription {
-            if let patient = extraction.patientName {
-                print("   👤 Patient: \(patient)")
+        if documentType.hasPatientField {
+            if extraction.patientName != nil {
+                print("   👤 Patient: [found]")
             } else {
                 print("   👤 Patient: Not found (will be excluded from filename)")
             }

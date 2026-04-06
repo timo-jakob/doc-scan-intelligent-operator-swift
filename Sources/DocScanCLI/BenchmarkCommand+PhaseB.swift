@@ -1,4 +1,3 @@
-import AppKit
 import ArgumentParser
 import DocScanCore
 import Foundation
@@ -132,7 +131,8 @@ private extension BenchmarkCommand {
                 "Regenerate all (overwrite with fresh results)",
             ],
         ) else {
-            throw ExitCode.success
+            print("No selection made — aborting.")
+            throw ExitCode.failure
         }
 
         if choice == 0, existingCount == allPDFCount {
@@ -192,11 +192,11 @@ private extension BenchmarkCommand {
 
         if TerminalUtils.confirm("Open sidecar files in default editor?") {
             let allPaths = posSidecars + negSidecars
-            await MainActor.run {
-                for path in allPaths {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
-                }
-            }
+            let openProcess = Process()
+            openProcess.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            openProcess.arguments = allPaths
+            try? openProcess.run()
+            openProcess.waitUntilExit()
         }
     }
 
@@ -204,6 +204,6 @@ private extension BenchmarkCommand {
         let contents = (try? fileManager.contentsOfDirectory(atPath: directory)) ?? []
         return contents.sorted()
             .filter { $0.hasSuffix(".pdf.json") }
-            .map { (directory as NSString).appendingPathComponent($0) }
+            .map { URL(fileURLWithPath: directory).appendingPathComponent($0).path }
     }
 }

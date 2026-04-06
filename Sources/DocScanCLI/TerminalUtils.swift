@@ -28,20 +28,26 @@ enum TerminalUtils {
         return readLine()?.trimmingCharacters(in: .whitespaces)
     }
 
-    /// Present a numbered menu and return the selected index (0-based)
+    /// Present a numbered menu and return the selected index (0-based).
+    /// Retries up to 3 times on invalid input before returning nil.
     static func menu(_ title: String, options: [String]) -> Int? {
         print(title)
         for (index, option) in options.enumerated() {
             print("  [\(index + 1)] \(option)")
         }
         print()
-        guard let input = prompt("Enter your choice (1-\(options.count)):"),
-              let choice = Int(input),
-              choice >= 1, choice <= options.count
-        else {
-            return nil
+        for attempt in 0 ..< 3 {
+            guard let input = prompt("Enter your choice (1-\(options.count)):") else {
+                return nil // stdin closed
+            }
+            if let choice = Int(input), choice >= 1, choice <= options.count {
+                return choice - 1
+            }
+            if attempt < 2 {
+                print("Invalid choice. Please try again.")
+            }
         }
-        return choice - 1
+        return nil
     }
 
     /// Ask a yes/no confirmation question
@@ -79,12 +85,8 @@ enum TerminalUtils {
                 qualifying.append(result)
             }
         }
-        qualifying.sort { lhs, rhs in
-            let lhsCross = lhs.totalScore * rhs.maxScore
-            let rhsCross = rhs.totalScore * lhs.maxScore
-            if lhsCross != rhsCross { return lhsCross > rhsCross }
-            return lhs.elapsedSeconds < rhs.elapsedSeconds
-        }
+        // Use the canonical rankedByScore() implementation (single source of truth)
+        qualifying = qualifying.rankedByScore()
 
         if qualifying.isEmpty {
             lines.append("  No qualifying results.")

@@ -80,7 +80,10 @@ struct BenchmarkWorkerCommand: AsyncParsableCommand {
         input workerInput: BenchmarkWorkerInput,
     ) async -> BenchmarkWorkerOutput {
         guard let textLLMData = workerInput.textLLMData else {
-            preconditionFailure("textLLMData must be set for the TextLLM phase")
+            let output = workerInput.makeDisqualifiedOutput(reason: "Missing textLLMData for TextLLM phase")
+            return .textLLM(output.textLLMResult ?? .disqualified(
+                modelName: workerInput.modelName, reason: "Missing textLLMData",
+            ))
         }
         let context = TextLLMBenchmarkContext(
             ocrTexts: textLLMData.ocrTexts,

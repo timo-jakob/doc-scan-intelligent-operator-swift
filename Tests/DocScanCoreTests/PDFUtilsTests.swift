@@ -126,7 +126,8 @@ final class PDFUtilsTests: XCTestCase {
         let pdfPath = try createTestPDF(withText: testText)
         defer { removeTestPDF(at: pdfPath) }
 
-        // Just verify it doesn't crash
+        // Note: Core Graphics-rendered PDFs don't always produce extractable text;
+        // the searchable PDF fixture test (testExtractTextFromSearchablePDFFixture) covers real extraction
         _ = PDFUtils.extractText(from: pdfPath)
     }
 
@@ -136,6 +137,8 @@ final class PDFUtilsTests: XCTestCase {
         let pdfPath = try createTestPDF(withText: testText)
         defer { removeTestPDF(at: pdfPath) }
 
+        // Core Graphics-rendered PDFs may not always have extractable text;
+        // just verify the call completes without crashing
         _ = PDFUtils.extractText(from: pdfPath, verbose: true)
     }
 
@@ -195,6 +198,8 @@ extension PDFUtilsTests {
         let pdfPath = try createTestPDF(withText: testText)
         defer { removeTestPDF(at: pdfPath) }
 
+        // Core Graphics-rendered PDFs may not have extractable text;
+        // just verify the call completes
         _ = PDFUtils.hasExtractableText(at: pdfPath)
     }
 

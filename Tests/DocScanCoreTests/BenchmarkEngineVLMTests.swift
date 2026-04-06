@@ -112,27 +112,27 @@ final class BenchmarkEngineVLMTests: XCTestCase {
     // MARK: - parseYesNoResponse
 
     func testParseYesNoResponseYes() {
-        XCTAssertTrue(BenchmarkEngine.parseYesNoResponse("Yes"))
-        XCTAssertTrue(BenchmarkEngine.parseYesNoResponse("YES"))
-        XCTAssertTrue(BenchmarkEngine.parseYesNoResponse("yes"))
-        XCTAssertTrue(BenchmarkEngine.parseYesNoResponse("Yes, this is an invoice"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("Yes"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("YES"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("yes"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("Yes, this is an invoice"))
     }
 
     func testParseYesNoResponseNo() {
-        XCTAssertFalse(BenchmarkEngine.parseYesNoResponse("No"))
-        XCTAssertFalse(BenchmarkEngine.parseYesNoResponse("NO"))
-        XCTAssertFalse(BenchmarkEngine.parseYesNoResponse("no"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("No"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("NO"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("no"))
     }
 
     func testParseYesNoResponseGerman() {
-        XCTAssertTrue(BenchmarkEngine.parseYesNoResponse("Ja"))
-        XCTAssertTrue(BenchmarkEngine.parseYesNoResponse("ja"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("Ja"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("ja"))
     }
 
     func testParseYesNoResponseAmbiguous() {
         // Empty or unrecognized responses default to false
-        XCTAssertFalse(BenchmarkEngine.parseYesNoResponse(""))
-        XCTAssertFalse(BenchmarkEngine.parseYesNoResponse("maybe"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse(""))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("maybe"))
     }
 
     // MARK: - VLM Benchmark Result Construction

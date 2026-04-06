@@ -65,8 +65,10 @@ public final class HuggingFaceClient: Sendable {
     private let apiToken: String?
     private let baseURL: String
     private let retryDelays: [UInt64]
+    private let decoder = JSONDecoder()
 
-    public static let defaultBaseURL = "https://" + "huggingface.co/api"
+    // swiftlint:disable:next force_https
+    public static let defaultBaseURL = "https://huggingface.co/api"
 
     public init(
         session: URLSessionProtocol = URLSession.shared,
@@ -159,13 +161,14 @@ public final class HuggingFaceClient: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.timeoutInterval = 30
         if let token = apiToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         let (data, response) = try await performRequest(request)
         try validateResponse(response)
-        return try JSONDecoder().decode(T.self, from: data)
+        return try decoder.decode(T.self, from: data)
     }
 
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {

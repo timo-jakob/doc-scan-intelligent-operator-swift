@@ -1,4 +1,4 @@
-@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated (audit periodically)
 import Foundation
 import MLX
 import MLXLLM
@@ -79,7 +79,7 @@ public actor ModelManager: VLMProvider {
 
         if config.verbose {
             print("VLM: Using model: \(model)")
-            print("VLM: Prompt: \(prompt)")
+            print("VLM: Prompt (\(prompt.count) chars)")
         }
 
         // Load model and create FRESH chat session (reset for each image to avoid conversation history contamination)
@@ -104,7 +104,8 @@ public actor ModelManager: VLMProvider {
         // 1. We create a fresh session per generateFromImage call (resetSession: true above)
         // 2. The isGenerating reentrancy guard prevents concurrent access
         // 3. The session is never shared outside this actor
-        // Remove nonisolated(unsafe) when mlx-swift-lm adopts Sendable
+        // TODO: Remove nonisolated(unsafe) when mlx-swift-lm adopts Sendable
+        //   Track: https://github.com/ml-explore/mlx-swift-lm/issues/165
         nonisolated(unsafe) let sendableSession = session
         let response = try await sendableSession.respond(
             to: prompt,
@@ -118,21 +119,52 @@ public actor ModelManager: VLMProvider {
         return response
     }
 
-    /// Save NSImage to temporary file for VLM processing
+    /// Save NSImage to temporary file for VLM processing.
+    /// Pre-scales to the VLM's expected input size (448×632) to avoid encoding a full-resolution bitmap.
     private func saveImageToTemp(_ image: NSImage) throws -> URL {
         let tempDir = fileManager.temporaryDirectory
         let tempURL = tempDir.appendingPathComponent(UUID().uuidString + ".png")
 
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw DocScanError.pdfConversionFailed("Unable to convert NSImage to CGImage")
+        // Pre-scale to VLM input size to reduce PNG encode from ~8 MB to ~1 MB
+        let targetSize = Self.a4Processing.resize ?? image.size
+        let width = Int(targetSize.width)
+        let height = Int(targetSize.height)
+
+        guard let bitmapRep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: height,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0,
+        ) else {
+            throw DocScanError.pdfConversionFailed("Unable to create bitmap for VLM scaling")
         }
 
-        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+        guard let context = NSGraphicsContext(bitmapImageRep: bitmapRep) else {
+            throw DocScanError.pdfConversionFailed("Unable to create graphics context for VLM scaling")
+        }
+
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        image.draw(
+            in: NSRect(origin: .zero, size: targetSize),
+            from: NSRect(origin: .zero, size: image.size),
+            operation: .copy,
+            fraction: 1.0,
+        )
         guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
             throw DocScanError.pdfConversionFailed("Unable to convert image to PNG")
         }
 
         try pngData.write(to: tempURL)
+        // Restrict permissions to owner-only for prescription PII protection
+        try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tempURL.path)
         return tempURL
     }
 
@@ -157,10 +189,11 @@ public actor ModelManager: VLMProvider {
             }
 
             // Load VLM using loadModel (recommended approach for VLMs)
+            let isVerboseLoad = config.verbose
             let model = try await loadModel(
                 id: modelName,
-            ) { [self] progress in
-                if config.verbose {
+            ) { progress in
+                if isVerboseLoad {
                     let percent = Int(progress.fractionCompleted * 100)
                     print("Downloading VLM: \(percent)%")
                 }

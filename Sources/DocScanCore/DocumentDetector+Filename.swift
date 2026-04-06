@@ -62,6 +62,12 @@ extension DocumentDetector {
             )
         }
 
+        // Clean up consecutive or trailing underscores from removed placeholders (single-pass)
+        let ext = result.hasSuffix(".pdf") ? ".pdf" : ""
+        let base = ext.isEmpty ? result : String(result.dropLast(ext.count))
+        let cleaned = base.components(separatedBy: "_").filter { !$0.isEmpty }.joined(separator: "_")
+        result = cleaned + ext
+
         return result
     }
 }

@@ -2,6 +2,9 @@ import Foundation
 
 /// Handles safe file renaming with collision detection
 public struct FileRenamer: Sendable {
+    /// Maximum number of collision retries before giving up
+    private static let maxCollisionRetries = 1000
+
     private let verbose: Bool
 
     public init(verbose: Bool = false) {
@@ -18,9 +21,11 @@ public struct FileRenamer: Sendable {
         let sourceDirectory = sourceURL.deletingLastPathComponent()
         let targetURL = sourceDirectory.appendingPathComponent(targetFilename)
 
-        // Validate target stays within source directory (prevent path traversal)
-        let resolvedTarget = targetURL.standardized
-        guard resolvedTarget.path.hasPrefix(sourceDirectory.standardized.path) else {
+        // Validate target stays within source directory (prevent path traversal via symlinks)
+        let resolvedTarget = targetURL.standardized.resolvingSymlinksInPath()
+        let resolvedSource = sourceDirectory.standardized.resolvingSymlinksInPath()
+        let sourceDirPath = resolvedSource.path.hasSuffix("/") ? resolvedSource.path : resolvedSource.path + "/"
+        guard resolvedTarget.path.hasPrefix(sourceDirPath) || resolvedTarget.path == resolvedSource.path else {
             throw DocScanError.fileOperationFailed(
                 "Target filename would escape source directory: \(targetFilename)",
             )
@@ -59,23 +64,27 @@ public struct FileRenamer: Sendable {
         return finalURL.path
     }
 
+    /// Construct a collision-suffixed URL (e.g., "file_1.pdf", "file_2.pdf")
+    private static func candidateURL(base: URL, counter: Int) -> URL {
+        let directory = base.deletingLastPathComponent()
+        let filename = base.deletingPathExtension().lastPathComponent
+        let ext = base.pathExtension
+        let newFilename = ext.isEmpty
+            ? "\(filename)_\(counter)"
+            : "\(filename)_\(counter).\(ext)"
+        return directory.appendingPathComponent(newFilename)
+    }
+
     /// Find an available filename by checking for collisions (used for dry-run)
     private func findAvailableName(for targetURL: URL) throws(DocScanError) -> URL {
         if !FileManager.default.fileExists(atPath: targetURL.path) {
             return targetURL
         }
 
-        let directory = targetURL.deletingLastPathComponent()
-        let filename = targetURL.deletingPathExtension().lastPathComponent
-        let ext = targetURL.pathExtension
-
-        for counter in 1 ... 1000 {
-            let newFilename = ext.isEmpty
-                ? "\(filename)_\(counter)"
-                : "\(filename)_\(counter).\(ext)"
-            let candidateURL = directory.appendingPathComponent(newFilename)
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
+        for counter in 1 ... Self.maxCollisionRetries {
+            let candidate = Self.candidateURL(base: targetURL, counter: counter)
+            if !FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
             }
         }
         throw DocScanError.fileOperationFailed("Too many file collisions")
@@ -94,15 +103,8 @@ public struct FileRenamer: Sendable {
             throw DocScanError.fileOperationFailed("Failed to rename file: \(error.localizedDescription)")
         }
 
-        let directory = targetURL.deletingLastPathComponent()
-        let filename = targetURL.deletingPathExtension().lastPathComponent
-        let ext = targetURL.pathExtension
-
-        for counter in 1 ... 1000 {
-            let newFilename = ext.isEmpty
-                ? "\(filename)_\(counter)"
-                : "\(filename)_\(counter).\(ext)"
-            let candidateURL = directory.appendingPathComponent(newFilename)
+        for counter in 1 ... Self.maxCollisionRetries {
+            let candidateURL = Self.candidateURL(base: targetURL, counter: counter)
             do {
                 try FileManager.default.moveItem(at: sourceURL, to: candidateURL)
                 if verbose {
@@ -144,6 +146,16 @@ public struct FileRenamer: Sendable {
 
         let targetURL = URL(fileURLWithPath: targetDirectory)
             .appendingPathComponent(filename)
+
+        // Validate target stays within target directory (prevent path traversal)
+        let resolvedTarget = targetURL.standardized.resolvingSymlinksInPath()
+        let resolvedDir = URL(fileURLWithPath: targetDirectory).standardized.resolvingSymlinksInPath()
+        let dirPath = resolvedDir.path.hasSuffix("/") ? resolvedDir.path : resolvedDir.path + "/"
+        guard resolvedTarget.path.hasPrefix(dirPath) || resolvedTarget.path == resolvedDir.path else {
+            throw DocScanError.fileOperationFailed(
+                "Target filename would escape target directory: \(filename)",
+            )
+        }
 
         // Check if source exists
         guard FileManager.default.fileExists(atPath: sourcePath) else {

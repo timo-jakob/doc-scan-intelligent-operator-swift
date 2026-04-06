@@ -81,7 +81,7 @@ public actor TextLLMManager: TextLLMProviding {
             if config.verbose {
                 print("Text-LLM: Date not found by LLM, trying regex fallback...")
             }
-            let fallbackDate = extractDateWithRegex(from: text)
+            let fallbackDate = DateUtils.extractDateFromText(text)
             if config.verbose, let fallbackDate {
                 print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(fallbackDate))")
             }
@@ -95,8 +95,12 @@ public actor TextLLMManager: TextLLMProviding {
         return parsed
     }
 
-    /// Parse an LLM response into an ExtractionResult
-    private func parseExtractionResponse(
+    /// Sentinel values returned by the LLM when a field is not found
+    private static let sentinelValues: Set<String> = ["UNKNOWN", "NOT_FOUND"]
+
+    /// Parse an LLM response into an ExtractionResult.
+    /// Internal access for testability.
+    func parseExtractionResponse(
         _ response: String,
         documentType: DocumentType,
     ) -> ExtractionResult {
@@ -113,25 +117,22 @@ public actor TextLLMManager: TextLLMProviding {
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("DATE:") {
-                let value = trimmed
-                    .replacingOccurrences(of: "DATE:", with: "")
+                let value = String(trimmed.dropFirst("DATE:".count))
                     .trimmingCharacters(in: .whitespaces)
-                if value != "UNKNOWN", value != "NOT_FOUND" {
+                if !Self.sentinelValues.contains(value) {
                     date = DateUtils.parseDate(value)
                 }
             } else if trimmed.hasPrefix(secondaryPrefix) {
-                let value = trimmed
-                    .replacingOccurrences(of: secondaryPrefix, with: "")
+                let value = String(trimmed.dropFirst(secondaryPrefix.count))
                     .trimmingCharacters(in: .whitespaces)
-                if value != "UNKNOWN", value != "NOT_FOUND" {
-                    secondaryField = sanitizeFieldValue(value, for: documentType)
+                if !Self.sentinelValues.contains(value) {
+                    secondaryField = documentType.sanitizeSecondaryField(value)
                 }
             } else if trimmed.hasPrefix("PATIENT:"),
                       documentType == .prescription {
-                let value = trimmed
-                    .replacingOccurrences(of: "PATIENT:", with: "")
+                let value = String(trimmed.dropFirst("PATIENT:".count))
                     .trimmingCharacters(in: .whitespaces)
-                if value != "UNKNOWN", value != "NOT_FOUND" {
+                if !Self.sentinelValues.contains(value) {
                     patientName = StringUtils.sanitizePatientName(value)
                 }
             }
@@ -142,22 +143,6 @@ public actor TextLLMManager: TextLLMProviding {
             secondaryField: secondaryField,
             patientName: patientName,
         )
-    }
-
-    /// Sanitize field value based on document type
-    private func sanitizeFieldValue(_ value: String, for documentType: DocumentType) -> String {
-        switch documentType {
-        case .invoice:
-            StringUtils.sanitizeCompanyName(value)
-        case .prescription:
-            StringUtils.sanitizeDoctorName(value)
-        }
-    }
-
-    /// Extract date using regex patterns (fallback for LLM failures)
-    /// Uses shared DateUtils for consistent date extraction across the codebase
-    private func extractDateWithRegex(from text: String) -> Date? {
-        DateUtils.extractDateFromText(text)
     }
 
     // MARK: - LLM Generation
@@ -175,6 +160,10 @@ public actor TextLLMManager: TextLLMProviding {
             throw DocScanError.modelLoadFailed("Model container not initialized")
         }
 
+        // Capture config values before entering closure to avoid actor re-entry
+        let temperature = Float(config.temperature)
+        let isVerbose = config.verbose
+
         // Generate using mlx-swift-lm (AsyncStream API)
         return try await container.perform { context in
             // Prepare input with chat template
@@ -189,33 +178,33 @@ public actor TextLLMManager: TextLLMProviding {
                 input: input,
                 parameters: .init(
                     maxTokens: maxTokens,
-                    temperature: Float(self.config.temperature),
+                    temperature: temperature,
                 ),
                 context: context,
             )
 
-            var fullOutput = ""
+            var chunks: [String] = []
             for await generation in stream {
                 switch generation {
                 case let .chunk(text):
-                    fullOutput += text
-                    if self.config.verbose {
+                    chunks.append(text)
+                    if isVerbose {
                         print(".", terminator: "")
                     }
                 case .info:
                     break
                 case .toolCall:
-                    if self.config.verbose {
+                    if isVerbose {
                         print("[warn] unexpected toolCall event from TextLLM — ignored")
                     }
                 }
             }
 
-            if self.config.verbose {
+            if isVerbose {
                 print() // New line after progress dots
             }
 
-            return fullOutput
+            return chunks.joined()
         }
     }
 }
@@ -234,10 +223,11 @@ extension TextLLMManager {
         }
 
         // Load model using LLMModelFactory
+        let isVerboseLoad = config.verbose
         modelContainer = try await LLMModelFactory.shared.loadContainer(
             configuration: .init(id: config.textModelName),
-        ) { [self] progress in
-            if config.verbose {
+        ) { progress in
+            if isVerboseLoad {
                 let percent = Int(progress.fractionCompleted * 100)
                 print("Downloading model: \(percent)%")
             }

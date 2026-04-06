@@ -17,6 +17,9 @@ public struct KeywordResult: Equatable, Sendable {
 
 /// OCR engine using Apple's Vision framework for text recognition
 public struct OCREngine: Sendable {
+    /// Tile height (pixels) for splitting very tall images — kept below Vision's soft limit
+    private static let ocrTileHeightPixels = 800
+
     private let config: Configuration
 
     public init(config: Configuration) {
@@ -87,7 +90,7 @@ public struct OCREngine: Sendable {
     private func extractTextTiled(from cgImage: CGImage) throws -> String {
         let width = cgImage.width
         let height = cgImage.height
-        let tileHeight = 800 // Tile height in pixels
+        let tileHeight = Self.ocrTileHeightPixels
         var tileTexts: [String] = []
 
         for tileY in stride(from: 0, to: height, by: tileHeight) {
@@ -168,44 +171,5 @@ public struct OCREngine: Sendable {
         from text: String,
     ) -> KeywordResult {
         Self.detectKeywords(for: documentType, from: text)
-    }
-
-    /// Extract invoice date from OCR text
-    /// Uses shared DateUtils for consistent date extraction across the codebase
-    public func extractDate(from text: String) -> Date? {
-        DateUtils.extractDateFromText(text)
-    }
-
-    /// Extract company name from OCR text
-    public func extractCompany(from text: String) -> String? {
-        let lines = text.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-
-        guard !lines.isEmpty else { return nil }
-
-        // Strategy 1: Look for company indicators
-        let companyKeywords = [
-            "gmbh", "ag", "inc", "ltd", "llc", "corp", "corporation",
-            "sarl", "s.a.", "kg", "ohg",
-        ]
-
-        for line in lines.prefix(10) { // Check first 10 lines
-            let lowercased = line.lowercased()
-            if companyKeywords.contains(where: { lowercased.contains($0) }) {
-                return sanitizeCompanyName(line)
-            }
-        }
-
-        // Strategy 2: Use first non-empty line (often company name)
-        if let firstLine = lines.first, firstLine.count > 3 {
-            return sanitizeCompanyName(firstLine)
-        }
-
-        return nil
-    }
-
-    private func sanitizeCompanyName(_ name: String) -> String {
-        StringUtils.sanitizeCompanyName(name)
     }
 }

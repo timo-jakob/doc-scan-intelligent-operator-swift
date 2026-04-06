@@ -2,6 +2,10 @@ import Foundation
 
 /// Supported document types for categorization and data extraction
 public enum DocumentType: String, CaseIterable, Codable, Sendable {
+    /// System prompt for text-based classification (shared across all document types)
+    public static let textClassificationSystemPrompt =
+        "You are a document classification assistant. Answer only YES or NO."
+
     case invoice
     case prescription
 
@@ -123,6 +127,46 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
                 "apotheke", "apo", "pharmacy", "dosierung", "dosage",
                 "patient", "privat",
             ]
+        }
+    }
+
+    /// Label for the secondary extraction field (e.g., "Company", "Doctor")
+    public var secondaryFieldLabel: String {
+        switch self {
+        case .invoice: "Company"
+        case .prescription: "Doctor"
+        }
+    }
+
+    /// Emoji for the secondary extraction field
+    public var secondaryFieldEmoji: String {
+        switch self {
+        case .invoice: "🏢"
+        case .prescription: "👨‍⚕️"
+        }
+    }
+
+    /// Whether the secondary field is required for filename generation
+    public var isSecondaryFieldRequired: Bool {
+        switch self {
+        case .invoice: true
+        case .prescription: false
+        }
+    }
+
+    /// Whether this document type has a patient name field
+    public var hasPatientField: Bool {
+        switch self {
+        case .invoice: false
+        case .prescription: true
+        }
+    }
+
+    /// Sanitize a secondary field value for filename use
+    public func sanitizeSecondaryField(_ value: String) -> String {
+        switch self {
+        case .invoice: StringUtils.sanitizeCompanyName(value)
+        case .prescription: StringUtils.sanitizeDoctorName(value)
         }
     }
 

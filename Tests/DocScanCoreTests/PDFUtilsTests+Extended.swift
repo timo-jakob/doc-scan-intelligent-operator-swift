@@ -150,10 +150,12 @@ extension PDFUtilsTests {
                 return
             }
             if case .pdfConversionFailed = docScanError {
-                // Expected
+                // Expected (direct call)
+            } else if case .invalidPDF = docScanError {
+                // Expected (via openPDF path)
             } else {
                 XCTFail(
-                    "Expected pdfConversionFailed error, "
+                    "Expected pdfConversionFailed or invalidPDF error, "
                         + "got: \(docScanError)",
                 )
             }

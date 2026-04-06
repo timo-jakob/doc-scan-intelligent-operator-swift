@@ -1,4 +1,4 @@
-@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated (audit periodically)
 import Foundation
 
 // MARK: - VLM Benchmark
@@ -123,7 +123,7 @@ public extension BenchmarkEngine {
             }
 
             // Parse YES/NO response
-            let predictedIsMatch = Self.parseYesNoResponse(response)
+            let predictedIsMatch = StringUtils.parseYesNoResponse(response)
 
             return VLMDocumentResult(
                 filename: filename,
@@ -145,21 +145,5 @@ public extension BenchmarkEngine {
                 predictedIsMatch: !isPositive,
             )
         }
-    }
-
-    /// Parse a YES/NO response from a VLM or TextLLM.
-    ///
-    /// Strips whitespace and punctuation, then checks for exact match or common prefixed forms.
-    /// Returns `true` for "yes"/"ja" variants, `false` for everything else.
-    static func parseYesNoResponse(_ response: String) -> Bool {
-        let trimmed = response
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .trimmingCharacters(in: .punctuationCharacters)
-
-        if trimmed == "yes" || trimmed == "ja" { return true }
-        if trimmed.hasPrefix("yes,") || trimmed.hasPrefix("yes ") { return true }
-        if trimmed.hasPrefix("ja,") || trimmed.hasPrefix("ja ") { return true }
-        return false
     }
 }

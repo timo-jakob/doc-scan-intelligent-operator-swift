@@ -1,4 +1,4 @@
-@preconcurrency import Dispatch // Remove when DispatchWorkItem is Sendable-annotated
+@preconcurrency import Dispatch // TODO: Remove when DispatchWorkItem is Sendable-annotated (audit periodically)
 import Foundation
 import MLX
 
@@ -118,10 +118,13 @@ public struct BenchmarkEngine: Sendable {
 
     // MARK: - MLX Setup
 
-    /// Set MLX memory budget to 80% of physical RAM.
+    /// Fraction of physical RAM to allocate for MLX model loading
+    static let memoryBudgetFraction = 0.8
+
+    /// Set MLX memory budget to a fraction of physical RAM.
     /// Call once before any model loading to give MLX a generous allocation.
     public static func configureMLXMemoryBudget() {
-        Memory.memoryLimit = Int(Double(ProcessInfo.processInfo.physicalMemory) * 0.8)
+        Memory.memoryLimit = Int(Double(ProcessInfo.processInfo.physicalMemory) * memoryBudgetFraction)
     }
 
     // MARK: - PDF Enumeration
@@ -142,7 +145,7 @@ public struct BenchmarkEngine: Sendable {
         return contents
             .filter { $0.lowercased().hasSuffix(".pdf") }
             .sorted()
-            .map { (directory as NSString).appendingPathComponent($0) }
+            .map { URL(fileURLWithPath: directory).appendingPathComponent($0).path }
     }
 
     // MARK: - Sidecar Management
@@ -183,13 +186,29 @@ public struct BenchmarkEngine: Sendable {
     // MARK: - OCR Pre-extraction
 
     /// Pre-extract OCR text from all PDFs in parallel (shared across all TextLLM models)
+    /// Maximum concurrent OCR tasks to limit memory pressure from parallel PDF rasterization
+    private static let maxConcurrentOCR = 8
+
     public func preExtractOCRTexts(positivePDFs: [String], negativePDFs: [String]) async -> [String: String] {
         let allPDFs = positivePDFs + negativePDFs
         let config = configuration
         let isVerbose = verbose
 
+        let ocrEngine = OCREngine(config: config)
+
         return await withTaskGroup(of: (String, String?).self) { group in
+            var ocrTexts: [String: String] = [:]
+            // Limit concurrency to avoid memory pressure from parallel PDF rasterization
+            var inflight = 0
             for pdfPath in allPDFs {
+                if inflight >= Self.maxConcurrentOCR {
+                    // Collect the completed result before adding a new task
+                    if let (path, text) = await group.next() {
+                        if let text { ocrTexts[path] = text }
+                    }
+                    inflight -= 1
+                }
+                inflight += 1
                 group.addTask {
                     let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
 
@@ -203,7 +222,6 @@ public struct BenchmarkEngine: Sendable {
                     }
 
                     // Fall back to Vision OCR
-                    let ocrEngine = OCREngine(config: config)
                     do {
                         let image = try PDFUtils.pdfToImage(
                             at: pdfPath,
@@ -221,7 +239,7 @@ public struct BenchmarkEngine: Sendable {
                 }
             }
 
-            var ocrTexts: [String: String] = [:]
+            // Collect remaining results
             for await (path, text) in group {
                 if let text { ocrTexts[path] = text }
             }

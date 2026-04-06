@@ -3,6 +3,7 @@ import DocScanCore
 import Foundation
 
 /// Shared context for benchmark phases, grouping the common dependencies.
+/// Note: implicitly Sendable in Swift 6 (all stored properties are Sendable).
 struct BenchmarkContext {
     let runner: SubprocessRunner
     let engine: BenchmarkEngine
@@ -113,18 +114,8 @@ struct BenchmarkCommand: AsyncParsableCommand {
         textLLMResults: [TextLLMBenchmarkResult],
     ) {
         printBenchmarkPhaseHeader("Cleanup", title: "Model Cache Cleanup")
-        let bestVLM = vlmResults.filter { !$0.isDisqualified }
-            .max { lhs, rhs in
-                lhs.totalScore * rhs.maxScore < rhs.totalScore * lhs.maxScore
-                    || (lhs.totalScore * rhs.maxScore == rhs.totalScore * lhs.maxScore
-                        && lhs.elapsedSeconds > rhs.elapsedSeconds)
-            }?.modelName
-        let bestTextLLM = textLLMResults.filter { !$0.isDisqualified }
-            .max { lhs, rhs in
-                lhs.totalScore * rhs.maxScore < rhs.totalScore * lhs.maxScore
-                    || (lhs.totalScore * rhs.maxScore == rhs.totalScore * lhs.maxScore
-                        && lhs.elapsedSeconds > rhs.elapsedSeconds)
-            }?.modelName
+        let bestVLM = vlmResults.rankedByScore().first?.modelName
+        let bestTextLLM = textLLMResults.rankedByScore().first?.modelName
 
         engine.cleanupBenchmarkedModels(modelNames: vlmResults.map(\.modelName), keepModel: bestVLM)
         engine.cleanupBenchmarkedModels(modelNames: textLLMResults.map(\.modelName), keepModel: bestTextLLM)

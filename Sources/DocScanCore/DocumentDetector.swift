@@ -1,5 +1,6 @@
-@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated (audit periodically)
 import Foundation
+import PDFKit
 
 // MARK: - Categorization Method
 
@@ -15,6 +16,8 @@ public enum CategorizationMethod: Equatable, Sendable {
     case ocr
     /// OCR analysis timed out before completing
     case ocrTimeout
+    /// OCR analysis failed with an error
+    case ocrError
     /// Direct PDF text extraction (for searchable PDFs)
     case pdf
 }
@@ -48,6 +51,7 @@ public struct CategorizationResult: Equatable, Sendable {
         case .vlmError: "VLM (Vision Language Model - Error)"
         case .ocr: "OCR (Vision Framework)"
         case .ocrTimeout: "OCR (Vision Framework - Timeout)"
+        case .ocrError: "OCR (Vision Framework - Error)"
         case .pdf: "PDF (Direct Text Extraction)"
         }
     }
@@ -55,6 +59,11 @@ public struct CategorizationResult: Equatable, Sendable {
     /// True when this result represents a timeout rather than an actual categorisation decision.
     public var isTimedOut: Bool {
         method == .vlmTimeout || method == .ocrTimeout
+    }
+
+    /// True when this result represents an error rather than an actual categorisation decision.
+    public var isError: Bool {
+        method == .vlmError || method == .ocrError
     }
 
     /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
@@ -65,6 +74,7 @@ public struct CategorizationResult: Equatable, Sendable {
         case .vlmError: "VLM (error)"
         case .ocr: "Vision OCR"
         case .ocrTimeout: "OCR (timeout)"
+        case .ocrError: "OCR (error)"
         case .pdf: "PDF text"
         }
     }
@@ -129,14 +139,14 @@ extension DocumentDetector {
     /// Categorize a PDF — determine if it matches the document type using VLM + OCR in parallel.
     /// Returns both the verification result and a context that must be passed to `extractData`.
     public func categorize(pdfPath: String) async throws -> (CategorizationVerification, CategorizationContext) {
-        // Validate PDF and prepare image
-        try PDFUtils.validatePDF(at: pdfPath)
+        // Open PDF once and reuse for all operations
+        let document = try PDFUtils.openPDF(at: pdfPath)
 
-        let directText = Self.tryDirectTextExtraction(from: pdfPath, config: config)
+        let directText = Self.tryDirectTextExtraction(from: document, config: config)
 
         if config.verbose { print("Converting PDF to image...") }
         let image = try PDFUtils.pdfToImage(
-            at: pdfPath, dpi: config.pdfDPI, verbose: config.verbose,
+            from: document, dpi: config.pdfDPI, verbose: config.verbose,
         )
 
         if config.verbose {
@@ -153,13 +163,13 @@ extension DocumentDetector {
         async let vlmResult = Self.performVLMCategorization(
             image: image, vlmProvider: vlmProv, documentType: docType, config: cfg,
         )
-        async let ocrResult = Self.performOCRCategorization(
+        async let ocrResultTask = Self.performOCRCategorization(
             image: image, directText: directText, ocrEngine: ocrEng,
             documentType: docType, config: cfg,
         )
 
         let vlm = await vlmResult
-        let (ocr, ocrText) = try await ocrResult
+        let (ocr, ocrText) = await ocrResultTask
 
         // Build context for Phase 2 — prefer direct text, fall back to OCR text
         let finalOCRText = directText ?? ocrText ?? ""
@@ -173,12 +183,12 @@ extension DocumentDetector {
 
     /// Try direct PDF text extraction (faster for searchable PDFs)
     private nonisolated static func tryDirectTextExtraction(
-        from pdfPath: String,
+        from document: PDFDocument,
         config: Configuration,
     ) -> String? {
         if config.verbose { print("Checking for extractable text in PDF...") }
 
-        guard let text = PDFUtils.extractText(from: pdfPath, verbose: config.verbose),
+        guard let text = PDFUtils.extractText(from: document, verbose: config.verbose),
               text.count >= PDFUtils.minimumTextLength
         else { return nil }
 
@@ -207,9 +217,9 @@ extension DocumentDetector {
                 let response = try await vlmProvider.generateFromImage(
                     image, prompt: documentType.vlmPrompt,
                 )
-                if config.verbose { print("VLM response: \(response)") }
+                if config.verbose { print("VLM response received (\(response.count) chars)") }
 
-                let isMatch = Self.parseYesNoResponse(response)
+                let isMatch = StringUtils.parseYesNoResponse(response)
                 let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
                     .lowercased()
                     .trimmingCharacters(in: .punctuationCharacters)
@@ -221,9 +231,11 @@ extension DocumentDetector {
                     print("VLM: Is \(typeName) = \(isMatch) (confidence: \(confidence))")
                 }
 
+                // Store only the parsed decision, not the raw VLM response (may contain PII)
+                let parsedReason = isMatch ? "YES" : "NO"
                 return CategorizationResult(
                     isMatch: isMatch, confidence: confidence,
-                    method: .vlm, reason: response,
+                    method: .vlm, reason: parsedReason,
                 )
             }
         } catch is TimeoutError {
@@ -251,7 +263,7 @@ extension DocumentDetector {
         ocrEngine: OCREngine,
         documentType: DocumentType,
         config: Configuration,
-    ) async throws -> (CategorizationResult, String?) {
+    ) async -> (CategorizationResult, String?) {
         do {
             return try await TimeoutError.withTimeout(seconds: categorizationTimeoutSeconds) {
                 if let text = directText {
@@ -291,6 +303,12 @@ extension DocumentDetector {
                 isMatch: false, confidence: .low,
                 method: .ocrTimeout, reason: "Timed out",
             ), nil)
+        } catch {
+            if config.verbose { print("OCR categorization failed: \(error)") }
+            return (CategorizationResult(
+                isMatch: false, confidence: .low,
+                method: .ocrError, reason: error.localizedDescription,
+            ), nil)
         }
     }
 
@@ -326,12 +344,11 @@ extension DocumentDetector {
         let result = try await textLLM.extractData(for: documentType, from: context.ocrText)
 
         if config.verbose {
-            let fieldName = documentType == .invoice ? "Company" : "Doctor"
             print("Extracted data:")
-            print("  Date: \(result.date?.description ?? "not found")")
-            print("  \(fieldName): \(result.secondaryField ?? "not found")")
-            if documentType == .prescription {
-                print("  Patient: \(result.patientName ?? "not found")")
+            print("  Date: \(result.date != nil ? "found" : "not found")")
+            print("  \(documentType.secondaryFieldLabel): \(result.secondaryField != nil ? "found" : "not found")")
+            if documentType.hasPatientField {
+                print("  Patient: \(result.patientName != nil ? "found" : "not found")")
             }
         }
 
@@ -340,24 +357,6 @@ extension DocumentDetector {
             secondaryField: result.secondaryField,
             patientName: result.patientName,
         )
-    }
-
-    // MARK: - Response Parsing
-
-    /// Parse a YES/NO response from a VLM.
-    ///
-    /// Strips whitespace and punctuation, then checks for exact match or common prefixed forms.
-    /// Returns `true` for "yes"/"ja" variants, `false` for everything else.
-    nonisolated static func parseYesNoResponse(_ response: String) -> Bool {
-        let trimmed = response
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .trimmingCharacters(in: .punctuationCharacters)
-
-        if trimmed == "yes" || trimmed == "ja" { return true }
-        if trimmed.hasPrefix("yes,") || trimmed.hasPrefix("yes ") { return true }
-        if trimmed.hasPrefix("ja,") || trimmed.hasPrefix("ja ") { return true }
-        return false
     }
 
     // MARK: - Direct Text Categorization (public for testing)
