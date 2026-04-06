@@ -162,6 +162,14 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Sanitize a secondary field value for filename use
+    public func sanitizeSecondaryField(_ value: String) -> String {
+        switch self {
+        case .invoice: StringUtils.sanitizeCompanyName(value)
+        case .prescription: StringUtils.sanitizeDoctorName(value)
+        }
+    }
+
     /// Fields to extract for this document type
     public var extractionFields: [ExtractionField] {
         switch self {

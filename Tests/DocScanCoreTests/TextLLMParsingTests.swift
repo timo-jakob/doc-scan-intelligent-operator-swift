@@ -142,7 +142,10 @@ final class TextLLMParsingTests: XCTestCase {
             _ = try await detector.extractData(context: context)
             XCTFail("Expected error")
         } catch {
-            XCTAssertTrue(error is DocScanError)
+            guard let docError = error as? DocScanError, case .inferenceError = docError else {
+                XCTFail("Expected DocScanError.inferenceError, got: \(error)")
+                return
+            }
         }
     }
 }

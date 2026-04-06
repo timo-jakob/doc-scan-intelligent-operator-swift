@@ -13,6 +13,8 @@ public struct DocumentScoring: Equatable, Sendable {
 
 /// Fuzzy comparison utilities for benchmark scoring
 public enum FuzzyMatcher {
+    /// Cached calendar instance (avoids creating Calendar.current per comparison)
+    private static let calendar = Calendar(identifier: .gregorian)
     /// Compare two date strings by parsing them into Date objects
     /// Returns true if both parse to the same calendar date, or both are nil
     public static func datesMatch(_ expected: String?, _ actual: String?) -> Bool {
@@ -27,7 +29,6 @@ public enum FuzzyMatcher {
             else {
                 return false
             }
-            let calendar = Calendar.current
             return calendar.isDate(expectedDate, inSameDayAs: actualDate)
         }
     }

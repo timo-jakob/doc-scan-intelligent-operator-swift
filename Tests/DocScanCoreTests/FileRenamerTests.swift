@@ -103,7 +103,17 @@ final class FileRenamerTests: XCTestCase {
         XCTAssertThrowsError(
             try renamer.rename(from: nonExistentFile, to: "new.txt", dryRun: false),
         ) { error in
-            XCTAssertTrue(error is DocScanError)
+            guard let docError = error as? DocScanError else {
+                XCTFail("Expected DocScanError, got: \(error)")
+                return
+            }
+            // May be .fileNotFound or .fileOperationFailed depending on which check fires first
+            switch docError {
+            case .fileNotFound, .fileOperationFailed:
+                break // Expected
+            default:
+                XCTFail("Expected fileNotFound or fileOperationFailed, got: \(docError)")
+            }
         }
     }
 

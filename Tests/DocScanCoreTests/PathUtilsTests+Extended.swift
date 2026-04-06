@@ -95,7 +95,8 @@ extension PathUtilsTests {
     }
 
     func testGetCurrentWorkingDirectoryWithEnvVar() {
-        let testPath = "/test/original/path"
+        // Must use a real existing directory (validation checks existence)
+        let testPath = tempDirectory.path
 
         // Set the environment variable
         setenv(PathUtils.originalPWDEnvironmentKey, testPath, 1)
@@ -105,8 +106,9 @@ extension PathUtilsTests {
         // Clean up
         unsetenv(PathUtils.originalPWDEnvironmentKey)
 
-        // Should return the env var value
-        XCTAssertEqual(cwd, testPath)
+        // Should return the resolved env var value
+        let expected = URL(fileURLWithPath: testPath).standardized.resolvingSymlinksInPath().path
+        XCTAssertEqual(cwd, expected)
     }
 
     func testGetCurrentWorkingDirectoryWithEmptyEnvVar() {

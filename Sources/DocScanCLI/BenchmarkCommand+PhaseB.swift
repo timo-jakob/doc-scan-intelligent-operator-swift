@@ -131,7 +131,8 @@ private extension BenchmarkCommand {
                 "Regenerate all (overwrite with fresh results)",
             ],
         ) else {
-            throw ExitCode.success
+            print("No selection made — aborting.")
+            throw ExitCode.failure
         }
 
         if choice == 0, existingCount == allPDFCount {

@@ -14,13 +14,13 @@ public enum StringUtils {
     /// Maximum length for patient names in filenames
     private static let maxPatientNameLength = 30
 
-    /// Common doctor title prefixes to remove
-    private static let doctorTitles = [
+    /// Common doctor title prefixes to remove (sorted by descending length for correct matching)
+    private static let doctorTitles: [String] = [
         "dr. med.", "dr.med.", "dr med", "drmed",
         "dr.", "dr",
         "prof. dr.", "prof.dr.", "prof dr",
         "med.", "med",
-    ]
+    ].sorted { $0.count > $1.count }
 
     /// Sanitize a company name for use in filenames
     /// - Parameter name: The raw company name

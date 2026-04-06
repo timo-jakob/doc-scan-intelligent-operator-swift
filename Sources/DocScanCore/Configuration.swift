@@ -138,21 +138,15 @@ public struct Configuration: Codable, Equatable, Sendable {
     public static let defaultTemperature = 0.1
     public static let defaultPdfDPI = 150
 
-    private static var defaultCacheDir: String {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cache/docscan/models")
-            .path
-    }
+    private static let defaultCacheDir: String = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".cache/docscan/models")
+        .path
 
-    public static var defaultConfigDir: String {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".docscan").path
-    }
+    public static let defaultConfigDir: String = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".docscan").path
 
-    public static var defaultConfigPath: String {
-        URL(fileURLWithPath: defaultConfigDir)
-            .appendingPathComponent("docscan-config.yaml").path
-    }
+    public static let defaultConfigPath: String = URL(fileURLWithPath: defaultConfigDir)
+        .appendingPathComponent("docscan-config.yaml").path
 
     public init(
         modelName: String = Configuration.defaultModelName,
@@ -238,10 +232,14 @@ public struct Configuration: Codable, Equatable, Sendable {
     public func save(to path: String) throws {
         let url = URL(fileURLWithPath: path)
         let dir = url.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700],
+        )
         let encoder = YAMLEncoder()
         let yaml = try encoder.encode(self)
         try yaml.write(to: url, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     /// Get default configuration

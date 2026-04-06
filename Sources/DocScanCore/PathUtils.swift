@@ -12,7 +12,11 @@ public enum PathUtils {
         if let originalPwd = ProcessInfo.processInfo.environment[originalPWDEnvironmentKey],
            !originalPwd.isEmpty,
            originalPwd.hasPrefix("/") {
-            return originalPwd
+            // Validate the directory actually exists before trusting the env var
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: originalPwd, isDirectory: &isDir), isDir.boolValue {
+                return URL(fileURLWithPath: originalPwd).standardized.resolvingSymlinksInPath().path
+            }
         }
         return FileManager.default.currentDirectoryPath
     }

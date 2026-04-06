@@ -29,6 +29,20 @@ public struct GroundTruthMetadata: Codable, Equatable, Sendable {
 
 /// Ground truth for a single document, stored as a JSON sidecar file
 public struct GroundTruth: Codable, Equatable, Sendable {
+    /// Cached coders for repeated load/save operations during benchmarking
+    private static let jsonDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
+    private static let jsonEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
     /// Whether this document matches the target document type
     public var isMatch: Bool
 
@@ -81,9 +95,7 @@ public struct GroundTruth: Codable, Equatable, Sendable {
             throw DocScanError.fileOperationFailed("Failed to read ground truth: \(error.localizedDescription)")
         }
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(GroundTruth.self, from: data)
+            return try Self.jsonDecoder.decode(GroundTruth.self, from: data)
         } catch {
             throw DocScanError.benchmarkError("Failed to decode ground truth: \(error.localizedDescription)")
         }
@@ -91,12 +103,9 @@ public struct GroundTruth: Codable, Equatable, Sendable {
 
     /// Save ground truth to a JSON sidecar file (pretty-printed, sorted keys)
     public func save(to path: String) throws(DocScanError) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
         let data: Data
         do {
-            data = try encoder.encode(self)
+            data = try Self.jsonEncoder.encode(self)
         } catch {
             throw DocScanError.benchmarkError("Failed to encode ground truth: \(error.localizedDescription)")
         }

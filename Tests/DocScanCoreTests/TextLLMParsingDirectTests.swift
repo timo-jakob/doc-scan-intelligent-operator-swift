@@ -278,4 +278,45 @@ final class TextLLMParsingDirectTests: XCTestCase {
             XCTAssertTrue(msg.contains("escape target directory"))
         }
     }
+
+    // MARK: - Prescription filename trailing underscore fix
+
+    func testPrescriptionFilenameNoTrailingUnderscore() {
+        let data = DocumentData(
+            documentType: .prescription,
+            isMatch: true,
+            date: DateUtils.parseDate("2025-04-08"),
+            secondaryField: nil,
+            patientName: nil,
+        )
+        let config = Configuration()
+        let detector = DocumentDetector(
+            config: config, documentType: .prescription,
+            vlmProvider: MockVLMProvider(), textLLM: MockTextLLMProvider(),
+        )
+        let filename = detector.generateFilename(from: data)
+        XCTAssertNotNil(filename)
+        // Should not contain trailing underscore before .pdf or consecutive underscores
+        if let name = filename {
+            XCTAssertFalse(name.contains("_.pdf"), "Filename should not have trailing underscore: \(name)")
+            XCTAssertFalse(name.contains("__"), "Filename should not have consecutive underscores: \(name)")
+        }
+    }
+
+    // MARK: - GroundTruth file permissions
+
+    func testGroundTruthSaveSetsRestrictedPermissions() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("docscan-gt-perm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let gt = GroundTruth(isMatch: true, documentType: .invoice, date: "2024-01-01")
+        let path = tempDir.appendingPathComponent("test.pdf.json").path
+        try gt.save(to: path)
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: path)
+        let perms = attrs[.posixPermissions] as? Int
+        XCTAssertEqual(perms, 0o600, "Ground truth sidecar should have 0600 permissions")
+    }
 }

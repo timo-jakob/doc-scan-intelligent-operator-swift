@@ -79,7 +79,7 @@ public actor ModelManager: VLMProvider {
 
         if config.verbose {
             print("VLM: Using model: \(model)")
-            print("VLM: Prompt: \(prompt)")
+            print("VLM: Prompt (\(prompt.count) chars)")
         }
 
         // Load model and create FRESH chat session (reset for each image to avoid conversation history contamination)

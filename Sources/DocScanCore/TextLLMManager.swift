@@ -114,23 +114,20 @@ public actor TextLLMManager: TextLLMProviding {
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("DATE:") {
-                let value = trimmed
-                    .replacingOccurrences(of: "DATE:", with: "")
+                let value = String(trimmed.dropFirst("DATE:".count))
                     .trimmingCharacters(in: .whitespaces)
                 if value != "UNKNOWN", value != "NOT_FOUND" {
                     date = DateUtils.parseDate(value)
                 }
             } else if trimmed.hasPrefix(secondaryPrefix) {
-                let value = trimmed
-                    .replacingOccurrences(of: secondaryPrefix, with: "")
+                let value = String(trimmed.dropFirst(secondaryPrefix.count))
                     .trimmingCharacters(in: .whitespaces)
                 if value != "UNKNOWN", value != "NOT_FOUND" {
-                    secondaryField = sanitizeFieldValue(value, for: documentType)
+                    secondaryField = documentType.sanitizeSecondaryField(value)
                 }
             } else if trimmed.hasPrefix("PATIENT:"),
                       documentType == .prescription {
-                let value = trimmed
-                    .replacingOccurrences(of: "PATIENT:", with: "")
+                let value = String(trimmed.dropFirst("PATIENT:".count))
                     .trimmingCharacters(in: .whitespaces)
                 if value != "UNKNOWN", value != "NOT_FOUND" {
                     patientName = StringUtils.sanitizePatientName(value)
@@ -143,16 +140,6 @@ public actor TextLLMManager: TextLLMProviding {
             secondaryField: secondaryField,
             patientName: patientName,
         )
-    }
-
-    /// Sanitize field value based on document type
-    private func sanitizeFieldValue(_ value: String, for documentType: DocumentType) -> String {
-        switch documentType {
-        case .invoice:
-            StringUtils.sanitizeCompanyName(value)
-        case .prescription:
-            StringUtils.sanitizeDoctorName(value)
-        }
     }
 
     // MARK: - LLM Generation
@@ -170,6 +157,10 @@ public actor TextLLMManager: TextLLMProviding {
             throw DocScanError.modelLoadFailed("Model container not initialized")
         }
 
+        // Capture config values before entering closure to avoid actor re-entry
+        let temperature = Float(config.temperature)
+        let isVerbose = config.verbose
+
         // Generate using mlx-swift-lm (AsyncStream API)
         return try await container.perform { context in
             // Prepare input with chat template
@@ -184,7 +175,7 @@ public actor TextLLMManager: TextLLMProviding {
                 input: input,
                 parameters: .init(
                     maxTokens: maxTokens,
-                    temperature: Float(self.config.temperature),
+                    temperature: temperature,
                 ),
                 context: context,
             )
@@ -194,19 +185,19 @@ public actor TextLLMManager: TextLLMProviding {
                 switch generation {
                 case let .chunk(text):
                     chunks.append(text)
-                    if self.config.verbose {
+                    if isVerbose {
                         print(".", terminator: "")
                     }
                 case .info:
                     break
                 case .toolCall:
-                    if self.config.verbose {
+                    if isVerbose {
                         print("[warn] unexpected toolCall event from TextLLM — ignored")
                     }
                 }
             }
 
-            if self.config.verbose {
+            if isVerbose {
                 print() // New line after progress dots
             }
 

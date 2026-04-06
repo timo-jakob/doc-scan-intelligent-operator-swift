@@ -22,12 +22,17 @@ public final class SubprocessRunner: Sendable {
     /// Dedicated temp directory for all worker handover files.
     /// Created on init, removed by ``cleanup()``.
     let workDir: URL
+    private let decoder = JSONDecoder()
 
     public init() {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("docscan-benchmark-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         workDir = dir
+    }
+
+    deinit {
+        cleanup()
     }
 
     /// Remove the dedicated temp directory and all handover files inside it.
@@ -176,7 +181,7 @@ public final class SubprocessRunner: Sendable {
 
         do {
             let outputData = try Data(contentsOf: outputURL)
-            let output = try JSONDecoder().decode(BenchmarkWorkerOutput.self, from: outputData)
+            let output = try decoder.decode(BenchmarkWorkerOutput.self, from: outputData)
             return .success(output)
         } catch {
             return .decodingFailed("Failed to decode worker output: \(error.localizedDescription)")

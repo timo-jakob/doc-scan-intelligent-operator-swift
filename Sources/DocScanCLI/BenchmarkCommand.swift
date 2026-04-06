@@ -3,9 +3,8 @@ import DocScanCore
 import Foundation
 
 /// Shared context for benchmark phases, grouping the common dependencies.
-// swiftformat:disable redundantConformance
-struct BenchmarkContext: Sendable {
-// swiftformat:enable redundantConformance
+/// Note: implicitly Sendable in Swift 6 (all stored properties are Sendable).
+struct BenchmarkContext {
     let runner: SubprocessRunner
     let engine: BenchmarkEngine
     let pdfSet: BenchmarkPDFSet

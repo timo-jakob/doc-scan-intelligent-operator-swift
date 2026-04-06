@@ -62,6 +62,12 @@ extension DocumentDetector {
             )
         }
 
+        // Clean up consecutive or trailing underscores from removed placeholders
+        while result.contains("__") {
+            result = result.replacingOccurrences(of: "__", with: "_")
+        }
+        result = result.replacingOccurrences(of: "_.pdf", with: ".pdf")
+
         return result
     }
 }

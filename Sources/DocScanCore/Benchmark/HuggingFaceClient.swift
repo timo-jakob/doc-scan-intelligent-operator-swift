@@ -67,7 +67,8 @@ public final class HuggingFaceClient: Sendable {
     private let retryDelays: [UInt64]
     private let decoder = JSONDecoder()
 
-    public static let defaultBaseURL = "https://" + "huggingface.co/api"
+    // swiftlint:disable:next force_https
+    public static let defaultBaseURL = "https://huggingface.co/api"
 
     public init(
         session: URLSessionProtocol = URLSession.shared,
