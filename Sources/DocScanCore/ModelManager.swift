@@ -1,4 +1,4 @@
-@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated (audit periodically)
 import Foundation
 import MLX
 import MLXLLM
@@ -127,21 +127,37 @@ public actor ModelManager: VLMProvider {
 
         // Pre-scale to VLM input size to reduce PNG encode from ~8 MB to ~1 MB
         let targetSize = Self.a4Processing.resize ?? image.size
-        let scaledImage = NSImage(size: targetSize)
-        scaledImage.lockFocus()
+        let width = Int(targetSize.width)
+        let height = Int(targetSize.height)
+
+        guard let bitmapRep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: height,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0,
+        ) else {
+            throw DocScanError.pdfConversionFailed("Unable to create bitmap for VLM scaling")
+        }
+
+        guard let context = NSGraphicsContext(bitmapImageRep: bitmapRep) else {
+            throw DocScanError.pdfConversionFailed("Unable to create graphics context for VLM scaling")
+        }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
         image.draw(
             in: NSRect(origin: .zero, size: targetSize),
             from: NSRect(origin: .zero, size: image.size),
             operation: .copy,
             fraction: 1.0,
         )
-        scaledImage.unlockFocus()
-
-        guard let cgImage = scaledImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw DocScanError.pdfConversionFailed("Unable to convert NSImage to CGImage")
-        }
-
-        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+        NSGraphicsContext.restoreGraphicsState()
         guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
             throw DocScanError.pdfConversionFailed("Unable to convert image to PNG")
         }

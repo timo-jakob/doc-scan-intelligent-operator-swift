@@ -149,6 +149,15 @@ public struct FileRenamer: Sendable {
         let targetURL = URL(fileURLWithPath: targetDirectory)
             .appendingPathComponent(filename)
 
+        // Validate target stays within target directory (prevent path traversal)
+        let resolvedTarget = targetURL.standardized.resolvingSymlinksInPath()
+        let resolvedDir = URL(fileURLWithPath: targetDirectory).standardized.resolvingSymlinksInPath()
+        guard resolvedTarget.path.hasPrefix(resolvedDir.path) else {
+            throw DocScanError.fileOperationFailed(
+                "Target filename would escape target directory: \(filename)",
+            )
+        }
+
         // Check if source exists
         guard FileManager.default.fileExists(atPath: sourcePath) else {
             throw DocScanError.fileNotFound(sourcePath)

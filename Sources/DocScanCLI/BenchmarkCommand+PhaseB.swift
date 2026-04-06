@@ -1,4 +1,3 @@
-import AppKit
 import ArgumentParser
 import DocScanCore
 import Foundation
@@ -192,11 +191,11 @@ private extension BenchmarkCommand {
 
         if TerminalUtils.confirm("Open sidecar files in default editor?") {
             let allPaths = posSidecars + negSidecars
-            await MainActor.run {
-                for path in allPaths {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
-                }
-            }
+            let openProcess = Process()
+            openProcess.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            openProcess.arguments = allPaths
+            try? openProcess.run()
+            openProcess.waitUntilExit()
         }
     }
 

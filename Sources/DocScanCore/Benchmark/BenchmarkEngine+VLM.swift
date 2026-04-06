@@ -1,4 +1,4 @@
-@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated (audit periodically)
 import Foundation
 
 // MARK: - VLM Benchmark
@@ -123,7 +123,7 @@ public extension BenchmarkEngine {
             }
 
             // Parse YES/NO response
-            let predictedIsMatch = Self.parseYesNoResponse(response)
+            let predictedIsMatch = StringUtils.parseYesNoResponse(response)
 
             return VLMDocumentResult(
                 filename: filename,
@@ -145,10 +145,5 @@ public extension BenchmarkEngine {
                 predictedIsMatch: !isPositive,
             )
         }
-    }
-
-    /// Parse a YES/NO response from a VLM or TextLLM. Delegates to shared StringUtils implementation.
-    static func parseYesNoResponse(_ response: String) -> Bool {
-        StringUtils.parseYesNoResponse(response)
     }
 }

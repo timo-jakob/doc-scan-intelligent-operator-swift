@@ -5,93 +5,93 @@ final class ParseYesNoResponseTests: XCTestCase {
     // MARK: - Positive Cases
 
     func testExactYes() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("yes"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("yes"))
     }
 
     func testExactYesUppercase() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("YES"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("YES"))
     }
 
     func testExactYesMixedCase() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("Yes"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("Yes"))
     }
 
     func testExactJa() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("ja"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("ja"))
     }
 
     func testExactJaUppercase() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("JA"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("JA"))
     }
 
     func testYesWithTrailingWhitespace() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("  yes  "))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("  yes  "))
     }
 
     func testYesWithNewlines() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("\nyes\n"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("\nyes\n"))
     }
 
     func testYesWithTrailingPunctuation() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("yes."))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("yes."))
     }
 
     func testYesWithExclamationMark() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("Yes!"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("Yes!"))
     }
 
     func testYesPrefixedWithComma() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("yes, this is an invoice"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("yes, this is an invoice"))
     }
 
     func testYesPrefixedWithSpace() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("yes this is an invoice"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("yes this is an invoice"))
     }
 
     func testJaPrefixedWithComma() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("ja, das ist eine Rechnung"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("ja, das ist eine Rechnung"))
     }
 
     func testJaPrefixedWithSpace() {
-        XCTAssertTrue(DocumentDetector.parseYesNoResponse("ja das ist eine Rechnung"))
+        XCTAssertTrue(StringUtils.parseYesNoResponse("ja das ist eine Rechnung"))
     }
 
     // MARK: - Negative Cases
 
     func testExactNo() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("no"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("no"))
     }
 
     func testExactNoUppercase() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("NO"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("NO"))
     }
 
     func testExactNein() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("nein"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("nein"))
     }
 
     func testEmptyString() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse(""))
+        XCTAssertFalse(StringUtils.parseYesNoResponse(""))
     }
 
     func testWhitespaceOnly() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("   "))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("   "))
     }
 
     func testRandomText() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("This is a document"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("This is a document"))
     }
 
     func testYesEmbeddedInWord() {
         // "yesterday" starts with "yes" but should not match because no comma/space after "yes"
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("yesterday"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("yesterday"))
     }
 
     func testNoWithExplanation() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("no, this is not an invoice"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("no, this is not an invoice"))
     }
 
     func testNeinWithExplanation() {
-        XCTAssertFalse(DocumentDetector.parseYesNoResponse("nein, das ist keine Rechnung"))
+        XCTAssertFalse(StringUtils.parseYesNoResponse("nein, das ist keine Rechnung"))
     }
 }

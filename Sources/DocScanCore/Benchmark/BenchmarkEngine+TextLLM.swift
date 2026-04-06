@@ -202,13 +202,13 @@ private extension BenchmarkEngine {
             let response = try await Self.withHardTimeout(seconds: timeoutSeconds * 2) {
                 try await TimeoutError.withTimeout(seconds: timeoutSeconds) {
                     try await textLLM.generate(
-                        systemPrompt: "You are a document classification assistant. Answer only YES or NO.",
+                        systemPrompt: DocumentType.textClassificationSystemPrompt,
                         userPrompt: prompt + "\n\nDocument text:\n" + ocrText,
                         maxTokens: 10,
                     )
                 }
             }
-            return Self.parseYesNoResponse(response)
+            return StringUtils.parseYesNoResponse(response)
         } catch {
             return nil
         }

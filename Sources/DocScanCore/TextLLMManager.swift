@@ -189,11 +189,11 @@ public actor TextLLMManager: TextLLMProviding {
                 context: context,
             )
 
-            var fullOutput = ""
+            var chunks: [String] = []
             for await generation in stream {
                 switch generation {
                 case let .chunk(text):
-                    fullOutput += text
+                    chunks.append(text)
                     if self.config.verbose {
                         print(".", terminator: "")
                     }
@@ -210,7 +210,7 @@ public actor TextLLMManager: TextLLMProviding {
                 print() // New line after progress dots
             }
 
-            return fullOutput
+            return chunks.joined()
         }
     }
 }

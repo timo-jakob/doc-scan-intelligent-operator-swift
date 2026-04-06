@@ -42,6 +42,7 @@ let package = Package(
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
             ],
             path: "Sources/DocScanCore",
+            swiftSettings: [.swiftLanguageMode(.v6)],
         ),
 
         // CLI executable
@@ -52,6 +53,7 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources/DocScanCLI",
+            swiftSettings: [.swiftLanguageMode(.v6)],
         ),
 
         // Tests
@@ -59,6 +61,7 @@ let package = Package(
             name: "DocScanCoreTests",
             dependencies: ["DocScanCore"],
             path: "Tests/DocScanCoreTests",
+            swiftSettings: [.swiftLanguageMode(.v6)],
         ),
     ],
 )

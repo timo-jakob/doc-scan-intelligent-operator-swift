@@ -65,6 +65,7 @@ public final class HuggingFaceClient: Sendable {
     private let apiToken: String?
     private let baseURL: String
     private let retryDelays: [UInt64]
+    private let decoder = JSONDecoder()
 
     public static let defaultBaseURL = "https://" + "huggingface.co/api"
 
@@ -165,7 +166,7 @@ public final class HuggingFaceClient: Sendable {
 
         let (data, response) = try await performRequest(request)
         try validateResponse(response)
-        return try JSONDecoder().decode(T.self, from: data)
+        return try decoder.decode(T.self, from: data)
     }
 
     private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {

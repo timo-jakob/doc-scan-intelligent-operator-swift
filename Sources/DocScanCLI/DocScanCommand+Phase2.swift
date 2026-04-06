@@ -40,8 +40,8 @@ extension ScanCommand {
             print("   \(fieldEmoji) \(fieldName): Not found (will be excluded from filename)")
         }
         if documentType.hasPatientField {
-            if let patient = extraction.patientName {
-                print("   👤 Patient: \(patient)")
+            if extraction.patientName != nil {
+                print("   👤 Patient: [found]")
             } else {
                 print("   👤 Patient: Not found (will be excluded from filename)")
             }

@@ -51,20 +51,22 @@ extension ScanCommand {
         _ categorization: CategorizationVerification,
         documentType: DocumentType,
     ) throws -> Bool {
-        let vlmTimedOut = categorization.vlmResult.isTimedOut
-        let ocrTimedOut = categorization.ocrResult.isTimedOut
+        let vlmUnavailable = categorization.vlmResult.isTimedOut || categorization.vlmResult.isError
+        let ocrUnavailable = categorization.ocrResult.isTimedOut || categorization.ocrResult.isError
         let typeName = documentType.displayName.lowercased()
 
-        if vlmTimedOut, ocrTimedOut {
-            print("❌ Both methods timed out")
+        if vlmUnavailable, ocrUnavailable {
+            print("❌ Both methods failed or timed out")
             throw ExitCode.failure
         }
-        if vlmTimedOut {
-            print("⏱️  VLM timed out - using OCR result")
+        if vlmUnavailable {
+            let label = categorization.vlmResult.shortDisplayLabel
+            print("⚠️  \(label) - using OCR result")
             return categorization.ocrResult.isMatch
         }
-        if ocrTimedOut {
-            print("⏱️  OCR timed out - using VLM result")
+        if ocrUnavailable {
+            let label = categorization.ocrResult.shortDisplayLabel
+            print("⚠️  \(label) - using VLM result")
             return categorization.vlmResult.isMatch
         }
         if categorization.bothAgree {
@@ -160,28 +162,30 @@ extension ScanCommand {
         _ categorization: CategorizationVerification,
         documentType: DocumentType,
     ) throws -> Bool {
-        let vlmTimedOut = categorization.vlmResult.isTimedOut
-        let ocrTimedOut = categorization.ocrResult.isTimedOut
+        let vlmUnavailable = categorization.vlmResult.isTimedOut || categorization.vlmResult.isError
+        let ocrUnavailable = categorization.ocrResult.isTimedOut || categorization.ocrResult.isError
         let vlmConf = categorization.vlmResult.confidence
         let ocrConf = categorization.ocrResult.confidence
         let typeName = documentType.displayName.lowercased()
 
-        if vlmTimedOut, ocrTimedOut {
-            writeStdout("📋 Phase 1  ❌ both methods timed out\n")
+        if vlmUnavailable, ocrUnavailable {
+            writeStdout("📋 Phase 1  ❌ both methods failed\n")
             throw ExitCode.failure
         }
 
-        if vlmTimedOut {
+        if vlmUnavailable {
             let isMatch = categorization.ocrResult.isMatch
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  ⏱️ VLM · OCR: \(ocrConf.rawValue)\n")
+            let vlmStatus = categorization.vlmResult.shortDisplayLabel
+            writeStdout("📋 Phase 1  \(label)  \(vlmStatus) · OCR: \(ocrConf.rawValue)\n")
             return isMatch
         }
 
-        if ocrTimedOut {
+        if ocrUnavailable {
             let isMatch = categorization.vlmResult.isMatch
             let label = isMatch ? "✅ \(typeName)" : "❌ unknown document"
-            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf.rawValue) · ⏱️ OCR\n")
+            let ocrStatus = categorization.ocrResult.shortDisplayLabel
+            writeStdout("📋 Phase 1  \(label)  VLM: \(vlmConf.rawValue) · \(ocrStatus)\n")
             return isMatch
         }
 

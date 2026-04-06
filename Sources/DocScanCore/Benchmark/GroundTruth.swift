@@ -103,6 +103,8 @@ public struct GroundTruth: Codable, Equatable, Sendable {
         do {
             let url = URL(fileURLWithPath: path)
             try data.write(to: url, options: .atomic)
+            // Restrict permissions — sidecars may contain patient PII
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         } catch {
             throw DocScanError.fileOperationFailed("Failed to write ground truth: \(error.localizedDescription)")
         }

@@ -184,4 +184,98 @@ final class TextLLMParsingDirectTests: XCTestCase {
         XCTAssertFalse(StringUtils.parseYesNoResponse("Nein."))
         XCTAssertFalse(StringUtils.parseYesNoResponse(""))
     }
+
+    // MARK: - Boundary success tests for ProcessingSettings
+
+    func testValidateMaxTokensOne() throws {
+        let settings = ProcessingSettings(maxTokens: 1)
+        XCTAssertNoThrow(try settings.validate())
+    }
+
+    func testValidatePdfDPIOne() throws {
+        let settings = ProcessingSettings(pdfDPI: 1)
+        XCTAssertNoThrow(try settings.validate())
+    }
+
+    // MARK: - DocumentType metadata properties
+
+    func testDocumentTypeSecondaryFieldEmoji() {
+        XCTAssertEqual(DocumentType.invoice.secondaryFieldEmoji, "🏢")
+        XCTAssertEqual(DocumentType.prescription.secondaryFieldEmoji, "👨‍⚕️")
+    }
+
+    func testDocumentTypeIsSecondaryFieldRequired() {
+        XCTAssertTrue(DocumentType.invoice.isSecondaryFieldRequired)
+        XCTAssertFalse(DocumentType.prescription.isSecondaryFieldRequired)
+    }
+
+    func testDocumentTypeHasPatientField() {
+        XCTAssertFalse(DocumentType.invoice.hasPatientField)
+        XCTAssertTrue(DocumentType.prescription.hasPatientField)
+    }
+
+    func testDocumentTypeSecondaryFieldLabel() {
+        XCTAssertEqual(DocumentType.invoice.secondaryFieldLabel, "Company")
+        XCTAssertEqual(DocumentType.prescription.secondaryFieldLabel, "Doctor")
+    }
+
+    func testDocumentTypeTextClassificationSystemPrompt() {
+        XCTAssertTrue(DocumentType.textClassificationSystemPrompt.contains("YES or NO"))
+    }
+
+    // MARK: - Stronger error assertions
+
+    func testFileRenamerNonExistentFileThrowsFileNotFound() {
+        let renamer = FileRenamer(verbose: false)
+        XCTAssertThrowsError(try renamer.rename(
+            from: "/nonexistent/path.pdf", to: "new.pdf",
+        )) { error in
+            guard let docError = error as? DocScanError,
+                  case .fileNotFound = docError
+            else {
+                XCTFail("Expected DocScanError.fileNotFound, got: \(error)")
+                return
+            }
+        }
+    }
+
+    // MARK: - CategorizationMethod.ocrError
+
+    func testOcrErrorDisplayLabels() {
+        let result = CategorizationResult(
+            isMatch: false, confidence: .low,
+            method: .ocrError, reason: "Test error",
+        )
+        XCTAssertEqual(result.shortDisplayLabel, "OCR (error)")
+        XCTAssertTrue(result.displayLabel.contains("Error"))
+        XCTAssertTrue(result.isError)
+        XCTAssertFalse(result.isTimedOut)
+    }
+
+    // MARK: - renameToDirectory path traversal
+
+    func testRenameToDirectoryPathTraversalGuard() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("docscan-dir-test-\(UUID().uuidString)")
+        let targetDir = tempDir.appendingPathComponent("target")
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let testFile = tempDir.appendingPathComponent("test.pdf")
+        try "test".write(to: testFile, atomically: true, encoding: .utf8)
+
+        let renamer = FileRenamer(verbose: false)
+        XCTAssertThrowsError(try renamer.renameToDirectory(
+            from: testFile.path, to: targetDir.path,
+            filename: "../../escape.pdf",
+        )) { error in
+            guard let docError = error as? DocScanError,
+                  case let .fileOperationFailed(msg) = docError
+            else {
+                XCTFail("Expected DocScanError.fileOperationFailed")
+                return
+            }
+            XCTAssertTrue(msg.contains("escape target directory"))
+        }
+    }
 }

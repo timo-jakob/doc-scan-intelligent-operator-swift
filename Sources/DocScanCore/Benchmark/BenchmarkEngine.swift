@@ -1,4 +1,4 @@
-@preconcurrency import Dispatch // Remove when DispatchWorkItem is Sendable-annotated
+@preconcurrency import Dispatch // TODO: Remove when DispatchWorkItem is Sendable-annotated (audit periodically)
 import Foundation
 import MLX
 
@@ -183,13 +183,23 @@ public struct BenchmarkEngine: Sendable {
     // MARK: - OCR Pre-extraction
 
     /// Pre-extract OCR text from all PDFs in parallel (shared across all TextLLM models)
+    /// Maximum concurrent OCR tasks to limit memory pressure from parallel PDF rasterization
+    private static let maxConcurrentOCR = 8
+
     public func preExtractOCRTexts(positivePDFs: [String], negativePDFs: [String]) async -> [String: String] {
         let allPDFs = positivePDFs + negativePDFs
         let config = configuration
         let isVerbose = verbose
 
         return await withTaskGroup(of: (String, String?).self) { group in
+            // Limit concurrency to avoid memory pressure from parallel PDF rasterization
+            var inflight = 0
             for pdfPath in allPDFs {
+                if inflight >= Self.maxConcurrentOCR {
+                    _ = await group.next()
+                    inflight -= 1
+                }
+                inflight += 1
                 group.addTask {
                     let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
 

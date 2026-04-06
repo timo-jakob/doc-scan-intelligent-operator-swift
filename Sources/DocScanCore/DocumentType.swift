@@ -2,6 +2,10 @@ import Foundation
 
 /// Supported document types for categorization and data extraction
 public enum DocumentType: String, CaseIterable, Codable, Sendable {
+    /// System prompt for text-based classification (shared across all document types)
+    public static let textClassificationSystemPrompt =
+        "You are a document classification assistant. Answer only YES or NO."
+
     case invoice
     case prescription
 

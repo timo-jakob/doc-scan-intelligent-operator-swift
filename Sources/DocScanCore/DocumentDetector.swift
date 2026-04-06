@@ -1,4 +1,4 @@
-@preconcurrency import AppKit // Remove when NSImage is Sendable-annotated
+@preconcurrency import AppKit // TODO: Remove when NSImage is Sendable-annotated (audit periodically)
 import Foundation
 import PDFKit
 
@@ -16,6 +16,8 @@ public enum CategorizationMethod: Equatable, Sendable {
     case ocr
     /// OCR analysis timed out before completing
     case ocrTimeout
+    /// OCR analysis failed with an error
+    case ocrError
     /// Direct PDF text extraction (for searchable PDFs)
     case pdf
 }
@@ -49,6 +51,7 @@ public struct CategorizationResult: Equatable, Sendable {
         case .vlmError: "VLM (Vision Language Model - Error)"
         case .ocr: "OCR (Vision Framework)"
         case .ocrTimeout: "OCR (Vision Framework - Timeout)"
+        case .ocrError: "OCR (Vision Framework - Error)"
         case .pdf: "PDF (Direct Text Extraction)"
         }
     }
@@ -56,6 +59,11 @@ public struct CategorizationResult: Equatable, Sendable {
     /// True when this result represents a timeout rather than an actual categorisation decision.
     public var isTimedOut: Bool {
         method == .vlmTimeout || method == .ocrTimeout
+    }
+
+    /// True when this result represents an error rather than an actual categorisation decision.
+    public var isError: Bool {
+        method == .vlmError || method == .ocrError
     }
 
     /// Short display label for inline messages (e.g., "VLM", "PDF text", "Vision OCR")
@@ -66,6 +74,7 @@ public struct CategorizationResult: Equatable, Sendable {
         case .vlmError: "VLM (error)"
         case .ocr: "Vision OCR"
         case .ocrTimeout: "OCR (timeout)"
+        case .ocrError: "OCR (error)"
         case .pdf: "PDF text"
         }
     }
@@ -210,7 +219,7 @@ extension DocumentDetector {
                 )
                 if config.verbose { print("VLM response received (\(response.count) chars)") }
 
-                let isMatch = Self.parseYesNoResponse(response)
+                let isMatch = StringUtils.parseYesNoResponse(response)
                 let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
                     .lowercased()
                     .trimmingCharacters(in: .punctuationCharacters)
@@ -296,7 +305,7 @@ extension DocumentDetector {
             if config.verbose { print("OCR categorization failed: \(error)") }
             return (CategorizationResult(
                 isMatch: false, confidence: .low,
-                method: .ocrTimeout, reason: error.localizedDescription,
+                method: .ocrError, reason: error.localizedDescription,
             ), nil)
         }
     }
@@ -346,13 +355,6 @@ extension DocumentDetector {
             secondaryField: result.secondaryField,
             patientName: result.patientName,
         )
-    }
-
-    // MARK: - Response Parsing
-
-    /// Parse a YES/NO response from a VLM. Delegates to shared StringUtils implementation.
-    nonisolated static func parseYesNoResponse(_ response: String) -> Bool {
-        StringUtils.parseYesNoResponse(response)
     }
 
     // MARK: - Direct Text Categorization (public for testing)

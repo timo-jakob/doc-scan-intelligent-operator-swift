@@ -17,6 +17,9 @@ public struct KeywordResult: Equatable, Sendable {
 
 /// OCR engine using Apple's Vision framework for text recognition
 public struct OCREngine: Sendable {
+    /// Tile height (pixels) for splitting very tall images — kept below Vision's soft limit
+    private static let ocrTileHeightPixels = 800
+
     private let config: Configuration
 
     public init(config: Configuration) {
@@ -87,7 +90,7 @@ public struct OCREngine: Sendable {
     private func extractTextTiled(from cgImage: CGImage) throws -> String {
         let width = cgImage.width
         let height = cgImage.height
-        let tileHeight = 800 // Tile height in pixels
+        let tileHeight = Self.ocrTileHeightPixels
         var tileTexts: [String] = []
 
         for tileY in stride(from: 0, to: height, by: tileHeight) {

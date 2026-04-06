@@ -58,8 +58,12 @@ public enum StringUtils {
     // MARK: - Whitespace regex (pre-compiled for performance)
 
     /// Pre-compiled regex for normalizing whitespace in filenames
-    // swiftlint:disable:next force_try
-    private static let whitespaceRegex = try! NSRegularExpression(pattern: "\\s+")
+    private static let whitespaceRegex: NSRegularExpression = {
+        guard let regex = try? NSRegularExpression(pattern: "\\s+") else {
+            preconditionFailure("Invalid whitespace regex pattern")
+        }
+        return regex
+    }()
 
     // MARK: - VLM Response Parsing
 

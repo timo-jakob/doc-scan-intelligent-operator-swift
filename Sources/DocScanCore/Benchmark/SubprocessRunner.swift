@@ -1,4 +1,4 @@
-@preconcurrency import Foundation // Remove when Process/DispatchWorkItem are Sendable-annotated
+@preconcurrency import Foundation // TODO: Remove when Process/DispatchWorkItem are Sendable-annotated (audit periodically)
 
 /// Outcome of a single benchmark worker subprocess
 public enum SubprocessResult: Equatable, Sendable {
@@ -88,6 +88,8 @@ public final class SubprocessRunner: Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(input).write(to: inputURL)
+        // Restrict permissions — IPC files may contain OCR text with PII
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: inputURL.path)
 
         let process = makeWorkerProcess(inputPath: inputURL.path, outputPath: outputURL.path)
         let timeout = Self.overallTimeout(for: input)
