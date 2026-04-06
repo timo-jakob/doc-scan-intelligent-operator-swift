@@ -34,7 +34,7 @@ public extension BenchmarkEngine {
             }
             // mlx-community/Qwen2-VL-2B-Instruct-4bit → models--mlx-community--Qwen2-VL-2B-Instruct-4bit
             let dirName = "models--" + modelName.replacingOccurrences(of: "/", with: "--")
-            let fullPath = (hubCache as NSString).appendingPathComponent(dirName)
+            let fullPath = URL(fileURLWithPath: hubCache).appendingPathComponent(dirName).path
 
             guard fileManager.fileExists(atPath: fullPath) else { continue }
 
@@ -62,25 +62,30 @@ public extension BenchmarkEngine {
             return hubCache
         }
         if let hfHome = environment["HF_HOME"] {
-            return (hfHome as NSString).appendingPathComponent("hub")
+            return URL(fileURLWithPath: hfHome).appendingPathComponent("hub").path
         }
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".cache/huggingface/hub")
             .path
     }
 
-    /// Calculate total size of a directory recursively
+    /// Calculate total size of a directory recursively using bulk attribute fetching
     internal static func directorySize(at path: String) -> UInt64 {
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(atPath: path) else { return 0 }
+        let url = URL(fileURLWithPath: path)
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+        ) else { return 0 }
 
         var totalSize: UInt64 = 0
-        for case let file as String in enumerator {
-            let fullPath = (path as NSString).appendingPathComponent(file)
-            if let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
-               let fileSize = attrs[.size] as? UInt64 {
-                totalSize += fileSize
-            }
+        for case let fileURL as URL in enumerator {
+            guard let values = try? fileURL.resourceValues(
+                forKeys: [.fileSizeKey, .isRegularFileKey],
+            ),
+                values.isRegularFile == true,
+                let size = values.fileSize
+            else { continue }
+            totalSize += UInt64(size)
         }
         return totalSize
     }

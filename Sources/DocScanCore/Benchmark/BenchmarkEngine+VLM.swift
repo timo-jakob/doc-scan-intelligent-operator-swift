@@ -147,19 +147,8 @@ public extension BenchmarkEngine {
         }
     }
 
-    /// Parse a YES/NO response from a VLM or TextLLM.
-    ///
-    /// Strips whitespace and punctuation, then checks for exact match or common prefixed forms.
-    /// Returns `true` for "yes"/"ja" variants, `false` for everything else.
+    /// Parse a YES/NO response from a VLM or TextLLM. Delegates to shared StringUtils implementation.
     static func parseYesNoResponse(_ response: String) -> Bool {
-        let trimmed = response
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .trimmingCharacters(in: .punctuationCharacters)
-
-        if trimmed == "yes" || trimmed == "ja" { return true }
-        if trimmed.hasPrefix("yes,") || trimmed.hasPrefix("yes ") { return true }
-        if trimmed.hasPrefix("ja,") || trimmed.hasPrefix("ja ") { return true }
-        return false
+        StringUtils.parseYesNoResponse(response)
     }
 }

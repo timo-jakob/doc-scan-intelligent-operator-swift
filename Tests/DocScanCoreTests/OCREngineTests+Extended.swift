@@ -79,7 +79,7 @@ extension OCREngineTests {
     func testExtractDateUSFormat() throws {
         // US format MM/dd/yyyy
         let text = "Date: 12/22/2024"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -91,7 +91,7 @@ extension OCREngineTests {
 
     func testExtractDateSlashSeparated() throws {
         let text = "Datum: 22/12/2024"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -135,30 +135,7 @@ extension OCREngineTests {
         XCTAssertFalse(engine.detectKeywords(for: .invoice, from: "").isMatch)
     }
 
-    // MARK: - Company Extraction with Various Legal Suffixes
-
-    func testExtractCompanyWithVariousLegalSuffixes() {
-        let testCases: [(text: String, expectedContains: String)] = [
-            ("Company Inc\nAddress", "Inc"),
-            ("Business Ltd\nCity", "Ltd"),
-            ("Startup Corp\nState", "Corp"),
-            ("French SARL\nParis", "SARL"),
-            ("Spanish S.A.\nMadrid", "S.A."),
-            ("German KG\nBerlin", "KG"),
-            ("Another OHG\nMunich", "OHG"),
-        ]
-
-        for (text, expectedContains) in testCases {
-            let company = engine.extractCompany(from: text)
-            XCTAssertNotNil(company, "Should extract company from: \(text)")
-            if let company {
-                XCTAssertTrue(
-                    company.contains(expectedContains),
-                    "Company '\(company)' should contain '\(expectedContains)'",
-                )
-            }
-        }
-    }
+    // Note: extractCompany tests removed — method was dead code
 
     // MARK: - Multiple Keywords in Same Text
 

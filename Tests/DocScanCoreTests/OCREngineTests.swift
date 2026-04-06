@@ -57,11 +57,11 @@ final class OCREngineTests: XCTestCase {
         XCTAssertEqual(result3.confidence, .high) // High confidence it's NOT an invoice
     }
 
-    // MARK: - Date Extraction Tests
+    // MARK: - Date Extraction Tests (via DateUtils)
 
     func testExtractDateISO() throws {
         let text = "Invoice Date: 2024-12-22"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -73,7 +73,7 @@ final class OCREngineTests: XCTestCase {
 
     func testExtractDateEuropean() throws {
         let text = "Rechnungsdatum: 22.12.2024"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -85,7 +85,7 @@ final class OCREngineTests: XCTestCase {
 
     func testExtractDateNotFound() {
         let text = "This text has no date"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNil(date)
     }
@@ -93,7 +93,7 @@ final class OCREngineTests: XCTestCase {
     func testExtractDateColonSeparated() throws {
         // OCR sometimes reads dots as colons
         let text = "Datum:13:11:2025"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -105,7 +105,7 @@ final class OCREngineTests: XCTestCase {
 
     func testExtractDateGermanMonth() throws {
         let text = "Beitragsrechnung September 2022"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -117,7 +117,7 @@ final class OCREngineTests: XCTestCase {
 
     func testExtractDateGermanMonthAbbreviated() throws {
         let text = "Rechnung Okt 2023"
-        let date = engine.extractDate(from: text)
+        let date = DateUtils.extractDateFromText(text)
 
         XCTAssertNotNil(date)
         let calendar = Calendar.current
@@ -129,18 +129,18 @@ final class OCREngineTests: XCTestCase {
     func testExtractDateGermanMonthWordBoundary() {
         // "mai" should not match within "email"
         let textWithEmail = "Contact: info@company.com or email 2023"
-        let dateFromEmail = engine.extractDate(from: textWithEmail)
+        let dateFromEmail = DateUtils.extractDateFromText(textWithEmail)
         XCTAssertNil(dateFromEmail, "Should not match 'mai' within 'email'")
 
         // "jan" should not match within "january" when looking for German abbreviation
         // (but "januar" should still work as full German month)
         let textWithJanuar = "Rechnung Januar 2023"
-        let dateFromJanuar = engine.extractDate(from: textWithJanuar)
+        let dateFromJanuar = DateUtils.extractDateFromText(textWithJanuar)
         XCTAssertNotNil(dateFromJanuar, "Should match 'januar' as complete word")
 
         // Standalone "mai" should still work
         let textWithMai = "Rechnung Mai 2023"
-        let dateFromMai = engine.extractDate(from: textWithMai)
+        let dateFromMai = DateUtils.extractDateFromText(textWithMai)
         XCTAssertNotNil(dateFromMai, "Should match standalone 'Mai'")
         if let date = dateFromMai {
             let components = Calendar.current.dateComponents([.month], from: date)
@@ -148,89 +148,6 @@ final class OCREngineTests: XCTestCase {
         }
     }
 
-    // MARK: - Company Extraction Tests
-
-    func testExtractCompanyWithKeywords() throws {
-        let text = """
-        Acme Corporation GmbH
-        Musterstraße 123
-        12345 Berlin
-        """
-
-        let company = engine.extractCompany(from: text)
-        XCTAssertNotNil(company)
-        XCTAssertTrue(try XCTUnwrap(company?.contains("Acme")))
-    }
-
-    func testExtractCompanyFirstLine() {
-        let text = """
-        My Company Name
-        Some address
-        Some city
-        """
-
-        let company = engine.extractCompany(from: text)
-        // sanitizeCompanyName replaces spaces with underscores
-        XCTAssertEqual(company, "My_Company_Name")
-    }
-
-    func testExtractCompanyWithLegalSuffix() throws {
-        let text = """
-        Some Random Text
-        Another Line
-        BigCorp AG
-        More text here
-        """
-
-        let company = engine.extractCompany(from: text)
-        XCTAssertNotNil(company)
-        XCTAssertTrue(try XCTUnwrap(company?.contains("BigCorp")))
-    }
-
-    func testExtractCompanyWithLLC() throws {
-        let text = """
-        Random Header
-        Tech Solutions LLC
-        Address Line
-        """
-
-        let company = engine.extractCompany(from: text)
-        XCTAssertNotNil(company)
-        XCTAssertTrue(try XCTUnwrap(company?.contains("Tech")))
-        XCTAssertTrue(try XCTUnwrap(company?.contains("LLC")))
-    }
-
-    func testExtractCompanyWithCorporation() throws {
-        let text = """
-        Some text
-        Apple Corporation
-        More text
-        """
-
-        let company = engine.extractCompany(from: text)
-        XCTAssertNotNil(company)
-        XCTAssertTrue(try XCTUnwrap(company?.contains("Apple")))
-    }
-
-    func testExtractCompanyEmptyText() {
-        let company = engine.extractCompany(from: "")
-        XCTAssertNil(company)
-    }
-
-    func testExtractCompanyOnlyWhitespace() {
-        let company = engine.extractCompany(from: "   \n\n   ")
-        XCTAssertNil(company)
-    }
-
-    func testExtractCompanyShortFirstLine() {
-        // First line is too short (<=3 chars), no company keywords
-        let text = """
-        Ab
-        Another line
-        """
-
-        let company = engine.extractCompany(from: text)
-        // Should return nil as first line is too short and no keywords found
-        XCTAssertNil(company)
-    }
+    // Note: extractCompany and extractDate were removed from OCREngine
+    // (dead code — extraction is done via TextLLMManager)
 }

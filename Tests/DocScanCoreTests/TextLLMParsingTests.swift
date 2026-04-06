@@ -13,7 +13,7 @@ final class TextLLMParsingTests: XCTestCase {
         mockDate: Date? = nil,
         mockSecondary: String? = nil,
         mockPatient: String? = nil,
-        documentType: DocumentType = .invoice
+        documentType: DocumentType = .invoice,
     ) -> (DocumentDetector, MockTextLLMProvider) {
         let mockVLM = MockVLMProvider()
         let mockTextLLM = MockTextLLMProvider()
@@ -26,7 +26,7 @@ final class TextLLMParsingTests: XCTestCase {
             config: config,
             documentType: documentType,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
         return (detector, mockTextLLM)
     }
@@ -36,7 +36,7 @@ final class TextLLMParsingTests: XCTestCase {
     func testInvoiceExtractionAllFields() async throws {
         let date = DateUtils.parseDate("2025-06-27")
         let (detector, _) = makeDetector(
-            mockDate: date, mockSecondary: "DB_Fernverkehr_AG"
+            mockDate: date, mockSecondary: "DB_Fernverkehr_AG",
         )
 
         let context = CategorizationContext(ocrText: "Rechnung Datum 2025-06-27 DB Fernverkehr AG", pdfPath: "/test.pdf")
@@ -76,7 +76,7 @@ final class TextLLMParsingTests: XCTestCase {
             mockDate: date,
             mockSecondary: "Gesine_Kaiser",
             mockPatient: "Max",
-            documentType: .prescription
+            documentType: .prescription,
         )
 
         let context = CategorizationContext(ocrText: "Rezept Dr. Kaiser Patient Max", pdfPath: "/test.pdf")
@@ -92,7 +92,7 @@ final class TextLLMParsingTests: XCTestCase {
         let (detector, _) = makeDetector(
             mockDate: date,
             mockSecondary: "Mueller",
-            documentType: .prescription
+            documentType: .prescription,
         )
 
         let context = CategorizationContext(ocrText: "Rezept Dr. Mueller", pdfPath: "/test.pdf")
@@ -133,7 +133,7 @@ final class TextLLMParsingTests: XCTestCase {
             config: Configuration.defaultConfiguration,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let context = CategorizationContext(ocrText: "Some text", pdfPath: "/test.pdf")

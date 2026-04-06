@@ -2,6 +2,9 @@ import Foundation
 
 /// Handles safe file renaming with collision detection
 public struct FileRenamer: Sendable {
+    /// Maximum number of collision retries before giving up
+    private static let maxCollisionRetries = 1000
+
     private let verbose: Bool
 
     public init(verbose: Bool = false) {
@@ -18,9 +21,10 @@ public struct FileRenamer: Sendable {
         let sourceDirectory = sourceURL.deletingLastPathComponent()
         let targetURL = sourceDirectory.appendingPathComponent(targetFilename)
 
-        // Validate target stays within source directory (prevent path traversal)
-        let resolvedTarget = targetURL.standardized
-        guard resolvedTarget.path.hasPrefix(sourceDirectory.standardized.path) else {
+        // Validate target stays within source directory (prevent path traversal via symlinks)
+        let resolvedTarget = targetURL.standardized.resolvingSymlinksInPath()
+        let resolvedSource = sourceDirectory.standardized.resolvingSymlinksInPath()
+        guard resolvedTarget.path.hasPrefix(resolvedSource.path) else {
             throw DocScanError.fileOperationFailed(
                 "Target filename would escape source directory: \(targetFilename)",
             )
@@ -69,7 +73,7 @@ public struct FileRenamer: Sendable {
         let filename = targetURL.deletingPathExtension().lastPathComponent
         let ext = targetURL.pathExtension
 
-        for counter in 1 ... 1000 {
+        for counter in 1 ... Self.maxCollisionRetries {
             let newFilename = ext.isEmpty
                 ? "\(filename)_\(counter)"
                 : "\(filename)_\(counter).\(ext)"
@@ -98,7 +102,7 @@ public struct FileRenamer: Sendable {
         let filename = targetURL.deletingPathExtension().lastPathComponent
         let ext = targetURL.pathExtension
 
-        for counter in 1 ... 1000 {
+        for counter in 1 ... Self.maxCollisionRetries {
             let newFilename = ext.isEmpty
                 ? "\(filename)_\(counter)"
                 : "\(filename)_\(counter).\(ext)"

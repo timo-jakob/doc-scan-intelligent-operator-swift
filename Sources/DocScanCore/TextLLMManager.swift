@@ -81,7 +81,7 @@ public actor TextLLMManager: TextLLMProviding {
             if config.verbose {
                 print("Text-LLM: Date not found by LLM, trying regex fallback...")
             }
-            let fallbackDate = extractDateWithRegex(from: text)
+            let fallbackDate = DateUtils.extractDateFromText(text)
             if config.verbose, let fallbackDate {
                 print("Text-LLM: Regex fallback found date: \(DateUtils.formatDate(fallbackDate))")
             }
@@ -95,8 +95,9 @@ public actor TextLLMManager: TextLLMProviding {
         return parsed
     }
 
-    /// Parse an LLM response into an ExtractionResult
-    private func parseExtractionResponse(
+    /// Parse an LLM response into an ExtractionResult.
+    /// Internal access for testability.
+    func parseExtractionResponse(
         _ response: String,
         documentType: DocumentType,
     ) -> ExtractionResult {
@@ -152,12 +153,6 @@ public actor TextLLMManager: TextLLMProviding {
         case .prescription:
             StringUtils.sanitizeDoctorName(value)
         }
-    }
-
-    /// Extract date using regex patterns (fallback for LLM failures)
-    /// Uses shared DateUtils for consistent date extraction across the codebase
-    private func extractDateWithRegex(from text: String) -> Date? {
-        DateUtils.extractDateFromText(text)
     }
 
     // MARK: - LLM Generation

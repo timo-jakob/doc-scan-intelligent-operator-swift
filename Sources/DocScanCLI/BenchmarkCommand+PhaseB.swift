@@ -204,6 +204,6 @@ private extension BenchmarkCommand {
         let contents = (try? fileManager.contentsOfDirectory(atPath: directory)) ?? []
         return contents.sorted()
             .filter { $0.hasSuffix(".pdf.json") }
-            .map { (directory as NSString).appendingPathComponent($0) }
+            .map { URL(fileURLWithPath: directory).appendingPathComponent($0).path }
     }
 }

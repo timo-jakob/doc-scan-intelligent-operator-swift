@@ -126,6 +126,38 @@ public enum DocumentType: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Label for the secondary extraction field (e.g., "Company", "Doctor")
+    public var secondaryFieldLabel: String {
+        switch self {
+        case .invoice: "Company"
+        case .prescription: "Doctor"
+        }
+    }
+
+    /// Emoji for the secondary extraction field
+    public var secondaryFieldEmoji: String {
+        switch self {
+        case .invoice: "🏢"
+        case .prescription: "👨‍⚕️"
+        }
+    }
+
+    /// Whether the secondary field is required for filename generation
+    public var isSecondaryFieldRequired: Bool {
+        switch self {
+        case .invoice: true
+        case .prescription: false
+        }
+    }
+
+    /// Whether this document type has a patient name field
+    public var hasPatientField: Bool {
+        switch self {
+        case .invoice: false
+        case .prescription: true
+        }
+    }
+
     /// Fields to extract for this document type
     public var extractionFields: [ExtractionField] {
         switch self {

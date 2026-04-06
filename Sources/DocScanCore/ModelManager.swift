@@ -104,7 +104,8 @@ public actor ModelManager: VLMProvider {
         // 1. We create a fresh session per generateFromImage call (resetSession: true above)
         // 2. The isGenerating reentrancy guard prevents concurrent access
         // 3. The session is never shared outside this actor
-        // Remove nonisolated(unsafe) when mlx-swift-lm adopts Sendable
+        // TODO: Remove nonisolated(unsafe) when mlx-swift-lm adopts Sendable
+        //   Track: https://github.com/ml-explore/mlx-swift-lm/issues/165
         nonisolated(unsafe) let sendableSession = session
         let response = try await sendableSession.respond(
             to: prompt,
@@ -118,12 +119,25 @@ public actor ModelManager: VLMProvider {
         return response
     }
 
-    /// Save NSImage to temporary file for VLM processing
+    /// Save NSImage to temporary file for VLM processing.
+    /// Pre-scales to the VLM's expected input size (448×632) to avoid encoding a full-resolution bitmap.
     private func saveImageToTemp(_ image: NSImage) throws -> URL {
         let tempDir = fileManager.temporaryDirectory
         let tempURL = tempDir.appendingPathComponent(UUID().uuidString + ".png")
 
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        // Pre-scale to VLM input size to reduce PNG encode from ~8 MB to ~1 MB
+        let targetSize = Self.a4Processing.resize ?? image.size
+        let scaledImage = NSImage(size: targetSize)
+        scaledImage.lockFocus()
+        image.draw(
+            in: NSRect(origin: .zero, size: targetSize),
+            from: NSRect(origin: .zero, size: image.size),
+            operation: .copy,
+            fraction: 1.0,
+        )
+        scaledImage.unlockFocus()
+
+        guard let cgImage = scaledImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw DocScanError.pdfConversionFailed("Unable to convert NSImage to CGImage")
         }
 
@@ -133,6 +147,8 @@ public actor ModelManager: VLMProvider {
         }
 
         try pngData.write(to: tempURL)
+        // Restrict permissions to owner-only for prescription PII protection
+        try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tempURL.path)
         return tempURL
     }
 

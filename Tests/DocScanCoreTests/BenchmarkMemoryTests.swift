@@ -44,7 +44,7 @@ final class BenchmarkMemoryTests: XCTestCase {
     func testParseWithCommunityPrefix() {
         XCTAssertEqual(
             BenchmarkEngine.parseParamBillions(from: "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"),
-            8.0
+            8.0,
         )
     }
 

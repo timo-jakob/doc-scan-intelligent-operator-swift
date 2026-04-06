@@ -142,7 +142,7 @@ public struct BenchmarkEngine: Sendable {
         return contents
             .filter { $0.lowercased().hasSuffix(".pdf") }
             .sorted()
-            .map { (directory as NSString).appendingPathComponent($0) }
+            .map { URL(fileURLWithPath: directory).appendingPathComponent($0).path }
     }
 
     // MARK: - Sidecar Management

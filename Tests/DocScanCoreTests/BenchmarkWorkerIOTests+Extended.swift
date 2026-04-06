@@ -8,7 +8,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
     func testPDFSetCount() {
         let set = BenchmarkPDFSet(
             positivePDFs: ["/a.pdf", "/b.pdf"],
-            negativePDFs: ["/c.pdf"]
+            negativePDFs: ["/c.pdf"],
         )
         XCTAssertEqual(set.count, 3)
     }
@@ -19,9 +19,9 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
     }
 
     func testPDFSetEquatable() {
-        let a = BenchmarkPDFSet(positivePDFs: ["/a.pdf"], negativePDFs: ["/b.pdf"])
-        let b = BenchmarkPDFSet(positivePDFs: ["/a.pdf"], negativePDFs: ["/b.pdf"])
-        XCTAssertEqual(a, b)
+        let set1 = BenchmarkPDFSet(positivePDFs: ["/a.pdf"], negativePDFs: ["/b.pdf"])
+        let set2 = BenchmarkPDFSet(positivePDFs: ["/a.pdf"], negativePDFs: ["/b.pdf"])
+        XCTAssertEqual(set1, set2)
     }
 
     func testPDFSetCodableRoundTrip() throws {
@@ -60,7 +60,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: [], negativePDFs: []),
             timeoutSeconds: 10,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let output = input.makeDisqualifiedOutput(reason: "crashed")
@@ -80,7 +80,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: [], negativePDFs: []),
             timeoutSeconds: 10,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let output = input.makeDisqualifiedOutput(reason: "OOM")
@@ -101,7 +101,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
             totalScore: 5,
             maxScore: 10,
             documentResults: [],
-            elapsedSeconds: 1.5
+            elapsedSeconds: 1.5,
         )
         let original = BenchmarkWorkerOutput.vlm(vlmResult)
         let data = try JSONEncoder().encode(original)
@@ -115,7 +115,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
             totalScore: 8,
             maxScore: 16,
             documentResults: [],
-            elapsedSeconds: 2.3
+            elapsedSeconds: 2.3,
         )
         let original = BenchmarkWorkerOutput.textLLM(textResult)
         let data = try JSONEncoder().encode(original)
@@ -129,7 +129,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
         let gt = GroundTruth(isMatch: true, documentType: .invoice, date: "2025-01-15", secondaryField: "Acme")
         let original = TextLLMInputData(
             ocrTexts: ["/a.pdf": "invoice text"],
-            groundTruths: ["/a.pdf": gt]
+            groundTruths: ["/a.pdf": gt],
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(TextLLMInputData.self, from: data)
@@ -146,7 +146,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
         ]
 
         let benchmark = VLMBenchmarkResult.from(
-            modelName: "test", documentResults: results, elapsedSeconds: 5.0
+            modelName: "test", documentResults: results, elapsedSeconds: 5.0,
         )
 
         XCTAssertEqual(benchmark.totalScore, 2) // TP + TN
@@ -166,7 +166,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
         ]
 
         let benchmark = TextLLMBenchmarkResult.from(
-            modelName: "test", documentResults: results, elapsedSeconds: 3.0
+            modelName: "test", documentResults: results, elapsedSeconds: 3.0,
         )
 
         XCTAssertEqual(benchmark.totalScore, 3) // 2 + 1 + 0
@@ -180,7 +180,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
     func testVLMBenchmarkResultScoreZeroMaxScore() {
         let result = VLMBenchmarkResult(
             modelName: "test", totalScore: 0, maxScore: 0,
-            documentResults: [], elapsedSeconds: 0
+            documentResults: [], elapsedSeconds: 0,
         )
         XCTAssertEqual(result.score, 0.0)
     }
@@ -188,7 +188,7 @@ final class BenchmarkWorkerIOExtendedTests: XCTestCase {
     func testTextLLMBenchmarkResultScoreZeroMaxScore() {
         let result = TextLLMBenchmarkResult(
             modelName: "test", totalScore: 0, maxScore: 0,
-            documentResults: [], elapsedSeconds: 0
+            documentResults: [], elapsedSeconds: 0,
         )
         XCTAssertEqual(result.score, 0.0)
     }

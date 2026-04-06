@@ -86,7 +86,7 @@ extension PathUtilsTests {
 extension PathUtilsTests {
     func testGetCurrentWorkingDirectoryWithoutEnvVar() {
         // Ensure env var is not set
-        unsetenv(docScanOriginalPwdKey)
+        unsetenv(PathUtils.originalPWDEnvironmentKey)
 
         let cwd = PathUtils.getCurrentWorkingDirectory()
 
@@ -98,12 +98,12 @@ extension PathUtilsTests {
         let testPath = "/test/original/path"
 
         // Set the environment variable
-        setenv(docScanOriginalPwdKey, testPath, 1)
+        setenv(PathUtils.originalPWDEnvironmentKey, testPath, 1)
 
         let cwd = PathUtils.getCurrentWorkingDirectory()
 
         // Clean up
-        unsetenv(docScanOriginalPwdKey)
+        unsetenv(PathUtils.originalPWDEnvironmentKey)
 
         // Should return the env var value
         XCTAssertEqual(cwd, testPath)
@@ -111,12 +111,12 @@ extension PathUtilsTests {
 
     func testGetCurrentWorkingDirectoryWithEmptyEnvVar() {
         // Set empty environment variable
-        setenv(docScanOriginalPwdKey, "", 1)
+        setenv(PathUtils.originalPWDEnvironmentKey, "", 1)
 
         let cwd = PathUtils.getCurrentWorkingDirectory()
 
         // Clean up
-        unsetenv(docScanOriginalPwdKey)
+        unsetenv(PathUtils.originalPWDEnvironmentKey)
 
         // Should fall back to FileManager's current directory
         XCTAssertEqual(cwd, FileManager.default.currentDirectoryPath)
@@ -128,13 +128,13 @@ extension PathUtilsTests {
         try "test content".write(to: testFile, atomically: true, encoding: .utf8)
 
         // Set the original PWD to temp directory (simulating wrapper script behavior)
-        setenv(docScanOriginalPwdKey, tempDirectory.path, 1)
+        setenv(PathUtils.originalPWDEnvironmentKey, tempDirectory.path, 1)
 
         // Resolve relative path - should use the env var, not current directory
         let resolved = PathUtils.resolvePath("env_test.pdf")
 
         // Clean up
-        unsetenv(docScanOriginalPwdKey)
+        unsetenv(PathUtils.originalPWDEnvironmentKey)
 
         // Should resolve relative to the env var path
         XCTAssertEqual(resolved, testFile.path)
@@ -151,13 +151,13 @@ extension PathUtilsTests {
         FileManager.default.changeCurrentDirectoryPath("/tmp")
 
         // Set the original PWD to temp directory
-        setenv(docScanOriginalPwdKey, tempDirectory.path, 1)
+        setenv(PathUtils.originalPWDEnvironmentKey, tempDirectory.path, 1)
 
         // Resolve relative path
         let resolved = PathUtils.resolvePath("different_dir_test.pdf")
 
         // Clean up
-        unsetenv(docScanOriginalPwdKey)
+        unsetenv(PathUtils.originalPWDEnvironmentKey)
         FileManager.default.changeCurrentDirectoryPath(originalDir)
 
         // Should resolve relative to the env var path, not /tmp

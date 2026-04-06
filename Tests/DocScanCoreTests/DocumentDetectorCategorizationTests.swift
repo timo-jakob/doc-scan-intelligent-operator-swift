@@ -39,7 +39,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, context) = try await detector.categorize(pdfPath: testPDFPath)
@@ -61,7 +61,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: noInvoicePDF)
@@ -82,7 +82,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: noInvoicePDF)
@@ -102,7 +102,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: testPDFPath)
@@ -123,7 +123,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: testPDFPath)
@@ -144,7 +144,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let emptyContext = CategorizationContext(ocrText: "", pdfPath: "/dummy.pdf")
@@ -171,7 +171,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let context = CategorizationContext(ocrText: "Some invoice text", pdfPath: "/dummy.pdf")
@@ -189,7 +189,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let context = CategorizationContext(ocrText: "Some invoice text", pdfPath: "/dummy.pdf")
@@ -213,7 +213,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: testPDFPath)
@@ -229,7 +229,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .invoice,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: testPDFPath)
@@ -249,7 +249,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
             config: config,
             documentType: .prescription,
             vlmProvider: mockVLM,
-            textLLM: mockTextLLM
+            textLLM: mockTextLLM,
         )
 
         let (verification, _) = try await detector.categorize(pdfPath: prescriptionPDF)
@@ -279,10 +279,10 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
         let attributes: [NSAttributedString.Key: Any] = [.font: font]
         let lines = text.components(separatedBy: "\n")
         for (index, line) in lines.enumerated() {
-            let y = 750 - (index * 16)
+            let yPos = 750 - (index * 16)
             let attributedString = NSAttributedString(string: line, attributes: attributes)
             let frameSetter = CTFramesetterCreateWithAttributedString(attributedString)
-            let path = CGPath(rect: CGRect(x: 50, y: y, width: 500, height: 20), transform: nil)
+            let path = CGPath(rect: CGRect(x: 50, y: yPos, width: 500, height: 20), transform: nil)
             let frame = CTFramesetterCreateFrame(frameSetter, CFRange(location: 0, length: 0), path, nil)
             CTFrameDraw(frame, context)
         }
@@ -290,6 +290,7 @@ final class DocumentDetectorCategorizationTests: XCTestCase {
         context.endPage()
         context.closePDF()
 
+        // swiftlint:disable:next force_try
         try! pdfData.write(to: pdfURL)
         return pdfURL.path
     }

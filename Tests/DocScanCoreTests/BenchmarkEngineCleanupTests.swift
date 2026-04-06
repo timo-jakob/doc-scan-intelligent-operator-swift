@@ -124,7 +124,7 @@ final class BenchmarkEngineCleanupTests: XCTestCase {
         let env = ["HF_HOME": hfHome]
 
         let resolved = BenchmarkEngine.huggingFaceCachePath(environment: env)
-        XCTAssertEqual(resolved, (hfHome as NSString).appendingPathComponent("hub"))
+        XCTAssertEqual(resolved, URL(fileURLWithPath: hfHome).appendingPathComponent("hub").path)
     }
 
     func testHuggingFaceCachePathFallsBackToDefault() {

@@ -9,7 +9,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             config: Configuration.defaultConfiguration,
             documentType: documentType,
             vlmProvider: MockVLMProvider(),
-            textLLM: MockTextLLMProvider()
+            textLLM: MockTextLLMProvider(),
         )
     }
 
@@ -26,7 +26,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             isMatch: true,
             date: date("2025-04-08"),
             secondaryField: "Gesine_Kaiser",
-            patientName: "Max"
+            patientName: "Max",
         )
 
         let filename = detector.generateFilename(from: data)
@@ -42,7 +42,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             isMatch: true,
             date: date("2025-04-08"),
             secondaryField: nil,
-            patientName: "Max"
+            patientName: "Max",
         )
 
         let filename = detector.generateFilename(from: data)
@@ -59,7 +59,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             isMatch: true,
             date: date("2025-04-08"),
             secondaryField: "Mueller",
-            patientName: nil
+            patientName: nil,
         )
 
         let filename = detector.generateFilename(from: data)
@@ -76,7 +76,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             isMatch: true,
             date: date("2025-04-08"),
             secondaryField: nil,
-            patientName: nil
+            patientName: nil,
         )
 
         let filename = detector.generateFilename(from: data)
@@ -93,7 +93,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             isMatch: false,
             date: date("2025-04-08"),
             secondaryField: "Mueller",
-            patientName: "Max"
+            patientName: "Max",
         )
 
         let filename = detector.generateFilename(from: data)
@@ -109,7 +109,7 @@ final class PrescriptionFilenameTests: XCTestCase {
             isMatch: true,
             date: nil,
             secondaryField: "Mueller",
-            patientName: "Max"
+            patientName: "Max",
         )
 
         let filename = detector.generateFilename(from: data)
@@ -123,13 +123,13 @@ final class PrescriptionFilenameTests: XCTestCase {
             config: Configuration.defaultConfiguration,
             documentType: .invoice,
             vlmProvider: MockVLMProvider(),
-            textLLM: MockTextLLMProvider()
+            textLLM: MockTextLLMProvider(),
         )
         let data = DocumentData(
             documentType: .invoice,
             isMatch: true,
             date: date("2025-06-27"),
-            secondaryField: nil // Missing company
+            secondaryField: nil, // Missing company
         )
 
         let filename = detector.generateFilename(from: data)
@@ -141,13 +141,13 @@ final class PrescriptionFilenameTests: XCTestCase {
             config: Configuration.defaultConfiguration,
             documentType: .invoice,
             vlmProvider: MockVLMProvider(),
-            textLLM: MockTextLLMProvider()
+            textLLM: MockTextLLMProvider(),
         )
         let data = DocumentData(
             documentType: .invoice,
             isMatch: true,
             date: date("2025-06-27"),
-            secondaryField: "DB_Fernverkehr_AG"
+            secondaryField: "DB_Fernverkehr_AG",
         )
 
         let filename = detector.generateFilename(from: data)

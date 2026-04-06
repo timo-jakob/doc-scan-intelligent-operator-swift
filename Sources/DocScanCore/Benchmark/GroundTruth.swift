@@ -102,7 +102,7 @@ public struct GroundTruth: Codable, Equatable, Sendable {
         }
         do {
             let url = URL(fileURLWithPath: path)
-            try data.write(to: url)
+            try data.write(to: url, options: .atomic)
         } catch {
             throw DocScanError.fileOperationFailed("Failed to write ground truth: \(error.localizedDescription)")
         }

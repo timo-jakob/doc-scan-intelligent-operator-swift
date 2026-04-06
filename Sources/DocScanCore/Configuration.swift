@@ -150,7 +150,8 @@ public struct Configuration: Codable, Equatable, Sendable {
     }
 
     public static var defaultConfigPath: String {
-        (defaultConfigDir as NSString).appendingPathComponent("docscan-config.yaml")
+        URL(fileURLWithPath: defaultConfigDir)
+            .appendingPathComponent("docscan-config.yaml").path
     }
 
     public init(
