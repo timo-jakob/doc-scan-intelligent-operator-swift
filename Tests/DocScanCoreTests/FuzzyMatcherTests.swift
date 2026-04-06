@@ -102,14 +102,14 @@ final class FuzzyMatcherTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
-            secondaryField: "DB_Fernverkehr_AG"
+            secondaryField: "DB_Fernverkehr_AG",
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "27.06.2025",
             actualSecondaryField: "db fernverkehr ag",
-            actualPatientName: nil
+            actualPatientName: nil,
         )
         XCTAssertTrue(scoring.categorizationCorrect)
         XCTAssertTrue(scoring.extractionCorrect)
@@ -121,14 +121,14 @@ final class FuzzyMatcherTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
-            secondaryField: "Company"
+            secondaryField: "Company",
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: false,
             actualDate: "2025-06-27",
             actualSecondaryField: "Company",
-            actualPatientName: nil
+            actualPatientName: nil,
         )
         XCTAssertFalse(scoring.categorizationCorrect)
         XCTAssertFalse(scoring.extractionCorrect)
@@ -140,14 +140,14 @@ final class FuzzyMatcherTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
-            secondaryField: "Company"
+            secondaryField: "Company",
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-07-27",
             actualSecondaryField: "Company",
-            actualPatientName: nil
+            actualPatientName: nil,
         )
         XCTAssertTrue(scoring.categorizationCorrect)
         XCTAssertFalse(scoring.extractionCorrect)
@@ -159,14 +159,14 @@ final class FuzzyMatcherTests: XCTestCase {
             isMatch: true,
             documentType: .invoice,
             date: "2025-06-27",
-            secondaryField: "Company_A"
+            secondaryField: "Company_A",
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-06-27",
             actualSecondaryField: "Company_B",
-            actualPatientName: nil
+            actualPatientName: nil,
         )
         XCTAssertTrue(scoring.categorizationCorrect)
         XCTAssertFalse(scoring.extractionCorrect)
@@ -179,14 +179,14 @@ final class FuzzyMatcherTests: XCTestCase {
             documentType: .prescription,
             date: "2025-04-08",
             secondaryField: "Kaiser",
-            patientName: "Penelope"
+            patientName: "Penelope",
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: "2025-04-08",
             actualSecondaryField: "Kaiser",
-            actualPatientName: "Charlotte"
+            actualPatientName: "Charlotte",
         )
         XCTAssertTrue(scoring.categorizationCorrect)
         XCTAssertFalse(scoring.extractionCorrect)
@@ -196,14 +196,14 @@ final class FuzzyMatcherTests: XCTestCase {
     func testScoreDocumentFalsePositive() {
         let groundTruth = GroundTruth(
             isMatch: false,
-            documentType: .invoice
+            documentType: .invoice,
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: true,
             actualDate: nil,
             actualSecondaryField: nil,
-            actualPatientName: nil
+            actualPatientName: nil,
         )
         XCTAssertFalse(scoring.categorizationCorrect)
         XCTAssertFalse(scoring.extractionCorrect)
@@ -213,14 +213,14 @@ final class FuzzyMatcherTests: XCTestCase {
     func testScoreDocumentCorrectRejection() {
         let groundTruth = GroundTruth(
             isMatch: false,
-            documentType: .invoice
+            documentType: .invoice,
         )
         let scoring = FuzzyMatcher.scoreDocument(
             expected: groundTruth,
             actualIsMatch: false,
             actualDate: nil,
             actualSecondaryField: nil,
-            actualPatientName: nil
+            actualPatientName: nil,
         )
         XCTAssertTrue(scoring.categorizationCorrect)
         XCTAssertTrue(scoring.extractionCorrect)

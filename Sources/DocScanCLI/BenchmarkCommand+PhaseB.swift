@@ -33,13 +33,13 @@ extension BenchmarkCommand {
                 timeoutSeconds: context.timeoutSeconds,
                 documentType: context.engine.documentType,
                 configuration: workerConfig,
-                textLLMData: TextLLMInputData(ocrTexts: ocrTexts, groundTruths: groundTruths)
+                textLLMData: TextLLMInputData(ocrTexts: ocrTexts, groundTruths: groundTruths),
             )
 
             let result: TextLLMBenchmarkResult = await runWorker(
                 runner: context.runner, input: input, modelName: modelName,
                 extractResult: { $0.textLLMResult },
-                makeDisqualified: TextLLMBenchmarkResult.disqualified
+                makeDisqualified: TextLLMBenchmarkResult.disqualified,
             )
             printBenchmarkResult(result)
             results.append(result)
@@ -51,13 +51,13 @@ extension BenchmarkCommand {
     }
 
     private func prepareTextLLMData(
-        context: BenchmarkContext
+        context: BenchmarkContext,
     ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]) {
         let (groundTruths, cachedOCRTexts) = try await manageGroundTruths(
             engine: context.engine,
             pdfSet: context.pdfSet,
             positiveDir: PathUtils.resolvePath(positiveDir),
-            negativeDir: PathUtils.resolvePath(negativeDir)
+            negativeDir: PathUtils.resolvePath(negativeDir),
         )
 
         let ocrTexts: [String: String]
@@ -67,7 +67,7 @@ extension BenchmarkCommand {
         } else {
             print("Pre-extracting OCR text from all documents...")
             ocrTexts = await context.engine.preExtractOCRTexts(
-                positivePDFs: context.pdfSet.positivePDFs, negativePDFs: context.pdfSet.negativePDFs
+                positivePDFs: context.pdfSet.positivePDFs, negativePDFs: context.pdfSet.negativePDFs,
             )
             print("  Extracted text from \(ocrTexts.count) document(s)")
         }
@@ -86,18 +86,18 @@ private extension BenchmarkCommand {
         engine: BenchmarkEngine,
         pdfSet: BenchmarkPDFSet,
         positiveDir: String,
-        negativeDir: String
+        negativeDir: String,
     ) async throws -> (groundTruths: [String: GroundTruth], ocrTexts: [String: String]?) {
         let (needsGeneration, skipExisting) = try promptGroundTruthStrategy(
             engine: engine, pdfSet: pdfSet,
-            positiveDir: positiveDir, negativeDir: negativeDir
+            positiveDir: positiveDir, negativeDir: negativeDir,
         )
 
         var ocrTexts: [String: String]?
         if needsGeneration {
             ocrTexts = try await generateAndReviewGroundTruths(
                 engine: engine, pdfSet: pdfSet,
-                skipExisting: skipExisting
+                skipExisting: skipExisting,
             )
         }
 
@@ -112,10 +112,10 @@ private extension BenchmarkCommand {
         engine: BenchmarkEngine,
         pdfSet: BenchmarkPDFSet,
         positiveDir: String,
-        negativeDir: String
+        negativeDir: String,
     ) throws -> (needsGeneration: Bool, skipExisting: Bool) {
         let existingMap = try engine.checkExistingSidecars(
-            positiveDir: positiveDir, negativeDir: negativeDir
+            positiveDir: positiveDir, negativeDir: negativeDir,
         )
         let existingCount = existingMap.filter(\.value).count
         let allPDFCount = pdfSet.count
@@ -130,7 +130,7 @@ private extension BenchmarkCommand {
             options: [
                 "Reuse existing (keep current ground truth)",
                 "Regenerate all (overwrite with fresh results)",
-            ]
+            ],
         ) else {
             throw ExitCode.success
         }
@@ -152,15 +152,15 @@ private extension BenchmarkCommand {
     func generateAndReviewGroundTruths(
         engine: BenchmarkEngine,
         pdfSet: BenchmarkPDFSet,
-        skipExisting: Bool
+        skipExisting: Bool,
     ) async throws -> [String: String] {
         print("Generating ground truth files...")
         let ocrTexts = await engine.preExtractOCRTexts(
-            positivePDFs: pdfSet.positivePDFs, negativePDFs: pdfSet.negativePDFs
+            positivePDFs: pdfSet.positivePDFs, negativePDFs: pdfSet.negativePDFs,
         )
         _ = try await engine.generateGroundTruths(
             positivePDFs: pdfSet.positivePDFs, negativePDFs: pdfSet.negativePDFs, ocrTexts: ocrTexts,
-            skipExisting: skipExisting
+            skipExisting: skipExisting,
         )
         print()
 

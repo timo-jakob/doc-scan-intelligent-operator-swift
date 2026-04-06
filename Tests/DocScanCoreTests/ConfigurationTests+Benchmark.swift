@@ -82,7 +82,7 @@ extension ConfigurationTests {
             modelName: "vlm-model",
             textModelName: "text-model",
             modelCacheDir: "/test/cache",
-            benchmark: BenchmarkSettings(huggingFaceUsername: "testuser")
+            benchmark: BenchmarkSettings(huggingFaceUsername: "testuser"),
         )
 
         let savePath = tempDirectory.appendingPathComponent("new_fields.yaml").path
@@ -152,7 +152,7 @@ extension ConfigurationTests {
     func testCustomBenchmarkTextLLMModelList() {
         let textModels = ["model/text-a", "model/text-b"]
         let config = Configuration(
-            benchmark: BenchmarkSettings(textLLMModels: textModels)
+            benchmark: BenchmarkSettings(textLLMModels: textModels),
         )
         XCTAssertEqual(config.benchmark.textLLMModels, textModels)
     }
@@ -180,7 +180,7 @@ extension ConfigurationTests {
 
     func testYAMLRoundTripWithBenchmarkModels() throws {
         let config = Configuration(
-            benchmark: BenchmarkSettings(textLLMModels: ["text/a"])
+            benchmark: BenchmarkSettings(textLLMModels: ["text/a"]),
         )
 
         let savePath = tempDirectory.appendingPathComponent("benchmark_models.yaml").path
@@ -194,8 +194,8 @@ extension ConfigurationTests {
         let config = Configuration(
             benchmark: BenchmarkSettings(
                 huggingFaceUsername: "user123",
-                textLLMModels: ["text/y", "text/z"]
-            )
+                textLLMModels: ["text/y", "text/z"],
+            ),
         )
 
         let path = tempDirectory.appendingPathComponent("all_benchmark.yaml").path

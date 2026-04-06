@@ -69,7 +69,7 @@ final class HuggingFaceClientTests: XCTestCase {
             MockURLSession.makeModel(id: "org/mlx-model-a", downloads: 500, tags: ["mlx", "image-text-to-text"]),
             MockURLSession.makeModel(
                 id: "org/non-mlx-model", downloads: 400,
-                tags: ["transformers", "image-text-to-text"]
+                tags: ["transformers", "image-text-to-text"],
             ),
             MockURLSession.makeModel(id: "org/mlx-model-b", downloads: 300, tags: ["mlx", "safetensors"]),
         ]

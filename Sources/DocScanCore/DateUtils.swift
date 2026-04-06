@@ -58,7 +58,7 @@ public enum DateUtils {
     /// Thread-safe DateFormatter cache. DateFormatter is not thread-safe, so all
     /// parse/format operations are performed under the lock.
     private static let formatterStore = OSAllocatedUnfairLock(
-        initialState: FormatterState()
+        initialState: FormatterState(),
     )
 
     /// Internal state for the formatter cache
@@ -273,7 +273,7 @@ public enum DateUtils {
             // Use cached word boundary regex to avoid false positives
             let searchRange = NSRange(lowercased.startIndex..., in: lowercased)
             guard let monthMatch = monthRegex.firstMatch(
-                in: lowercased, range: searchRange
+                in: lowercased, range: searchRange,
             ),
                 let monthRange = Range(monthMatch.range, in: lowercased)
             else {
@@ -284,10 +284,10 @@ public enum DateUtils {
             let afterMonthString = String(String(lowercased[monthRange.upperBound...]).prefix(20))
 
             let yearRange2 = NSRange(
-                afterMonthString.startIndex..., in: afterMonthString
+                afterMonthString.startIndex..., in: afterMonthString,
             )
             guard let yearMatch = yearRegex.firstMatch(
-                in: afterMonthString, range: yearRange2
+                in: afterMonthString, range: yearRange2,
             ),
                 let yearRange = Range(yearMatch.range, in: afterMonthString)
             else {

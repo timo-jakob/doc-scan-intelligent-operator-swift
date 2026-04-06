@@ -31,7 +31,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
         let pdfPath = tempDirectory.appendingPathComponent("test_invoice.pdf").path
         guard let pdfData = Data(
             base64Encoded: InvoiceDetectorTests.sharedSearchablePDFBase64,
-            options: .ignoreUnknownCharacters
+            options: .ignoreUnknownCharacters,
         ) else {
             throw NSError(domain: "TestError", code: 1)
         }
@@ -58,7 +58,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
             isMatch: true,
             confidence: .high,
             method: .vlm,
-            reason: "Found invoice keywords"
+            reason: "Found invoice keywords",
         )
 
         XCTAssertTrue(result.isMatch)
@@ -70,7 +70,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
     func testCategorizationResultDefaultValues() {
         let result = CategorizationResult(
             isMatch: false,
-            method: .ocr
+            method: .ocr,
         )
 
         XCTAssertFalse(result.isMatch)
@@ -142,7 +142,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
             isMatch: true,
             date: Date(),
             secondaryField: "Test Corp",
-            categorization: categorization
+            categorization: categorization,
         )
 
         XCTAssertTrue(data.isMatch)
@@ -160,7 +160,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
             isMatch: true, // User resolved in favor of VLM
             date: Date(),
             secondaryField: "Test Corp",
-            categorization: categorization
+            categorization: categorization,
         )
 
         XCTAssertTrue(data.isMatch)
@@ -266,7 +266,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: date,
-            secondaryField: "Test_Company"
+            secondaryField: "Test_Company",
         )
         let filename = detector.generateFilename(from: data)
 
@@ -279,7 +279,7 @@ final class InvoiceDetectorIntegrationTests: XCTestCase {
             documentType: .invoice,
             isMatch: true,
             date: Date(),
-            secondaryField: ""
+            secondaryField: "",
         )
         let filename = detector.generateFilename(from: data)
 

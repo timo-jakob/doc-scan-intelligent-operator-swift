@@ -17,14 +17,14 @@ public protocol TextLLMProviding: Sendable {
     /// Generic data extraction for any document type
     func extractData(
         for documentType: DocumentType,
-        from text: String
+        from text: String,
     ) async throws -> ExtractionResult
 
     /// Generate text from system and user prompts
     func generate(
         systemPrompt: String,
         userPrompt: String,
-        maxTokens: Int
+        maxTokens: Int,
     ) async throws -> String
 }
 
@@ -53,7 +53,7 @@ public actor TextLLMManager: TextLLMProviding {
         guard modelContainer == nil else { return }
 
         modelContainer = try await LLMModelFactory.shared.loadContainer(
-            configuration: .init(id: config.textModelName)
+            configuration: .init(id: config.textModelName),
         ) { progress in
             progressHandler(progress.fractionCompleted)
         }
@@ -63,7 +63,7 @@ public actor TextLLMManager: TextLLMProviding {
     /// Returns extracted date, secondary field (company/doctor), and optional patient name
     public func extractData(
         for documentType: DocumentType,
-        from text: String
+        from text: String,
     ) async throws -> ExtractionResult {
         let systemPrompt = documentType.extractionSystemPrompt
         let userPrompt = documentType.extractionUserPrompt(for: text)
@@ -71,7 +71,7 @@ public actor TextLLMManager: TextLLMProviding {
         let response = try await generate(
             systemPrompt: systemPrompt,
             userPrompt: userPrompt,
-            maxTokens: config.maxTokens
+            maxTokens: config.maxTokens,
         )
 
         var parsed = parseExtractionResponse(response, documentType: documentType)
@@ -88,7 +88,7 @@ public actor TextLLMManager: TextLLMProviding {
             parsed = ExtractionResult(
                 date: fallbackDate,
                 secondaryField: parsed.secondaryField,
-                patientName: parsed.patientName
+                patientName: parsed.patientName,
             )
         }
 
@@ -98,7 +98,7 @@ public actor TextLLMManager: TextLLMProviding {
     /// Parse an LLM response into an ExtractionResult
     private func parseExtractionResponse(
         _ response: String,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) -> ExtractionResult {
         let lines = response.components(separatedBy: .newlines)
         var date: Date?
@@ -140,7 +140,7 @@ public actor TextLLMManager: TextLLMProviding {
         return ExtractionResult(
             date: date,
             secondaryField: secondaryField,
-            patientName: patientName
+            patientName: patientName,
         )
     }
 
@@ -166,7 +166,7 @@ public actor TextLLMManager: TextLLMProviding {
     public func generate(
         systemPrompt: String,
         userPrompt: String,
-        maxTokens: Int
+        maxTokens: Int,
     ) async throws -> String {
         // Load model if needed
         try await loadModelIfNeeded()
@@ -182,16 +182,16 @@ public actor TextLLMManager: TextLLMProviding {
                 input: .init(messages: [
                     ["role": "system", "content": systemPrompt],
                     ["role": "user", "content": userPrompt],
-                ])
+                ]),
             )
 
             let stream = try MLXLMCommon.generate(
                 input: input,
                 parameters: .init(
                     maxTokens: maxTokens,
-                    temperature: Float(self.config.temperature)
+                    temperature: Float(self.config.temperature),
                 ),
-                context: context
+                context: context,
             )
 
             var fullOutput = ""
@@ -235,7 +235,7 @@ extension TextLLMManager {
 
         // Load model using LLMModelFactory
         modelContainer = try await LLMModelFactory.shared.loadContainer(
-            configuration: .init(id: config.textModelName)
+            configuration: .init(id: config.textModelName),
         ) { [self] progress in
             if config.verbose {
                 let percent = Int(progress.fractionCompleted * 100)

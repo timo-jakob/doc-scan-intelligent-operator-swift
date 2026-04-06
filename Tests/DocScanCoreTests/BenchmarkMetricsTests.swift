@@ -8,7 +8,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "invoice.pdf",
             isPositiveSample: true,
-            predictedIsMatch: true
+            predictedIsMatch: true,
         )
         XCTAssertTrue(result.correct)
         XCTAssertEqual(result.score, 1)
@@ -18,7 +18,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "invoice.pdf",
             isPositiveSample: true,
-            predictedIsMatch: false
+            predictedIsMatch: false,
         )
         XCTAssertFalse(result.correct)
         XCTAssertEqual(result.score, 0)
@@ -28,7 +28,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "not_invoice.pdf",
             isPositiveSample: false,
-            predictedIsMatch: false
+            predictedIsMatch: false,
         )
         XCTAssertTrue(result.correct)
         XCTAssertEqual(result.score, 1)
@@ -38,7 +38,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "not_invoice.pdf",
             isPositiveSample: false,
-            predictedIsMatch: true
+            predictedIsMatch: true,
         )
         XCTAssertFalse(result.correct)
         XCTAssertEqual(result.score, 0)
@@ -56,7 +56,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let benchmarkResult = VLMBenchmarkResult.from(
             modelName: "test/vlm",
             documentResults: results,
-            elapsedSeconds: 10.0
+            elapsedSeconds: 10.0,
         )
 
         XCTAssertEqual(benchmarkResult.totalScore, 2)
@@ -78,7 +78,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let benchmarkResult = VLMBenchmarkResult.from(
             modelName: "test/vlm",
             documentResults: results,
-            elapsedSeconds: 5.0
+            elapsedSeconds: 5.0,
         )
 
         XCTAssertEqual(benchmarkResult.score, 1.0)
@@ -89,7 +89,7 @@ final class BenchmarkMetricsTests: XCTestCase {
     func testVLMBenchmarkResultDisqualified() {
         let result = VLMBenchmarkResult.disqualified(
             modelName: "test/vlm",
-            reason: "Insufficient memory"
+            reason: "Insufficient memory",
         )
 
         XCTAssertTrue(result.isDisqualified)
@@ -104,7 +104,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let result = VLMBenchmarkResult.from(
             modelName: "test/vlm",
             documentResults: [],
-            elapsedSeconds: 0
+            elapsedSeconds: 0,
         )
 
         XCTAssertEqual(result.score, 0)
@@ -119,7 +119,7 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: true,
-            extractionCorrect: true
+            extractionCorrect: true,
         )
         XCTAssertEqual(result.score, 2)
     }
@@ -129,7 +129,7 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: true,
-            extractionCorrect: false
+            extractionCorrect: false,
         )
         XCTAssertEqual(result.score, 1)
     }
@@ -139,7 +139,7 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: false,
-            extractionCorrect: false
+            extractionCorrect: false,
         )
         XCTAssertEqual(result.score, 0)
     }
@@ -149,7 +149,7 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "not_invoice.pdf",
             isPositiveSample: false,
             categorizationCorrect: true,
-            extractionCorrect: true
+            extractionCorrect: true,
         )
         XCTAssertEqual(result.score, 2)
     }
@@ -168,7 +168,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let benchmarkResult = TextLLMBenchmarkResult.from(
             modelName: "test/text",
             documentResults: results,
-            elapsedSeconds: 15.0
+            elapsedSeconds: 15.0,
         )
 
         XCTAssertEqual(benchmarkResult.totalScore, 3) // 2 + 1 + 0
@@ -183,7 +183,7 @@ final class BenchmarkMetricsTests: XCTestCase {
     func testTextLLMBenchmarkResultDisqualified() {
         let result = TextLLMBenchmarkResult.disqualified(
             modelName: "test/text",
-            reason: "Failed to load"
+            reason: "Failed to load",
         )
 
         XCTAssertTrue(result.isDisqualified)
@@ -195,7 +195,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let result = TextLLMBenchmarkResult.from(
             modelName: "test/text",
             documentResults: [],
-            elapsedSeconds: 0
+            elapsedSeconds: 0,
         )
 
         XCTAssertEqual(result.score, 0)
@@ -208,7 +208,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let original = VLMDocumentResult(
             filename: "invoice.pdf",
             isPositiveSample: true,
-            predictedIsMatch: false
+            predictedIsMatch: false,
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(VLMDocumentResult.self, from: data)
@@ -223,7 +223,7 @@ final class BenchmarkMetricsTests: XCTestCase {
         let original = VLMBenchmarkResult.from(
             modelName: "test/vlm-model",
             documentResults: docResults,
-            elapsedSeconds: 7.5
+            elapsedSeconds: 7.5,
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(VLMBenchmarkResult.self, from: data)
@@ -232,7 +232,7 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     func testVLMBenchmarkResultDisqualifiedCodableRoundTrip() throws {
         let original = VLMBenchmarkResult.disqualified(
-            modelName: "bad/model", reason: "Out of memory"
+            modelName: "bad/model", reason: "Out of memory",
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(VLMBenchmarkResult.self, from: data)
@@ -244,7 +244,7 @@ final class BenchmarkMetricsTests: XCTestCase {
             filename: "invoice.pdf",
             isPositiveSample: true,
             categorizationCorrect: true,
-            extractionCorrect: false
+            extractionCorrect: false,
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(TextLLMDocumentResult.self, from: data)
@@ -255,17 +255,17 @@ final class BenchmarkMetricsTests: XCTestCase {
         let docResults = [
             TextLLMDocumentResult(
                 filename: "a.pdf", isPositiveSample: true,
-                categorizationCorrect: true, extractionCorrect: true
+                categorizationCorrect: true, extractionCorrect: true,
             ),
             TextLLMDocumentResult(
                 filename: "b.pdf", isPositiveSample: false,
-                categorizationCorrect: true, extractionCorrect: true
+                categorizationCorrect: true, extractionCorrect: true,
             ),
         ]
         let original = TextLLMBenchmarkResult.from(
             modelName: "test/text-model",
             documentResults: docResults,
-            elapsedSeconds: 20.0
+            elapsedSeconds: 20.0,
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(TextLLMBenchmarkResult.self, from: data)
@@ -274,7 +274,7 @@ final class BenchmarkMetricsTests: XCTestCase {
 
     func testTextLLMBenchmarkResultDisqualifiedCodableRoundTrip() throws {
         let original = TextLLMBenchmarkResult.disqualified(
-            modelName: "crash/model", reason: "Signal 11"
+            modelName: "crash/model", reason: "Signal 11",
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(TextLLMBenchmarkResult.self, from: data)

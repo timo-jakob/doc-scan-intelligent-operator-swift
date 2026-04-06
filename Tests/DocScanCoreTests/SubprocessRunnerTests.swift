@@ -8,7 +8,7 @@ final class SubprocessRunnerTests: XCTestCase {
         let path = SubprocessRunner.resolveExecutablePath()
         XCTAssertTrue(
             path.hasPrefix("/"),
-            "Expected absolute path, got: \(path)"
+            "Expected absolute path, got: \(path)",
         )
     }
 
@@ -16,7 +16,7 @@ final class SubprocessRunnerTests: XCTestCase {
 
     func testSubprocessResultSuccess() {
         let workerOutput = BenchmarkWorkerOutput.vlm(
-            VLMBenchmarkResult.disqualified(modelName: "m", reason: "test")
+            VLMBenchmarkResult.disqualified(modelName: "m", reason: "test"),
         )
         let result = SubprocessResult.success(workerOutput)
 
@@ -69,7 +69,7 @@ final class SubprocessRunnerTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: ["/a.pdf", "/b.pdf"], negativePDFs: ["/c.pdf"]),
             timeoutSeconds: 30.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let timeout = SubprocessRunner.overallTimeout(for: input)
@@ -85,7 +85,7 @@ final class SubprocessRunnerTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: [], negativePDFs: []),
             timeoutSeconds: 30.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let timeout = SubprocessRunner.overallTimeout(for: input)
@@ -101,7 +101,7 @@ final class SubprocessRunnerTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: ["/a.pdf"], negativePDFs: []),
             timeoutSeconds: 10.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let largeInput = BenchmarkWorkerInput(
@@ -109,11 +109,11 @@ final class SubprocessRunnerTests: XCTestCase {
             modelName: "test/model",
             pdfSet: BenchmarkPDFSet(
                 positivePDFs: ["/a.pdf", "/b.pdf", "/c.pdf", "/d.pdf", "/e.pdf"],
-                negativePDFs: ["/f.pdf", "/g.pdf", "/h.pdf", "/i.pdf", "/j.pdf"]
+                negativePDFs: ["/f.pdf", "/g.pdf", "/h.pdf", "/i.pdf", "/j.pdf"],
             ),
             timeoutSeconds: 10.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let smallTimeout = SubprocessRunner.overallTimeout(for: smallInput)
@@ -140,7 +140,7 @@ final class SubprocessRunnerTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: [], negativePDFs: []),
             timeoutSeconds: 10.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let result = try await runner.run(input: input)
@@ -166,7 +166,7 @@ final class SubprocessRunnerTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: [], negativePDFs: []),
             timeoutSeconds: 30.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let output = input.makeDisqualifiedOutput(reason: "crashed")
@@ -185,7 +185,7 @@ final class SubprocessRunnerTests: XCTestCase {
             pdfSet: BenchmarkPDFSet(positivePDFs: [], negativePDFs: []),
             timeoutSeconds: 30.0,
             documentType: .invoice,
-            configuration: Configuration.defaultConfiguration
+            configuration: Configuration.defaultConfiguration,
         )
 
         let output = input.makeDisqualifiedOutput(reason: "timeout")

@@ -17,7 +17,7 @@ final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
             url: url ?? URL(string: "https://huggingface.co/api/models")!,
             statusCode: statusCode,
             httpVersion: nil,
-            headerFields: nil
+            headerFields: nil,
         )!
     }
 
@@ -28,7 +28,7 @@ final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
         }
         return (
             mockData ?? Data(),
-            mockResponse ?? Self.httpResponse()
+            mockResponse ?? Self.httpResponse(),
         )
     }
 
@@ -51,14 +51,14 @@ final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
         id: String,
         downloads: Int = 100,
         tags: [String]? = nil,
-        gated: HFGated? = nil
+        gated: HFGated? = nil,
     ) -> HFModel {
         HFModel(
             modelId: id,
             downloads: downloads,
             tags: tags,
             lastModified: "2025-01-01T00:00:00.000Z",
-            gated: gated
+            gated: gated,
         )
     }
 }

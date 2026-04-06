@@ -99,7 +99,7 @@ public final class SubprocessRunner: Sendable {
     private static func escalateToKill(_ process: Process) {
         let pid = process.processIdentifier
         DispatchQueue.global().asyncAfter(
-            deadline: .now() + killEscalationSeconds
+            deadline: .now() + killEscalationSeconds,
         ) {
             if process.isRunning { kill(pid, SIGKILL) }
         }
@@ -123,7 +123,7 @@ public final class SubprocessRunner: Sendable {
     private typealias TermResult = (Int32, Process.TerminationReason)
 
     private func launchAndAwait(
-        _ process: Process, timeout: TimeInterval
+        _ process: Process, timeout: TimeInterval,
     ) async throws -> TermResult {
         try await withCheckedThrowingContinuation { continuation in
             let watchdog = DispatchWorkItem { [process] in
@@ -139,7 +139,7 @@ public final class SubprocessRunner: Sendable {
             process.terminationHandler = { proc in
                 watchdog.cancel()
                 continuation.resume(
-                    returning: (proc.terminationStatus, proc.terminationReason)
+                    returning: (proc.terminationStatus, proc.terminationReason),
                 )
             }
 
@@ -154,7 +154,7 @@ public final class SubprocessRunner: Sendable {
     }
 
     private func interpretResult(
-        status: Int32, reason: Process.TerminationReason, outputURL: URL
+        status: Int32, reason: Process.TerminationReason, outputURL: URL,
     ) -> SubprocessResult {
         if reason == .uncaughtSignal {
             return .crashed(exitCode: -1, signal: status)

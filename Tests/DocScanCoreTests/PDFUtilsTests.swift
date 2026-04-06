@@ -29,19 +29,19 @@ final class PDFUtilsTests: XCTestCase {
     func createSearchablePDFFromFixture() throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let pdfPath = tempDir.appendingPathComponent(
-            "searchable_\(UUID().uuidString).pdf"
+            "searchable_\(UUID().uuidString).pdf",
         ).path
 
         guard let pdfData = Data(
             base64Encoded: Self.searchablePDFBase64,
-            options: .ignoreUnknownCharacters
+            options: .ignoreUnknownCharacters,
         ) else {
             throw NSError(
                 domain: "TestError", code: 1,
                 userInfo: [
                     NSLocalizedDescriptionKey:
                         "Failed to decode base64 PDF",
-                ]
+                ],
             )
         }
 
@@ -53,7 +53,7 @@ final class PDFUtilsTests: XCTestCase {
     func createTestPDF(withText text: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let pdfPath = tempDir.appendingPathComponent(
-            "test_\(UUID().uuidString).pdf"
+            "test_\(UUID().uuidString).pdf",
         ).path
         let pdfURL = URL(fileURLWithPath: pdfPath)
 
@@ -61,14 +61,14 @@ final class PDFUtilsTests: XCTestCase {
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
 
         guard let context = CGContext(
-            pdfURL as CFURL, mediaBox: &mediaBox, nil
+            pdfURL as CFURL, mediaBox: &mediaBox, nil,
         ) else {
             throw NSError(
                 domain: "TestError", code: 1,
                 userInfo: [
                     NSLocalizedDescriptionKey:
                         "Failed to create PDF context",
-                ]
+                ],
             )
         }
 
@@ -109,7 +109,7 @@ final class PDFUtilsTests: XCTestCase {
 
     func testExtractTextFromNonExistentFile() {
         let result = PDFUtils.extractText(
-            from: "/nonexistent/path/file.pdf"
+            from: "/nonexistent/path/file.pdf",
         )
         XCTAssertNil(result)
     }
@@ -147,7 +147,7 @@ final class PDFUtilsTests: XCTestCase {
 
         XCTAssertNotNil(text)
         XCTAssertGreaterThan(
-            text?.count ?? 0, PDFUtils.minimumTextLength
+            text?.count ?? 0, PDFUtils.minimumTextLength,
         )
         XCTAssertTrue(text?.contains("Rechnung") ?? false)
         XCTAssertTrue(text?.contains("Invoice") ?? false)
@@ -158,7 +158,7 @@ final class PDFUtilsTests: XCTestCase {
         defer { removeTestPDF(at: pdfPath) }
 
         let text = PDFUtils.extractText(
-            from: pdfPath, verbose: true
+            from: pdfPath, verbose: true,
         )
 
         XCTAssertNotNil(text)
@@ -167,7 +167,7 @@ final class PDFUtilsTests: XCTestCase {
 
     func testExtractTextFromNonExistentFileVerbose() {
         let result = PDFUtils.extractText(
-            from: "/nonexistent/path/file.pdf", verbose: true
+            from: "/nonexistent/path/file.pdf", verbose: true,
         )
         XCTAssertNil(result)
     }
@@ -178,7 +178,7 @@ final class PDFUtilsTests: XCTestCase {
 extension PDFUtilsTests {
     func testHasExtractableTextFromNonExistentFile() {
         let result = PDFUtils.hasExtractableText(
-            at: "/nonexistent/path/file.pdf"
+            at: "/nonexistent/path/file.pdf",
         )
         XCTAssertFalse(result)
     }
@@ -206,7 +206,7 @@ extension PDFUtilsTests {
         defer { removeTestPDF(at: pdfPath) }
 
         _ = PDFUtils.hasExtractableText(
-            at: pdfPath, verbose: true
+            at: pdfPath, verbose: true,
         )
     }
 
@@ -232,14 +232,14 @@ extension PDFUtilsTests {
         defer { removeTestPDF(at: pdfPath) }
 
         let hasText = PDFUtils.hasExtractableText(
-            at: pdfPath, verbose: true
+            at: pdfPath, verbose: true,
         )
         XCTAssertTrue(hasText)
     }
 
     func testHasExtractableTextFromNonExistentFileVerbose() {
         let result = PDFUtils.hasExtractableText(
-            at: "/nonexistent/path/file.pdf", verbose: true
+            at: "/nonexistent/path/file.pdf", verbose: true,
         )
         XCTAssertFalse(result)
     }
@@ -260,7 +260,7 @@ extension PDFUtilsTests {
 
         XCTAssertNotNil(text)
         XCTAssertGreaterThan(
-            text?.count ?? 0, PDFUtils.minimumTextLength
+            text?.count ?? 0, PDFUtils.minimumTextLength,
         )
         XCTAssertTrue(text?.contains("Rechnung") ?? false)
         XCTAssertTrue(text?.contains("BahnCard") ?? false)

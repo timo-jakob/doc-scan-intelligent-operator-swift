@@ -73,7 +73,7 @@ public enum FuzzyMatcher {
         actualIsMatch: Bool,
         actualDate: String?,
         actualSecondaryField: String?,
-        actualPatientName: String?
+        actualPatientName: String?,
     ) -> DocumentScoring {
         let categorizationCorrect = (expected.isMatch == actualIsMatch)
 

@@ -18,7 +18,7 @@ public struct TextLLMBenchmarkContext: Sendable {
         ocrTexts: [String: String],
         groundTruths: [String: GroundTruth],
         timeoutSeconds: TimeInterval,
-        textLLMFactory: TextLLMOnlyFactory
+        textLLMFactory: TextLLMOnlyFactory,
     ) {
         self.ocrTexts = ocrTexts
         self.groundTruths = groundTruths
@@ -35,7 +35,7 @@ public extension BenchmarkEngine {
         modelName: String,
         positivePDFs: [String],
         negativePDFs: [String],
-        context: TextLLMBenchmarkContext
+        context: TextLLMBenchmarkContext,
     ) async -> TextLLMBenchmarkResult {
         if let earlyResult = await prepareTextLLM(modelName: modelName, context: context) {
             return earlyResult
@@ -45,7 +45,7 @@ public extension BenchmarkEngine {
         let documentResults = await processTextLLMDocuments(
             positivePDFs: positivePDFs,
             negativePDFs: negativePDFs,
-            context: context
+            context: context,
         )
 
         let elapsedSeconds = Date().timeIntervalSince(startTime)
@@ -62,7 +62,7 @@ private extension BenchmarkEngine {
     func processTextLLMDocuments(
         positivePDFs: [String],
         negativePDFs: [String],
-        context: TextLLMBenchmarkContext
+        context: TextLLMBenchmarkContext,
     ) async -> [TextLLMDocumentResult] {
         var results: [TextLLMDocumentResult] = []
         var extractionBuffer: [Character] = []
@@ -103,7 +103,7 @@ private extension BenchmarkEngine {
     /// Release previous model, check memory, preload new model. Returns a disqualified result on failure.
     func prepareTextLLM(
         modelName: String,
-        context: TextLLMBenchmarkContext
+        context: TextLLMBenchmarkContext,
     ) async -> TextLLMBenchmarkResult? {
         await context.textLLMFactory.releaseTextLLM()
 
@@ -115,7 +115,7 @@ private extension BenchmarkEngine {
             }
             return .disqualified(
                 modelName: modelName,
-                reason: "Insufficient memory (~\(estimatedMB) MB needed, \(availableMB) MB available)"
+                reason: "Insufficient memory (~\(estimatedMB) MB needed, \(availableMB) MB available)",
             )
         }
 
@@ -125,7 +125,7 @@ private extension BenchmarkEngine {
             await context.textLLMFactory.releaseTextLLM()
             return .disqualified(
                 modelName: modelName,
-                reason: "Failed to load model: \(error.localizedDescription)"
+                reason: "Failed to load model: \(error.localizedDescription)",
             )
         }
 
@@ -136,32 +136,32 @@ private extension BenchmarkEngine {
     func benchmarkTextLLMDocument(
         pdfPath: String,
         isPositive: Bool,
-        context: TextLLMBenchmarkContext
+        context: TextLLMBenchmarkContext,
     ) async -> TextLLMDocumentResult {
         let filename = URL(fileURLWithPath: pdfPath).lastPathComponent
 
         guard let ocrText = context.ocrTexts[pdfPath], !ocrText.isEmpty else {
             return TextLLMDocumentResult(
                 filename: filename, isPositiveSample: isPositive,
-                categorizationCorrect: false, extractionCorrect: false
+                categorizationCorrect: false, extractionCorrect: false,
             )
         }
 
         guard let textLLM = await context.textLLMFactory.makeTextLLMProvider() else {
             return TextLLMDocumentResult(
                 filename: filename, isPositiveSample: isPositive,
-                categorizationCorrect: false, extractionCorrect: false
+                categorizationCorrect: false, extractionCorrect: false,
             )
         }
 
         let predictedIsMatch = await categorizeWithTextLLM(
-            ocrText: ocrText, textLLM: textLLM, timeoutSeconds: context.timeoutSeconds
+            ocrText: ocrText, textLLM: textLLM, timeoutSeconds: context.timeoutSeconds,
         )
 
         guard let predicted = predictedIsMatch else {
             return TextLLMDocumentResult(
                 filename: filename, isPositiveSample: isPositive,
-                categorizationCorrect: false, extractionCorrect: false
+                categorizationCorrect: false, extractionCorrect: false,
             )
         }
 
@@ -171,23 +171,23 @@ private extension BenchmarkEngine {
             return TextLLMDocumentResult(
                 filename: filename, isPositiveSample: false,
                 categorizationCorrect: categorizationCorrect,
-                extractionCorrect: categorizationCorrect
+                extractionCorrect: categorizationCorrect,
             )
         }
 
         guard categorizationCorrect else {
             return TextLLMDocumentResult(
                 filename: filename, isPositiveSample: true,
-                categorizationCorrect: false, extractionCorrect: false
+                categorizationCorrect: false, extractionCorrect: false,
             )
         }
 
         let extractionCorrect = await scoreExtraction(
-            pdfPath: pdfPath, ocrText: ocrText, textLLM: textLLM, context: context
+            pdfPath: pdfPath, ocrText: ocrText, textLLM: textLLM, context: context,
         )
         return TextLLMDocumentResult(
             filename: filename, isPositiveSample: true,
-            categorizationCorrect: true, extractionCorrect: extractionCorrect
+            categorizationCorrect: true, extractionCorrect: extractionCorrect,
         )
     }
 
@@ -195,7 +195,7 @@ private extension BenchmarkEngine {
     func categorizeWithTextLLM(
         ocrText: String,
         textLLM: any TextLLMProviding,
-        timeoutSeconds: TimeInterval
+        timeoutSeconds: TimeInterval,
     ) async -> Bool? {
         let prompt = documentType.textCategorizationPrompt
         do {
@@ -204,7 +204,7 @@ private extension BenchmarkEngine {
                     try await textLLM.generate(
                         systemPrompt: "You are a document classification assistant. Answer only YES or NO.",
                         userPrompt: prompt + "\n\nDocument text:\n" + ocrText,
-                        maxTokens: 10
+                        maxTokens: 10,
                     )
                 }
             }
@@ -219,7 +219,7 @@ private extension BenchmarkEngine {
         pdfPath: String,
         ocrText: String,
         textLLM: any TextLLMProviding,
-        context: TextLLMBenchmarkContext
+        context: TextLLMBenchmarkContext,
     ) async -> Bool {
         guard let groundTruth = context.groundTruths[pdfPath] else {
             return false
@@ -243,7 +243,7 @@ private extension BenchmarkEngine {
                 actualIsMatch: true,
                 actualDate: actualDate,
                 actualSecondaryField: extraction.secondaryField,
-                actualPatientName: extraction.patientName
+                actualPatientName: extraction.patientName,
             )
             return scoring.extractionCorrect
         } catch {

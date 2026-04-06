@@ -12,7 +12,7 @@ public extension BenchmarkEngine {
     func cleanupBenchmarkedModels(
         modelNames: [String],
         keepModel: String?,
-        cachePath: String? = nil
+        cachePath: String? = nil,
     ) {
         let keepModels: Set<String> = keepModel.map { [$0] } ?? []
 
@@ -56,7 +56,7 @@ public extension BenchmarkEngine {
     ///   `ProcessInfo.processInfo.environment`. Pass a custom dictionary in tests
     ///   to avoid thread-unsafe `setenv`/`unsetenv` calls.
     internal static func huggingFaceCachePath(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
     ) -> String {
         if let hubCache = environment["HUGGINGFACE_HUB_CACHE"] {
             return hubCache

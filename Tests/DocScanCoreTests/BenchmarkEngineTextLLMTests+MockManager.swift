@@ -12,7 +12,7 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice
+            documentType: .invoice,
         )
     }
 
@@ -25,20 +25,20 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
 
         let groundTruth = GroundTruth(
             isMatch: true, documentType: .invoice,
-            date: "2025-01-15", secondaryField: "Acme_Corp"
+            date: "2025-01-15", secondaryField: "Acme_Corp",
         )
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Rechnung invoice text"],
             groundTruths: ["/fake/invoice.pdf": groundTruth],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -56,14 +56,14 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Rechnung invoice text"],
             groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -82,14 +82,14 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/letter.pdf": "Just a random letter about weather"],
             groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: [],
             negativePDFs: ["/fake/letter.pdf"],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -108,14 +108,14 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/letter.pdf": "Just a random letter"],
             groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: [],
             negativePDFs: ["/fake/letter.pdf"],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -133,14 +133,14 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Some text"],
             groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -157,7 +157,7 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         let calendar = Calendar.current
         let date = try XCTUnwrap(calendar.date(from: DateComponents(year: 2025, month: 1, day: 15)))
         mockLLM.mockExtractionResult = ExtractionResult(
-            date: date, secondaryField: "Acme_Corp", patientName: nil
+            date: date, secondaryField: "Acme_Corp", patientName: nil,
         )
 
         let factory = MockTextLLMOnlyFactory()
@@ -165,20 +165,20 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
 
         let groundTruth = GroundTruth(
             isMatch: true, documentType: .invoice,
-            date: "2025-01-15", secondaryField: "Acme_Corp"
+            date: "2025-01-15", secondaryField: "Acme_Corp",
         )
 
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Rechnung Acme Corp 2025-01-15"],
             groundTruths: ["/fake/invoice.pdf": groundTruth],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)
@@ -199,14 +199,14 @@ final class BenchmarkEngineTextLLMMockManagerTests: XCTestCase {
         let context = TextLLMBenchmarkContext(
             ocrTexts: ["/fake/invoice.pdf": "Rechnung text"],
             groundTruths: [:],
-            timeoutSeconds: 10, textLLMFactory: factory
+            timeoutSeconds: 10, textLLMFactory: factory,
         )
 
         let result = await engine.benchmarkTextLLM(
             modelName: "test/mock-text",
             positivePDFs: ["/fake/invoice.pdf"],
             negativePDFs: [],
-            context: context
+            context: context,
         )
 
         XCTAssertEqual(result.documentResults.count, 1)

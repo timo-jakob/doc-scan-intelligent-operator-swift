@@ -46,7 +46,7 @@ class BenchmarkMockVLMProvider: VLMProvider, @unchecked Sendable {
     func generateFromImage(
         _: NSImage,
         prompt _: String,
-        modelName _: String?
+        modelName _: String?,
     ) async throws -> String {
         mockResponse
     }
@@ -62,7 +62,7 @@ class BenchmarkMockVLMProviderThrowing: VLMProvider, @unchecked Sendable {
     func generateFromImage(
         _: NSImage,
         prompt _: String,
-        modelName _: String?
+        modelName _: String?,
     ) async throws -> String {
         throw errorToThrow
     }
@@ -105,7 +105,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         super.setUp()
         engine = BenchmarkEngine(
             configuration: Configuration(),
-            documentType: .invoice
+            documentType: .invoice,
         )
     }
 
@@ -141,7 +141,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "invoice.pdf",
             isPositiveSample: true,
-            predictedIsMatch: true
+            predictedIsMatch: true,
         )
         XCTAssertTrue(result.correct)
         XCTAssertEqual(result.score, 1)
@@ -151,7 +151,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "letter.pdf",
             isPositiveSample: false,
-            predictedIsMatch: false
+            predictedIsMatch: false,
         )
         XCTAssertTrue(result.correct)
         XCTAssertEqual(result.score, 1)
@@ -161,7 +161,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "letter.pdf",
             isPositiveSample: false,
-            predictedIsMatch: true
+            predictedIsMatch: true,
         )
         XCTAssertFalse(result.correct)
         XCTAssertEqual(result.score, 0)
@@ -171,7 +171,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         let result = VLMDocumentResult(
             filename: "invoice.pdf",
             isPositiveSample: true,
-            predictedIsMatch: false
+            predictedIsMatch: false,
         )
         XCTAssertFalse(result.correct)
         XCTAssertEqual(result.score, 0)
@@ -186,7 +186,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
         let benchmark = VLMBenchmarkResult.from(
             modelName: "test/vlm",
             documentResults: results,
-            elapsedSeconds: 42.5
+            elapsedSeconds: 42.5,
         )
         XCTAssertEqual(benchmark.elapsedSeconds, 42.5)
     }
@@ -194,7 +194,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
     func testVLMBenchmarkDisqualifiedModelHasZeroScore() {
         let result = VLMBenchmarkResult.disqualified(
             modelName: "test/vlm",
-            reason: "Out of memory"
+            reason: "Out of memory",
         )
         XCTAssertEqual(result.score, 0)
         XCTAssertTrue(result.isDisqualified)
@@ -222,7 +222,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
             positivePDFs: [positivePDF.path],
             negativePDFs: [negativePDF.path],
             timeoutSeconds: 10,
-            vlmFactory: factory
+            vlmFactory: factory,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -263,7 +263,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
             positivePDFs: [positivePDF.path],
             negativePDFs: [],
             timeoutSeconds: 10,
-            vlmFactory: factory
+            vlmFactory: factory,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -292,7 +292,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
             positivePDFs: [positivePDF.path],
             negativePDFs: [negativePDF.path],
             timeoutSeconds: 10,
-            vlmFactory: factory
+            vlmFactory: factory,
         )
 
         XCTAssertFalse(result.isDisqualified)
@@ -314,7 +314,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
             positivePDFs: [],
             negativePDFs: [],
             timeoutSeconds: 10,
-            vlmFactory: factory
+            vlmFactory: factory,
         )
 
         XCTAssertTrue(result.isDisqualified)
@@ -333,7 +333,7 @@ final class BenchmarkEngineVLMTests: XCTestCase {
             positivePDFs: [],
             negativePDFs: [],
             timeoutSeconds: 10,
-            vlmFactory: factory
+            vlmFactory: factory,
         )
 
         XCTAssertTrue(result.isDisqualified)

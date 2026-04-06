@@ -10,7 +10,7 @@ final class ConfigurationTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(
             at: tempDirectory,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
         )
     }
 
@@ -39,8 +39,8 @@ final class ConfigurationTests: XCTestCase {
             verbose: true,
             output: OutputSettings(
                 dateFormat: "dd-MM-yyyy",
-                filenamePattern: "{company}_{date}.pdf"
-            )
+                filenamePattern: "{company}_{date}.pdf",
+            ),
         )
 
         XCTAssertEqual(config.modelName, "custom-model")
@@ -72,7 +72,7 @@ final class ConfigurationTests: XCTestCase {
     func testOutputSettingsCustomInit() {
         let settings = OutputSettings(
             dateFormat: "dd/MM/yyyy",
-            filenamePattern: "{company}_{date}.pdf"
+            filenamePattern: "{company}_{date}.pdf",
         )
 
         XCTAssertEqual(settings.dateFormat, "dd/MM/yyyy")
@@ -194,8 +194,8 @@ final class ConfigurationTests: XCTestCase {
             verbose: true,
             output: OutputSettings(
                 dateFormat: "yyyy/MM/dd",
-                filenamePattern: "Invoice_{date}_{company}.pdf"
-            )
+                filenamePattern: "Invoice_{date}_{company}.pdf",
+            ),
         )
 
         let savePath = tempDirectory.appendingPathComponent("saved_config.yaml").path
@@ -239,7 +239,7 @@ final class ConfigurationTests: XCTestCase {
             modelName: "test-model",
             modelCacheDir: "/test/cache",
             processing: ProcessingSettings(maxTokens: 256, temperature: 0.1, pdfDPI: 150),
-            verbose: false
+            verbose: false,
         )
 
         let description = config.description
@@ -260,7 +260,7 @@ extension ConfigurationTests {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         XCTAssertEqual(
             Configuration.defaultConfigPath,
-            "\(home)/.docscan/docscan-config.yaml"
+            "\(home)/.docscan/docscan-config.yaml",
         )
     }
 
@@ -288,7 +288,7 @@ extension ConfigurationTests {
         let original = Configuration(
             modelName: "nested-vlm",
             textModelName: "nested-text",
-            processing: ProcessingSettings(maxTokens: 128)
+            processing: ProcessingSettings(maxTokens: 128),
         )
         try original.save(to: nested)
         let loaded = try Configuration.load(from: nested)

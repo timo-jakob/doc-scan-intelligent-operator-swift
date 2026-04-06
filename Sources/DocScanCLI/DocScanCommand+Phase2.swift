@@ -7,7 +7,7 @@ import Foundation
 extension ScanCommand {
     func validateExtraction(
         _ extraction: ExtractionResult,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) throws -> Date {
         let typeName = documentType.displayName.lowercased()
         guard let date = extraction.date else {
@@ -28,7 +28,7 @@ extension ScanCommand {
     func displayExtractionResults(
         _ extraction: ExtractionResult,
         date: Date,
-        documentType: DocumentType
+        documentType: DocumentType,
     ) {
         let fieldName = documentType == .invoice ? "Company" : "Doctor"
         let fieldEmoji = documentType == .invoice ? "🏢" : "👨‍⚕️"
@@ -52,7 +52,7 @@ extension ScanCommand {
     func printCompactPhase2(
         _ extraction: ExtractionResult,
         date: Date,
-        documentType _: DocumentType
+        documentType _: DocumentType,
     ) {
         let dateStr = formatDate(date)
         if let field = extraction.secondaryField {

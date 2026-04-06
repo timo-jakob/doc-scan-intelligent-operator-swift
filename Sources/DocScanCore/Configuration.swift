@@ -15,7 +15,7 @@ public struct ProcessingSettings: Codable, Equatable, Sendable {
     public init(
         maxTokens: Int = Configuration.defaultMaxTokens,
         temperature: Double = Configuration.defaultTemperature,
-        pdfDPI: Int = Configuration.defaultPdfDPI
+        pdfDPI: Int = Configuration.defaultPdfDPI,
     ) {
         self.maxTokens = maxTokens
         self.temperature = temperature
@@ -46,7 +46,7 @@ public struct OutputSettings: Codable, Equatable, Sendable {
 
     public init(
         dateFormat: String = "yyyy-MM-dd",
-        filenamePattern: String = "{date}_Rechnung_{company}.pdf"
+        filenamePattern: String = "{date}_Rechnung_{company}.pdf",
     ) {
         self.dateFormat = dateFormat
         self.filenamePattern = filenamePattern
@@ -70,7 +70,7 @@ public struct BenchmarkSettings: Codable, Equatable, Sendable {
 
     public init(
         huggingFaceUsername: String? = nil,
-        textLLMModels: [String]? = nil
+        textLLMModels: [String]? = nil,
     ) {
         self.huggingFaceUsername = huggingFaceUsername
         self.textLLMModels = textLLMModels
@@ -160,7 +160,7 @@ public struct Configuration: Codable, Equatable, Sendable {
         processing: ProcessingSettings = ProcessingSettings(),
         verbose: Bool = false,
         output: OutputSettings = OutputSettings(),
-        benchmark: BenchmarkSettings = BenchmarkSettings()
+        benchmark: BenchmarkSettings = BenchmarkSettings(),
     ) {
         self.modelName = modelName
         self.textModelName = textModelName
@@ -193,7 +193,7 @@ public struct Configuration: Codable, Equatable, Sendable {
             temperature: container.decodeIfPresent(Double.self, forKey: .temperature)
                 ?? Self.defaultTemperature,
             pdfDPI: container.decodeIfPresent(Int.self, forKey: .pdfDPI)
-                ?? Self.defaultPdfDPI
+                ?? Self.defaultPdfDPI,
         )
         verbose = try container.decodeIfPresent(Bool.self, forKey: .verbose) ?? false
         output = try container.decodeIfPresent(OutputSettings.self, forKey: .output) ?? OutputSettings()
@@ -201,7 +201,7 @@ public struct Configuration: Codable, Equatable, Sendable {
         let textLLMModels = try container.decodeIfPresent([String].self, forKey: .benchmarkTextLLMModels)
         benchmark = BenchmarkSettings(
             huggingFaceUsername: hfUsername,
-            textLLMModels: textLLMModels
+            textLLMModels: textLLMModels,
         )
     }
 

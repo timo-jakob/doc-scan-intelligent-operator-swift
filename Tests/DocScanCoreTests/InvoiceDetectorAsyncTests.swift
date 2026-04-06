@@ -31,7 +31,7 @@ final class InvoiceDetectorAsyncTests: XCTestCase {
         let pdfPath = tempDirectory.appendingPathComponent("test_invoice.pdf").path
         guard let pdfData = Data(
             base64Encoded: InvoiceDetectorTests.sharedSearchablePDFBase64,
-            options: .ignoreUnknownCharacters
+            options: .ignoreUnknownCharacters,
         ) else {
             throw NSError(domain: "TestError", code: 1)
         }

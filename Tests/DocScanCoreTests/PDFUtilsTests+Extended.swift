@@ -9,7 +9,7 @@ extension PDFUtilsTests {
         let nonExistentPath = "/nonexistent/path/file.pdf"
 
         XCTAssertThrowsError(
-            try PDFUtils.validatePDF(at: nonExistentPath)
+            try PDFUtils.validatePDF(at: nonExistentPath),
         ) { error in
             guard let docScanError = error as? DocScanError else {
                 XCTFail("Expected DocScanError")
@@ -26,20 +26,20 @@ extension PDFUtilsTests {
     func testValidatePDFInvalidFile() throws {
         let tempDir = FileManager.default.temporaryDirectory
         let fakePDFPath = tempDir.appendingPathComponent(
-            "fake_\(UUID().uuidString).pdf"
+            "fake_\(UUID().uuidString).pdf",
         ).path
 
         try "This is not a valid PDF content".write(
             toFile: fakePDFPath,
             atomically: true,
-            encoding: .utf8
+            encoding: .utf8,
         )
         defer {
             try? FileManager.default.removeItem(atPath: fakePDFPath)
         }
 
         XCTAssertThrowsError(
-            try PDFUtils.validatePDF(at: fakePDFPath)
+            try PDFUtils.validatePDF(at: fakePDFPath),
         ) { error in
             guard let docScanError = error as? DocScanError else {
                 XCTFail("Expected DocScanError")
@@ -55,7 +55,7 @@ extension PDFUtilsTests {
 
     func testValidatePDFSuccess() throws {
         let pdfPath = try createTestPDF(
-            withText: "Valid PDF content for validation test"
+            withText: "Valid PDF content for validation test",
         )
         defer { removeTestPDF(at: pdfPath) }
 
@@ -71,7 +71,7 @@ extension PDFUtilsTests {
         }
 
         XCTAssertNoThrow(
-            try PDFUtils.validatePDF(at: testPDFPath)
+            try PDFUtils.validatePDF(at: testPDFPath),
         )
     }
 }
@@ -81,7 +81,7 @@ extension PDFUtilsTests {
 extension PDFUtilsTests {
     func testPdfToImageSuccess() throws {
         let pdfPath = try createTestPDF(
-            withText: "Test content for image conversion"
+            withText: "Test content for image conversion",
         )
         defer { removeTestPDF(at: pdfPath) }
 
@@ -93,35 +93,35 @@ extension PDFUtilsTests {
 
     func testPdfToImageWithCustomDPI() throws {
         let pdfPath = try createTestPDF(
-            withText: "Test content for DPI test"
+            withText: "Test content for DPI test",
         )
         defer { removeTestPDF(at: pdfPath) }
 
         let image72 = try PDFUtils.pdfToImage(at: pdfPath, dpi: 72)
         let image150 = try PDFUtils.pdfToImage(
-            at: pdfPath, dpi: 150
+            at: pdfPath, dpi: 150,
         )
         let image300 = try PDFUtils.pdfToImage(
-            at: pdfPath, dpi: 300
+            at: pdfPath, dpi: 300,
         )
 
         // Higher DPI should produce larger images
         XCTAssertLessThan(
-            image72.size.width, image150.size.width
+            image72.size.width, image150.size.width,
         )
         XCTAssertLessThan(
-            image150.size.width, image300.size.width
+            image150.size.width, image300.size.width,
         )
     }
 
     func testPdfToImageWithVerboseMode() throws {
         let pdfPath = try createTestPDF(
-            withText: "Test content for verbose mode"
+            withText: "Test content for verbose mode",
         )
         defer { removeTestPDF(at: pdfPath) }
 
         let image = try PDFUtils.pdfToImage(
-            at: pdfPath, dpi: 150, verbose: true
+            at: pdfPath, dpi: 150, verbose: true,
         )
 
         XCTAssertGreaterThan(image.size.width, 0)
@@ -130,20 +130,20 @@ extension PDFUtilsTests {
     func testPdfToImageInvalidPDF() throws {
         let tempDir = FileManager.default.temporaryDirectory
         let fakePDFPath = tempDir.appendingPathComponent(
-            "fake_\(UUID().uuidString).pdf"
+            "fake_\(UUID().uuidString).pdf",
         ).path
 
         try "This is not a valid PDF".write(
             toFile: fakePDFPath,
             atomically: true,
-            encoding: .utf8
+            encoding: .utf8,
         )
         defer {
             try? FileManager.default.removeItem(atPath: fakePDFPath)
         }
 
         XCTAssertThrowsError(
-            try PDFUtils.pdfToImage(at: fakePDFPath)
+            try PDFUtils.pdfToImage(at: fakePDFPath),
         ) { error in
             guard let docScanError = error as? DocScanError else {
                 XCTFail("Expected DocScanError")
@@ -154,7 +154,7 @@ extension PDFUtilsTests {
             } else {
                 XCTFail(
                     "Expected pdfConversionFailed error, "
-                        + "got: \(docScanError)"
+                        + "got: \(docScanError)",
                 )
             }
         }
@@ -169,7 +169,7 @@ extension PDFUtilsTests {
         }
 
         let image = try PDFUtils.pdfToImage(
-            at: testPDFPath, dpi: 150
+            at: testPDFPath, dpi: 150,
         )
 
         XCTAssertGreaterThan(image.size.width, 0)
@@ -182,7 +182,7 @@ extension PDFUtilsTests {
 extension PDFUtilsTests {
     func testImageToDataSuccess() throws {
         let pdfPath = try createTestPDF(
-            withText: "Test content for image data conversion"
+            withText: "Test content for image data conversion",
         )
         defer { removeTestPDF(at: pdfPath) }
 
@@ -215,7 +215,7 @@ extension PDFUtilsTests {
 extension PDFUtilsTests {
     func testSaveImageSuccess() throws {
         let pdfPath = try createTestPDF(
-            withText: "Test content for saving image"
+            withText: "Test content for saving image",
         )
         defer { removeTestPDF(at: pdfPath) }
 
@@ -223,7 +223,7 @@ extension PDFUtilsTests {
 
         let tempDir = FileManager.default.temporaryDirectory
         let outputPath = tempDir.appendingPathComponent(
-            "saved_image_\(UUID().uuidString).png"
+            "saved_image_\(UUID().uuidString).png",
         ).path
         defer {
             try? FileManager.default.removeItem(atPath: outputPath)
@@ -232,12 +232,12 @@ extension PDFUtilsTests {
         try PDFUtils.saveImage(image, to: outputPath)
 
         XCTAssertTrue(
-            FileManager.default.fileExists(atPath: outputPath)
+            FileManager.default.fileExists(atPath: outputPath),
         )
 
         // Verify it's a valid PNG file
         let savedData = try Data(
-            contentsOf: URL(fileURLWithPath: outputPath)
+            contentsOf: URL(fileURLWithPath: outputPath),
         )
         let pngHeader = Data([0x89, 0x50, 0x4E, 0x47])
         XCTAssertEqual(savedData.prefix(4), pngHeader)
@@ -250,7 +250,7 @@ extension PDFUtilsTests {
     func testExtractTextReturnsNilForEmptyPDF() {
         let tempDir = FileManager.default.temporaryDirectory
         let pdfPath = tempDir.appendingPathComponent(
-            "empty_\(UUID().uuidString).pdf"
+            "empty_\(UUID().uuidString).pdf",
         ).path
         let pdfURL = URL(fileURLWithPath: pdfPath)
         defer {
@@ -258,10 +258,10 @@ extension PDFUtilsTests {
         }
 
         var mediaBox = CGRect(
-            x: 0, y: 0, width: 612, height: 792
+            x: 0, y: 0, width: 612, height: 792,
         )
         guard let context = CGContext(
-            pdfURL as CFURL, mediaBox: &mediaBox, nil
+            pdfURL as CFURL, mediaBox: &mediaBox, nil,
         ) else {
             XCTFail("Failed to create PDF context")
             return
@@ -276,7 +276,7 @@ extension PDFUtilsTests {
 
         let result = PDFUtils.extractText(from: pdfPath)
         XCTAssertTrue(
-            result == nil || result?.isEmpty == true
+            result == nil || result?.isEmpty == true,
         )
     }
 
@@ -287,7 +287,7 @@ extension PDFUtilsTests {
         defer { removeTestPDF(at: pdfPath) }
 
         let result = PDFUtils.hasExtractableText(
-            at: pdfPath, verbose: true
+            at: pdfPath, verbose: true,
         )
         XCTAssertFalse(result)
     }

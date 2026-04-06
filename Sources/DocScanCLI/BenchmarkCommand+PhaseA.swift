@@ -7,7 +7,7 @@ extension BenchmarkCommand {
     /// Phase A: Run each VLM model against all documents for categorization scoring.
     /// Each model runs in a subprocess so that MLX fatal errors are contained.
     func runPhaseA(
-        context: BenchmarkContext, vlmModels: [String]
+        context: BenchmarkContext, vlmModels: [String],
     ) async throws -> [VLMBenchmarkResult] {
         printBenchmarkPhaseHeader("A", title: "VLM Categorization Benchmark")
         print("Evaluating \(vlmModels.count) VLM model(s)")
@@ -27,13 +27,13 @@ extension BenchmarkCommand {
                 pdfSet: context.pdfSet,
                 timeoutSeconds: context.timeoutSeconds,
                 documentType: context.engine.documentType,
-                configuration: workerConfig
+                configuration: workerConfig,
             )
 
             let result: VLMBenchmarkResult = await runWorker(
                 runner: context.runner, input: input, modelName: modelName,
                 extractResult: { $0.vlmResult },
-                makeDisqualified: VLMBenchmarkResult.disqualified
+                makeDisqualified: VLMBenchmarkResult.disqualified,
             )
             printBenchmarkResult(result)
             results.append(result)

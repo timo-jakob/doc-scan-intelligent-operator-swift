@@ -14,7 +14,7 @@ public struct TimeoutError: Error, LocalizedError {
     /// subprocess-level isolation instead.
     public static func withTimeout<T: Sendable>(
         seconds: TimeInterval,
-        operation: @Sendable @escaping () async throws -> T
+        operation: @Sendable @escaping () async throws -> T,
     ) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask { try await operation() }

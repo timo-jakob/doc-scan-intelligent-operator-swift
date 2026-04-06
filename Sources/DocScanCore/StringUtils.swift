@@ -56,7 +56,7 @@ public enum StringUtils {
         let singleSpaced = cleaned.replacingOccurrences(
             of: "\\s+",
             with: " ",
-            options: .regularExpression
+            options: .regularExpression,
         )
         let trimmed = singleSpaced.trimmingCharacters(in: .whitespaces)
         let underscored = trimmed.replacingOccurrences(of: " ", with: "_")

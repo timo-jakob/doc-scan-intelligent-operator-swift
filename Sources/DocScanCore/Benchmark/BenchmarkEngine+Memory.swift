@@ -30,7 +30,7 @@ public extension BenchmarkEngine {
     internal static func parseParamBillions(from modelId: String) -> Double {
         guard let match = paramBillionsRegex.firstMatch(
             in: modelId,
-            range: NSRange(modelId.startIndex ..< modelId.endIndex, in: modelId)
+            range: NSRange(modelId.startIndex ..< modelId.endIndex, in: modelId),
         ),
             let range = Range(match.range(at: 1), in: modelId),
             let value = Double(modelId[range])

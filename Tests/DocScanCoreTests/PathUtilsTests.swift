@@ -16,7 +16,7 @@ final class PathUtilsTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(
             at: tempDirectory,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
         )
     }
 
@@ -226,7 +226,7 @@ extension PathUtilsTests {
         let symlinkFile = tempDirectory.appendingPathComponent("link.pdf")
         try FileManager.default.createSymbolicLink(
             atPath: symlinkFile.path,
-            withDestinationPath: actualFile.path
+            withDestinationPath: actualFile.path,
         )
 
         // Resolve symlink
@@ -246,14 +246,14 @@ extension PathUtilsTests {
         let symlink1 = tempDirectory.appendingPathComponent("link1.pdf")
         try FileManager.default.createSymbolicLink(
             atPath: symlink1.path,
-            withDestinationPath: actualFile.path
+            withDestinationPath: actualFile.path,
         )
 
         // Create symlink to symlink
         let symlink2 = tempDirectory.appendingPathComponent("link2.pdf")
         try FileManager.default.createSymbolicLink(
             atPath: symlink2.path,
-            withDestinationPath: symlink1.path
+            withDestinationPath: symlink1.path,
         )
 
         // Resolve nested symlinks
@@ -276,7 +276,7 @@ extension PathUtilsTests {
         let symlinkFile = subdir.appendingPathComponent("link.pdf")
         try FileManager.default.createSymbolicLink(
             atPath: symlinkFile.path,
-            withDestinationPath: "../actual.pdf"
+            withDestinationPath: "../actual.pdf",
         )
 
         // Resolve symlink
