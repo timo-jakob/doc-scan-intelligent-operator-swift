@@ -118,10 +118,13 @@ public struct BenchmarkEngine: Sendable {
 
     // MARK: - MLX Setup
 
-    /// Set MLX memory budget to 80% of physical RAM.
+    /// Fraction of physical RAM to allocate for MLX model loading
+    static let memoryBudgetFraction = 0.8
+
+    /// Set MLX memory budget to a fraction of physical RAM.
     /// Call once before any model loading to give MLX a generous allocation.
     public static func configureMLXMemoryBudget() {
-        Memory.memoryLimit = Int(Double(ProcessInfo.processInfo.physicalMemory) * 0.8)
+        Memory.memoryLimit = Int(Double(ProcessInfo.processInfo.physicalMemory) * memoryBudgetFraction)
     }
 
     // MARK: - PDF Enumeration

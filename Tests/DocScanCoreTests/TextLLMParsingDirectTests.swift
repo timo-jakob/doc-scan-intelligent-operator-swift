@@ -319,4 +319,38 @@ final class TextLLMParsingDirectTests: XCTestCase {
         let perms = attrs[.posixPermissions] as? Int
         XCTAssertEqual(perms, 0o600, "Ground truth sidecar should have 0600 permissions")
     }
+
+    // MARK: - FuzzyMatcher edge cases
+
+    func testFuzzyMatcherNumbersMatchNonNumeric() {
+        XCTAssertFalse(FuzzyMatcher.numbersMatch("abc", "1"))
+        XCTAssertFalse(FuzzyMatcher.numbersMatch("1", "xyz"))
+        XCTAssertFalse(FuzzyMatcher.numbersMatch("abc", "xyz"))
+    }
+
+    // MARK: - ExtractionField placeholders
+
+    func testExtractionFieldPlaceholders() {
+        XCTAssertEqual(ExtractionField.date.placeholder, "{date}")
+        XCTAssertEqual(ExtractionField.company.placeholder, "{company}")
+        XCTAssertEqual(ExtractionField.doctor.placeholder, "{doctor}")
+        XCTAssertEqual(ExtractionField.patient.placeholder, "{patient}")
+    }
+
+    // MARK: - Configuration.save file permissions
+
+    func testConfigurationSaveSetsRestrictedPermissions() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("docscan-config-perm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let config = Configuration()
+        let path = tempDir.appendingPathComponent("test-config.yaml").path
+        try config.save(to: path)
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: path)
+        let perms = attrs[.posixPermissions] as? Int
+        XCTAssertEqual(perms, 0o600, "Configuration file should have 0600 permissions")
+    }
 }

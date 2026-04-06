@@ -243,9 +243,7 @@ public struct Configuration: Codable, Equatable, Sendable {
     }
 
     /// Get default configuration
-    public static var defaultConfiguration: Configuration {
-        Configuration()
-    }
+    public static let defaultConfiguration = Configuration()
 }
 
 // MARK: - CustomStringConvertible

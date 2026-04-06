@@ -231,9 +231,11 @@ extension DocumentDetector {
                     print("VLM: Is \(typeName) = \(isMatch) (confidence: \(confidence))")
                 }
 
+                // Store only the parsed decision, not the raw VLM response (may contain PII)
+                let parsedReason = isMatch ? "YES" : "NO"
                 return CategorizationResult(
                     isMatch: isMatch, confidence: confidence,
-                    method: .vlm, reason: response,
+                    method: .vlm, reason: parsedReason,
                 )
             }
         } catch is TimeoutError {

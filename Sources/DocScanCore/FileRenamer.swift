@@ -64,23 +64,27 @@ public struct FileRenamer: Sendable {
         return finalURL.path
     }
 
+    /// Construct a collision-suffixed URL (e.g., "file_1.pdf", "file_2.pdf")
+    private static func candidateURL(base: URL, counter: Int) -> URL {
+        let directory = base.deletingLastPathComponent()
+        let filename = base.deletingPathExtension().lastPathComponent
+        let ext = base.pathExtension
+        let newFilename = ext.isEmpty
+            ? "\(filename)_\(counter)"
+            : "\(filename)_\(counter).\(ext)"
+        return directory.appendingPathComponent(newFilename)
+    }
+
     /// Find an available filename by checking for collisions (used for dry-run)
     private func findAvailableName(for targetURL: URL) throws(DocScanError) -> URL {
         if !FileManager.default.fileExists(atPath: targetURL.path) {
             return targetURL
         }
 
-        let directory = targetURL.deletingLastPathComponent()
-        let filename = targetURL.deletingPathExtension().lastPathComponent
-        let ext = targetURL.pathExtension
-
         for counter in 1 ... Self.maxCollisionRetries {
-            let newFilename = ext.isEmpty
-                ? "\(filename)_\(counter)"
-                : "\(filename)_\(counter).\(ext)"
-            let candidateURL = directory.appendingPathComponent(newFilename)
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
+            let candidate = Self.candidateURL(base: targetURL, counter: counter)
+            if !FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
             }
         }
         throw DocScanError.fileOperationFailed("Too many file collisions")
@@ -99,15 +103,8 @@ public struct FileRenamer: Sendable {
             throw DocScanError.fileOperationFailed("Failed to rename file: \(error.localizedDescription)")
         }
 
-        let directory = targetURL.deletingLastPathComponent()
-        let filename = targetURL.deletingPathExtension().lastPathComponent
-        let ext = targetURL.pathExtension
-
         for counter in 1 ... Self.maxCollisionRetries {
-            let newFilename = ext.isEmpty
-                ? "\(filename)_\(counter)"
-                : "\(filename)_\(counter).\(ext)"
-            let candidateURL = directory.appendingPathComponent(newFilename)
+            let candidateURL = Self.candidateURL(base: targetURL, counter: counter)
             do {
                 try FileManager.default.moveItem(at: sourceURL, to: candidateURL)
                 if verbose {

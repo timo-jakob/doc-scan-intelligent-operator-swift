@@ -174,7 +174,7 @@ public enum DateUtils {
         return nil
     }
 
-    /// Validate that a date is reasonable for an invoice
+    /// Validate that a date is within an acceptable range for document processing
     /// - Rejects dates before 2000
     /// - Rejects dates more than 2 years in the future
     public static func isValidDate(_ date: Date) -> Bool {

@@ -150,6 +150,7 @@ public actor ModelManager: VLMProvider {
         }
 
         NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = context
         image.draw(
             in: NSRect(origin: .zero, size: targetSize),
@@ -157,7 +158,6 @@ public actor ModelManager: VLMProvider {
             operation: .copy,
             fraction: 1.0,
         )
-        NSGraphicsContext.restoreGraphicsState()
         guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
             throw DocScanError.pdfConversionFailed("Unable to convert image to PNG")
         }
