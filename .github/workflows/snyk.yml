@@ -12,7 +12,7 @@ on:
 jobs:
   snyk-security:
     name: Snyk Security Scan
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
     - name: Checkout code
